@@ -217,11 +217,11 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
           <div className="text-xs text-discord-muted truncate capitalize">{user?.status}</div>
         </div>
         <button
-          title="Log out"
-          onClick={logout}
+          title="User Settings"
+          onClick={() => navigate('/channels/settings')}
           className="text-discord-muted hover:text-discord-text leading-none p-1"
         >
-          <Icon name="log-out" size={18} />
+          <Icon name="settings" size={18} />
         </button>
       </div>
 
