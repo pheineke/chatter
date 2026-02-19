@@ -1,6 +1,6 @@
 ﻿# Chat
 
-A Discord-inspired real-time chat platform built with **FastAPI**. Supports servers with text and voice channels, role-based permissions, rich messaging, and private direct messages.
+A Discord-inspired real-time chat platform with a **FastAPI** backend and a **React** frontend. Supports servers with text and voice channels, role-based permissions, rich messaging, and private direct messages.
 
 > **Status:** Early-stage — dependencies and feature spec are defined, implementation is underway.
 
@@ -8,13 +8,25 @@ A Discord-inspired real-time chat platform built with **FastAPI**. Supports serv
 
 ## Tech Stack
 
+### Backend
+
 | Technology | Role |
 |---|---|
 | [FastAPI](https://fastapi.tiangolo.com/) | Web framework (REST + WebSocket) |
 | [Uvicorn](https://www.uvicorn.org/) | ASGI server |
+| [PostgreSQL](https://www.postgresql.org/) | Relational database |
+| [SQLAlchemy (async)](https://docs.sqlalchemy.org/) | ORM and query layer |
+| [Alembic](https://alembic.sqlalchemy.org/) | Database migrations |
 | [python-jose](https://github.com/mpdavis/python-jose) | JWT authentication |
 | [passlib / bcrypt](https://passlib.readthedocs.io/) | Password hashing |
 | [python-multipart](https://github.com/andrew-d/python-multipart) | File upload handling |
+### Frontend
+
+| Technology | Role |
+|---|---|
+| [React](https://react.dev/) | UI framework |
+| [Vite](https://vitejs.dev/) | Dev server and bundler |
+| [React Router](https://reactrouter.com/) | Client-side routing |
 
 ---
 
@@ -23,25 +35,35 @@ A Discord-inspired real-time chat platform built with **FastAPI**. Supports serv
 ### Prerequisites
 
 - Python 3.10+
+- Node.js 18+
 
-### Installation
+### Backend
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/chat.git
-cd chat
+cd chat/backend
 
 # Install dependencies
 pip install -r requirements.txt
-```
 
-### Running the Development Server
-
-```bash
+# Start the development server
 uvicorn main:app --reload
 ```
 
-> **Note:** A database layer and entry point (`main.py`) are not yet implemented. This step will be updated as the project progresses.
+### Frontend
+
+```bash
+cd chat/frontend
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+> **Note:** A database layer and the backend entry point (`main.py`) are not yet implemented. These steps will be updated as the project progresses.
 
 ---
 
@@ -49,11 +71,20 @@ uvicorn main:app --reload
 
 ```
 chat/
-├── app/          # Route handlers and application logic
-├── models/       # Pydantic / ORM data models
-├── static/       # Frontend assets and uploaded media
-├── main.py       # Entry point (planned)
-└── requirements.txt
+├── backend/
+│   ├── app/              # Route handlers and application logic
+│   ├── models/           # Pydantic / ORM data models
+│   ├── static/           # Uploaded media (avatars, attachments, etc.)
+│   ├── main.py           # Entry point (planned)
+│   └── requirements.txt
+└── frontend/
+    ├── public/           # Static assets
+    ├── src/
+    │   ├── components/   # Reusable UI components
+    │   ├── pages/        # Route-level page components
+    │   ├── hooks/        # Custom React hooks
+    │   └── main.jsx      # App entry point
+    └── package.json
 ```
 
 ---
