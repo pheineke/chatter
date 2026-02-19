@@ -33,6 +33,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.auth import decode_access_token
 from app.database import get_db
@@ -164,17 +165,24 @@ async def voice_ws(
         await ws.close(code=4005, reason="Channel is not a voice channel")
         return
     mem_result = await db.execute(
-        select(ServerMember).where(
+        select(ServerMember).options(selectinload(ServerMember.user)).where(
             ServerMember.server_id == channel.server_id,
             ServerMember.user_id == user_id,
         )
     )
-    if mem_result.scalar_one_or_none() is None:
+    member = mem_result.scalar_one_or_none()
+    if member is None:
         await ws.close(code=4003, reason="Not a member of this server")
         return
 
     # --- Connect (accepts the WebSocket) ------------------------------------
-    await voice_manager.connect(channel_id, user_id, ws)
+    await voice_manager.connect(
+        channel_id,
+        user_id,
+        ws,
+        username=member.user.username,
+        avatar=member.user.avatar,
+    )
 
     # Notify all server members that this user joined this voice channel
     participant_data = voice_manager.get_participant(channel_id, user_id)

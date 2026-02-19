@@ -356,8 +356,8 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
         if (!user) {
           user = {
             id: p.user_id,
-            username: `User ${p.user_id.slice(0, 4)}`,
-            avatar: null,
+            username: p.username ?? `User ${p.user_id.slice(0, 4)}`,
+            avatar: p.avatar ?? null,
             description: null,
             status: 'offline',
             created_at: '',

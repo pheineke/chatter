@@ -58,8 +58,8 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
         // Fallback for users not yet in the member list (e.g. joined before member list refreshed)
         const user: User = m?.user ?? {
           id: p.user_id,
-          username: 'User ' + p.user_id.slice(0, 4),
-          avatar: null,
+          username: p.username ?? `User ${p.user_id.slice(0, 4)}`,
+          avatar: p.avatar ?? null,
           description: null,
           status: 'offline',
           created_at: '',

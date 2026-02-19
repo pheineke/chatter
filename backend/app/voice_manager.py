@@ -48,6 +48,8 @@ logger = logging.getLogger(__name__)
 class VoiceParticipant:
     user_id: uuid.UUID
     ws: WebSocket
+    username: str
+    avatar: str | None = None
     is_muted: bool = False
     is_deafened: bool = False
     is_sharing_screen: bool = False
@@ -56,6 +58,8 @@ class VoiceParticipant:
     def to_dict(self) -> dict[str, Any]:
         return {
             "user_id": str(self.user_id),
+            "username": self.username,
+            "avatar": self.avatar,
             "is_muted": self.is_muted,
             "is_deafened": self.is_deafened,
             "is_sharing_screen": self.is_sharing_screen,
@@ -73,12 +77,24 @@ class VoiceManager:
     # Connection lifecycle
     # ------------------------------------------------------------------
 
-    async def connect(self, channel_id: uuid.UUID, user_id: uuid.UUID, ws: WebSocket) -> None:
+    async def connect(
+        self,
+        channel_id: uuid.UUID,
+        user_id: uuid.UUID,
+        ws: WebSocket,
+        username: str,
+        avatar: str | None = None,
+    ) -> None:
         await ws.accept()
         async with self._lock:
             if channel_id not in self._rooms:
                 self._rooms[channel_id] = {}
-            participant = VoiceParticipant(user_id=user_id, ws=ws)
+            participant = VoiceParticipant(
+                user_id=user_id,
+                ws=ws,
+                username=username,
+                avatar=avatar,
+            )
             self._rooms[channel_id][user_id] = participant
 
         logger.debug("Voice joined channel=%s user=%s", channel_id, user_id)

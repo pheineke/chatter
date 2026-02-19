@@ -132,6 +132,8 @@ export interface Friend {
 
 export interface VoiceParticipant {
   user_id: string
+  username: string
+  avatar: string | null
   is_muted: boolean
   is_deafened: boolean
   is_sharing_screen: boolean
