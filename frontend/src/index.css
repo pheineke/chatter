@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background-color: #36393f;
+  color: #dcddde;
+  overflow: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #202225;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #18191c;
+}
+
+/* Mention highlight inside messages */
+.mention {
+  @apply bg-discord-mention/20 text-discord-mention rounded px-0.5 cursor-pointer;
+}
+.mention:hover {
+  @apply bg-discord-mention/40;
+}
+
+/* Reusable button */
+.btn {
+  @apply px-4 py-2 rounded bg-discord-mention text-white font-semibold text-sm
+         hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed
+         transition-colors;
+}
+.btn-ghost {
+  @apply bg-discord-input text-discord-text hover:bg-discord-input/80;
+}
+
+/* Reusable text input */
+.input {
+  @apply bg-discord-bg rounded px-3 py-2 text-sm text-discord-text
+         placeholder:text-discord-muted outline-none border border-transparent
+         focus:border-discord-mention transition-colors;
+}
+
+/* Hide scrollbar but keep scroll */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

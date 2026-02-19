@@ -1,0 +1,139 @@
+// Shared TypeScript types mirroring the backend Pydantic schemas
+
+export type UserStatus = 'online' | 'away' | 'busy' | 'offline'
+
+export interface User {
+  id: string
+  username: string
+  avatar: string | null
+  description: string | null
+  status: UserStatus
+  created_at: string
+}
+
+export interface Token {
+  access_token: string
+  token_type: string
+}
+
+// ---- Servers ---------------------------------------------------------------
+
+export interface Server {
+  id: string
+  title: string
+  description: string | null
+  image: string | null
+  banner: string | null
+  owner_id: string
+  created_at: string
+}
+
+export interface Role {
+  id: string
+  server_id: string
+  name: string
+  color: string | null
+  is_admin: boolean
+  position: number
+}
+
+export interface Member {
+  user_id: string
+  server_id: string
+  joined_at: string
+  user: User
+}
+
+// ---- Channels --------------------------------------------------------------
+
+export type ChannelType = 'text' | 'voice'
+
+export interface Channel {
+  id: string
+  server_id: string
+  title: string
+  description: string | null
+  type: ChannelType
+  position: number
+  category_id: string | null
+}
+
+export interface Category {
+  id: string
+  server_id: string
+  title: string
+  position: number
+}
+
+// ---- Messages --------------------------------------------------------------
+
+export interface Attachment {
+  id: string
+  file_path: string
+  file_type: string
+}
+
+export interface Reaction {
+  id: string
+  emoji: string
+  user_id: string
+}
+
+export interface MentionInfo {
+  id: string
+  mentioned_user_id: string | null
+  mentioned_role_id: string | null
+  mentioned_username: string | null
+  mentioned_role_name: string | null
+}
+
+export interface Message {
+  id: string
+  channel_id: string
+  content: string
+  author: User
+  reply_to_id: string | null
+  is_deleted: boolean
+  created_at: string
+  attachments: Attachment[]
+  reactions: Reaction[]
+  mentions: MentionInfo[]
+}
+
+// ---- DMs -------------------------------------------------------------------
+
+export interface DM {
+  id: string
+  sender: User
+  recipient: User
+  content: string
+  is_deleted: boolean
+  created_at: string
+  attachments: Attachment[]
+}
+
+// ---- Friends ---------------------------------------------------------------
+
+export type FriendRequestStatus = 'pending' | 'accepted' | 'declined'
+
+export interface FriendRequest {
+  id: string
+  sender: User
+  recipient: User
+  status: FriendRequestStatus
+  created_at: string
+}
+
+export interface Friend {
+  user: User
+}
+
+// ---- Voice -----------------------------------------------------------------
+
+export interface VoiceParticipant {
+  user_id: string
+  is_muted: boolean
+  is_deafened: boolean
+  is_sharing_screen: boolean
+  is_sharing_webcam: boolean
+}
