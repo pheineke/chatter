@@ -19,14 +19,14 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.auth import decode_access_token
-from app.database import AsyncSessionLocal
+from app.database import get_db
 from app.ws_manager import manager
 from models.server import ServerMember
-from sqlalchemy import select
 
 router = APIRouter(tags=["websocket"])
 
@@ -90,6 +90,7 @@ async def server_ws(
     server_id: uuid.UUID,
     ws: WebSocket,
     token: str = Query(..., description="JWT access token"),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Subscribe to server-level events:
@@ -100,22 +101,24 @@ async def server_ws(
       - role.updated
       - role.deleted
       - role.assigned
+      - voice.user_joined
+      - voice.user_left
+      - voice.state_changed
     """
     user_id = await _authenticate_ws(ws, token)
     if user_id is None:
         return
 
     # Verify caller is a member of the server
-    async with AsyncSessionLocal() as db:
-        row = await db.execute(
-            select(ServerMember).where(
-                ServerMember.server_id == server_id,
-                ServerMember.user_id == user_id,
-            )
+    row = await db.execute(
+        select(ServerMember).where(
+            ServerMember.server_id == server_id,
+            ServerMember.user_id == user_id,
         )
-        if row.scalar_one_or_none() is None:
-            await ws.close(code=4003, reason="Not a member of this server")
-            return
+    )
+    if row.scalar_one_or_none() is None:
+        await ws.close(code=4003, reason="Not a member of this server")
+        return
 
     room = manager.server_room(server_id)
     await manager.connect(room, ws)

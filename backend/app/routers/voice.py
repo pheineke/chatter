@@ -26,6 +26,7 @@ State-change messages (broadcast to all channel members):
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from typing import Any, Dict, List
 
@@ -41,6 +42,8 @@ from app.ws_manager import manager as ws_manager
 from models.channel import Channel, ChannelType
 from models.server import ServerMember
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["voice"])
 
 # ---------------------------------------------------------------------------
@@ -48,6 +51,27 @@ router = APIRouter(tags=["voice"])
 # ---------------------------------------------------------------------------
 _RELAY_TYPES = {"offer", "answer", "ice_candidate"}
 _STATE_TYPES = {"mute", "deafen", "screen_share", "webcam"}
+
+
+# ---------------------------------------------------------------------------
+# Helper: broadcast voice state change to all server members
+# ---------------------------------------------------------------------------
+
+async def _broadcast_state_change(
+    channel: Channel, channel_id: uuid.UUID, user_id: uuid.UUID
+) -> None:
+    """Push a voice.state_changed event to every server-WS subscriber so the
+    sidebar can reflect mute / deafen / screen-share / webcam status."""
+    participant_data = voice_manager.get_participant(channel_id, user_id)
+    if participant_data:
+        await ws_manager.broadcast_server(
+            channel.server_id,
+            {
+                "type": "voice.state_changed",
+                "channel_id": str(channel_id),
+                "data": participant_data,
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +179,10 @@ async def voice_ws(
     # Notify all server members that this user joined this voice channel
     participant_data = voice_manager.get_participant(channel_id, user_id)
     if participant_data:
+        logger.info(
+            "voice.user_joined  channel=%s user=%s server=%s",
+            channel_id, user_id, channel.server_id,
+        )
         await ws_manager.broadcast_server(
             channel.server_id,
             {
@@ -192,21 +220,25 @@ async def voice_ws(
                 val = msg.get("is_muted")
                 if isinstance(val, bool):
                     await voice_manager.update_state(channel_id, user_id, is_muted=val)
+                    await _broadcast_state_change(channel, channel_id, user_id)
 
             elif msg_type == "deafen":
                 val = msg.get("is_deafened")
                 if isinstance(val, bool):
                     await voice_manager.update_state(channel_id, user_id, is_deafened=val)
+                    await _broadcast_state_change(channel, channel_id, user_id)
 
             elif msg_type == "screen_share":
                 val = msg.get("enabled")
                 if isinstance(val, bool):
                     await voice_manager.update_state(channel_id, user_id, is_sharing_screen=val)
+                    await _broadcast_state_change(channel, channel_id, user_id)
 
             elif msg_type == "webcam":
                 val = msg.get("enabled")
                 if isinstance(val, bool):
                     await voice_manager.update_state(channel_id, user_id, is_sharing_webcam=val)
+                    await _broadcast_state_change(channel, channel_id, user_id)
 
             # -- Unknown message types → silently ignore ------------------
 
@@ -215,6 +247,10 @@ async def voice_ws(
     finally:
         await voice_manager.disconnect(channel_id, user_id)
         # Notify all server members that this user left this voice channel
+        logger.info(
+            "voice.user_left  channel=%s user=%s server=%s",
+            channel_id, user_id, channel.server_id,
+        )
         await ws_manager.broadcast_server(
             channel.server_id,
             {

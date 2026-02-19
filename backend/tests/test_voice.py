@@ -507,3 +507,93 @@ def test_voice_ws_user_left_on_disconnect(voice_app):
     assert len(left_events) == 1
     assert left_events[0]["data"]["user_id"] == b_user_id
     t_a.join(timeout=5)
+
+
+# --- Cross-WebSocket broadcast (server WS receives voice events) -----------
+
+def test_server_ws_receives_voice_user_joined(voice_app):
+    """
+    A user connected to /ws/servers/{server_id} (the server WebSocket) should
+    receive voice.user_joined when another user joins a voice channel on that
+    server.  This tests the cross-WS broadcast path.
+    """
+    token_a = _token(voice_app, "xws_a")
+    token_b = _token(voice_app, "xws_b")
+    server_id, channel_id = _setup_voice_channel(voice_app, token_a)
+    voice_app.post(f"/servers/{server_id}/join", headers={"Authorization": f"Bearer {token_b}"})
+
+    r_a = voice_app.get("/users/me", headers={"Authorization": f"Bearer {token_a}"})
+    a_user_id = r_a.json()["id"]
+
+    b_events: list[dict] = []
+    b_ready = threading.Event()
+
+    def _b_server_ws():
+        with voice_app.websocket_connect(f"/ws/servers/{server_id}?token={token_b}") as ws:
+            b_ready.set()
+            while True:
+                msg = ws.receive_json()
+                b_events.append(msg)
+                if msg["type"] == "voice.user_joined":
+                    break
+
+    t_b = threading.Thread(target=_b_server_ws, daemon=True)
+    t_b.start()
+    b_ready.wait(timeout=5)
+    import time; time.sleep(0.2)
+
+    # A joins voice
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token_a}") as ws_a:
+        ws_a.receive_json()  # voice.members
+        t_b.join(timeout=5)
+
+    joined = [e for e in b_events if e["type"] == "voice.user_joined"]
+    assert len(joined) == 1
+    assert joined[0]["data"]["user_id"] == a_user_id
+    assert joined[0]["channel_id"] == channel_id
+
+
+def test_server_ws_receives_voice_user_left(voice_app):
+    """
+    A user connected to /ws/servers/{server_id} should receive voice.user_left
+    when another user disconnects from a voice channel.
+    """
+    token_a = _token(voice_app, "xwsl_a")
+    token_b = _token(voice_app, "xwsl_b")
+    server_id, channel_id = _setup_voice_channel(voice_app, token_a)
+    voice_app.post(f"/servers/{server_id}/join", headers={"Authorization": f"Bearer {token_b}"})
+
+    r_a = voice_app.get("/users/me", headers={"Authorization": f"Bearer {token_a}"})
+    a_user_id = r_a.json()["id"]
+
+    b_events: list[dict] = []
+    b_ready = threading.Event()
+    b_done = threading.Event()
+
+    def _b_server_ws():
+        with voice_app.websocket_connect(f"/ws/servers/{server_id}?token={token_b}") as ws:
+            b_ready.set()
+            while True:
+                msg = ws.receive_json()
+                b_events.append(msg)
+                if msg["type"] == "voice.user_left":
+                    break
+        b_done.set()
+
+    t_b = threading.Thread(target=_b_server_ws, daemon=True)
+    t_b.start()
+    b_ready.wait(timeout=5)
+    import time; time.sleep(0.2)
+
+    # A joins then disconnects from voice
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token_a}") as ws_a:
+        ws_a.receive_json()  # voice.members
+
+    # A disconnected — B should receive voice.user_left
+    b_done.wait(timeout=5)
+    t_b.join(timeout=5)
+
+    left = [e for e in b_events if e["type"] == "voice.user_left"]
+    assert len(left) == 1
+    assert left[0]["data"]["user_id"] == a_user_id
+    assert left[0]["channel_id"] == channel_id

@@ -57,6 +57,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     queryFn: () => getServerVoicePresence(serverId!),
     enabled: !!serverId,
     staleTime: 10_000,
+    refetchInterval: 10_000,  // Fallback: poll every 10s in case WS events are missed
   })
 
   const [showAddChannel, setShowAddChannel] = useState(false)
@@ -349,9 +350,21 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
     ? channelPresence.map((p) => {
         const isSelf = p.user_id === localUser?.id
         const m = members.find((m) => m.user_id === p.user_id)
-        const user = isSelf ? localUser! : m?.user
-        return user ? { user, isSelf } : null
-      }).filter(Boolean) as { user: User; isSelf: boolean }[]
+        let user: User | null = isSelf ? localUser! : (m?.user ?? null)
+        
+        // Fallback if not found: mock minimal user object so they still appear
+        if (!user) {
+          user = {
+            id: p.user_id,
+            username: `User ${p.user_id.slice(0, 4)}`,
+            avatar: null,
+            description: null,
+            status: 'offline',
+            created_at: '',
+          }
+        }
+        return { user, isSelf }
+      })
     : []
 
   return (

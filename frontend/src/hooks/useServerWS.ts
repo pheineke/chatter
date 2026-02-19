@@ -2,6 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
 import type { Channel, VoiceParticipant } from '../api/types'
 
+/** Voice presence query key for a given server. */
+const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
+
 /**
  * Subscribes to the server-level WebSocket and keeps channel/category
  * caches up-to-date in real time for all connected clients.
@@ -13,7 +16,7 @@ export function useServerWS(serverId: string | null) {
     enabled: serverId !== null,
     onOpen() {
       // Refetch presence on every (re)connect so events missed during the gap are recovered
-      qc.invalidateQueries({ queryKey: ['voicePresence', serverId] })
+      qc.invalidateQueries({ queryKey: vpKey(serverId) })
     },
     onMessage(msg) {
       switch (msg.type) {
@@ -39,7 +42,10 @@ export function useServerWS(serverId: string | null) {
         case 'voice.user_joined': {
           const channelId = msg.channel_id as string
           const participant = msg.data as VoiceParticipant
-          qc.setQueryData<Record<string, VoiceParticipant[]>>(['voicePresence', serverId], (old = {}) => {
+          // Cancel any in-flight voice presence refetch so it doesn't
+          // overwrite this real-time update with stale REST data.
+          void qc.cancelQueries({ queryKey: vpKey(serverId) })
+          qc.setQueryData<Record<string, VoiceParticipant[]>>(vpKey(serverId), (old = {}) => {
             const existing = old[channelId] ?? []
             // Avoid duplicates
             if (existing.some((p) => p.user_id === participant.user_id)) return old
@@ -50,13 +56,30 @@ export function useServerWS(serverId: string | null) {
         case 'voice.user_left': {
           const channelId = msg.channel_id as string
           const { user_id } = msg.data as { user_id: string }
-          qc.setQueryData<Record<string, VoiceParticipant[]>>(['voicePresence', serverId], (old = {}) => {
+          void qc.cancelQueries({ queryKey: vpKey(serverId) })
+          qc.setQueryData<Record<string, VoiceParticipant[]>>(vpKey(serverId), (old = {}) => {
             const updated = (old[channelId] ?? []).filter((p) => p.user_id !== user_id)
             if (updated.length === 0) {
               const { [channelId]: _removed, ...rest } = old
               return rest
             }
             return { ...old, [channelId]: updated }
+          })
+          break
+        }
+        case 'voice.state_changed': {
+          const channelId = msg.channel_id as string
+          const participant = msg.data as VoiceParticipant
+          void qc.cancelQueries({ queryKey: vpKey(serverId) })
+          qc.setQueryData<Record<string, VoiceParticipant[]>>(vpKey(serverId), (old = {}) => {
+            const existing = old[channelId]
+            if (!existing) return old
+            return {
+              ...old,
+              [channelId]: existing.map((p) =>
+                p.user_id === participant.user_id ? participant : p,
+              ),
+            }
           })
           break
         }
