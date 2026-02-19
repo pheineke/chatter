@@ -34,6 +34,14 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   const peers = useRef<Map<string, RTCPeerConnection>>(new Map())
   const localStream = useRef<MediaStream | null>(null)
 
+  /**
+   * Tie-breaking: the peer with the lexicographically smaller user ID is the
+   * "impolite" side and always initiates calls. The other side only answers.
+   * This eliminates the WebRTC glare condition (both sides sending offers
+   * simultaneously).
+   */
+  const isImpolite = useCallback((peerId: string) => userId < peerId, [userId])
+
   const { send } = useWebSocket(
     channelId ? `/ws/voice/${channelId}` : '',
     {
@@ -45,15 +53,16 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
               (p) => p.user_id !== userId,
             )
             setState((s) => ({ ...s, participants: members }))
-            // Initiate calls to all existing members
-            members.forEach((p) => initiateCall(p.user_id))
+            // Only the impolite side (lower ID) initiates to each existing member
+            members.forEach((p) => { if (isImpolite(p.user_id)) initiateCall(p.user_id) })
             break
           }
           case 'voice.user_joined': {
             const p = msg.data as VoiceParticipant
             if (p.user_id === userId) break
             setState((s) => ({ ...s, participants: [...s.participants, p] }))
-            initiateCall(p.user_id)
+            // Only initiate if we are the impolite side
+            if (isImpolite(p.user_id)) initiateCall(p.user_id)
             break
           }
           case 'voice.user_left': {
@@ -128,6 +137,12 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   }, [send])
 
   const handleOffer = useCallback(async (peerId: string, sdp: string) => {
+    // If we already have a peer for this ID (e.g. from a previous session),
+    // tear it down before renegotiating.
+    if (peers.current.has(peerId)) {
+      peers.current.get(peerId)!.close()
+      peers.current.delete(peerId)
+    }
     const pc = createPeer(peerId)
     await pc.setRemoteDescription({ type: 'offer', sdp })
     const answer = await pc.createAnswer()
@@ -137,12 +152,21 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
 
   const handleAnswer = useCallback(async (peerId: string, sdp: string) => {
     const pc = peers.current.get(peerId)
-    if (pc) await pc.setRemoteDescription({ type: 'answer', sdp })
+    if (!pc) return
+    // Only apply the answer when we are in the right state
+    if (pc.signalingState === 'have-local-offer') {
+      await pc.setRemoteDescription({ type: 'answer', sdp })
+    }
   }, [])
 
   const handleIce = useCallback(async (peerId: string, candidate: RTCIceCandidateInit) => {
     const pc = peers.current.get(peerId)
-    if (pc) await pc.addIceCandidate(candidate)
+    if (!pc || pc.remoteDescription == null) return
+    try {
+      await pc.addIceCandidate(candidate)
+    } catch {
+      // Silently ignore stale / out-of-order ICE candidates
+    }
   }, [])
 
   function cleanupPeer(peerId: string) {

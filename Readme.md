@@ -2,7 +2,7 @@
 
 A Discord-inspired real-time chat platform with a **FastAPI** backend and a **React** frontend. Supports servers with text and voice channels, role-based permissions, rich messaging, and private direct messages.
 
-> **Status:** Early-stage — dependencies and feature spec are defined, implementation is underway.
+> **Status:** Backend 100% complete (128 tests passing). **Frontend complete** — React/Vite/TypeScript app with full UI.
 
 ---
 
@@ -20,13 +20,19 @@ A Discord-inspired real-time chat platform with a **FastAPI** backend and a **Re
 | [python-jose](https://github.com/mpdavis/python-jose) | JWT authentication |
 | [passlib / bcrypt](https://passlib.readthedocs.io/) | Password hashing |
 | [python-multipart](https://github.com/andrew-d/python-multipart) | File upload handling |
+
 ### Frontend
 
 | Technology | Role |
 |---|---|
-| [React](https://react.dev/) | UI framework |
-| [Vite](https://vitejs.dev/) | Dev server and bundler |
-| [React Router](https://reactrouter.com/) | Client-side routing |
+| [React 18](https://react.dev/) | UI framework |
+| [Vite 5](https://vitejs.dev/) | Dev server and bundler |
+| [TypeScript 5](https://www.typescriptlang.org/) | Type-safe JavaScript |
+| [React Router v6](https://reactrouter.com/) | Client-side routing |
+| [TanStack Query v5](https://tanstack.com/query) | Server state management |
+| [Axios](https://axios-http.com/) | HTTP client with JWT interceptor |
+| [Tailwind CSS](https://tailwindcss.com/) | Utility-first styling (Discord theme) |
+| [date-fns](https://date-fns.org/) | Date formatting |
 
 ---
 
@@ -63,7 +69,27 @@ npm install
 npm run dev
 ```
 
-> **Note:** A database layer and the backend entry point (`main.py`) are not yet implemented. These steps will be updated as the project progresses.
+> **Note:** Copy `backend/.env.example` to `backend/.env` and set your `DATABASE_URL` and `SECRET_KEY`, then run `alembic upgrade head` inside `backend/` to apply the schema before starting the server.
+
+### Running Tests
+
+The test suite uses an in-memory SQLite database so no external database is required.
+
+```bash
+cd chat/backend
+
+# Install dependencies (includes pytest, httpx, aiosqlite)
+pip install -r requirements.txt
+
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run a specific test file
+pytest tests/test_auth.py
+```
 
 ---
 
@@ -155,37 +181,59 @@ chat/
 ## Roadmap
 
 ### Authentication & Users
-- [ ] User registration and login (JWT)
-- [ ] Avatar and profile description upload
-- [ ] User status management
+- [x] User registration and login (JWT)
+- [x] Avatar and profile description upload
+- [x] User status management
 
 ### Servers
-- [ ] Create / edit / delete servers
-- [ ] Server image and banner upload
-- [ ] Role management (create, assign, delete)
+- [x] Create / edit / delete servers
+- [x] Server image and banner upload
+- [x] Role management (create, assign, delete)
 
 ### Channels
-- [ ] Create text and voice channels
-- [ ] Category management and reordering
-- [ ] Per-role channel permissions
+- [x] Create text and voice channels
+- [x] Category management and reordering
+- [x] Per-role channel permissions
 
 ### Messaging
-- [ ] Send, delete, and reply to messages
-- [ ] Reactions
-- [ ] Attachment uploads (image, GIF, audio)
-- [ ] `@user` and `@role` mentions
+- [x] Send, delete, and reply to messages
+- [x] Reactions
+- [x] Attachment uploads (image, GIF, audio)
+- [x] `@user` and `@role` mentions
+
+### Real-time Events (WebSockets)
+- [x] WebSocket connection manager (channel / server / user rooms)
+- [x] Channel message events (`message.created`, `message.updated`, `message.deleted`, `reaction.added`, `reaction.removed`)
+- [x] Server membership events (`server.member_joined`, `server.member_left`, `server.member_kicked`)
+- [x] Role events (`role.created`, `role.updated`, `role.deleted`)
+- [x] DM events (`dm.created`, `dm.deleted`)
+- [x] Friend-request events (`friend_request.received`, `friend_request.accepted`, `friend_request.declined`)
 
 ### Voice
-- [ ] WebRTC voice channel integration
-- [ ] Mute / deafen controls
-- [ ] Screen sharing
-- [ ] Webcam support
+- [x] WebRTC voice channel signaling (offer / answer / ICE relay via WebSocket)
+- [x] Mute / deafen controls (server-side state broadcast)
+- [x] Screen sharing (signaling support for display-capture tracks)
+- [x] Webcam support (signaling support for video tracks)
+- [ ] WebRTC media (requires frontend + browser APIs — server is signaling-only)
 
 ### Direct Messages
-- [ ] Private one-to-one DM threads
+- [x] Private one-to-one DM threads
 
 ### Friends
-- [ ] Send and receive friend requests
-- [ ] Accept / decline requests
-- [ ] Friends list with live status
-- [ ] Remove friends
+- [x] Send and receive friend requests
+- [x] Accept / decline requests
+- [x] Friends list with live status
+- [x] Remove friends
+
+### Tests
+- [x] Auth — register, login, duplicate, bad token
+- [x] Users — profile read/update, avatar upload, user lookup
+- [x] Servers — CRUD, membership, role CRUD, role assignment
+- [x] Channels — category CRUD, channel CRUD, permissions, mute/unmute
+- [x] Messages — send, list, pagination, edit, delete, reply, reactions, attachments
+- [x] Direct Messages — send, list, delete, attachments
+- [x] Friends — send request, list, accept, decline, friends list, remove
+- [x] `@user`/`@role` mention parsing
+- [x] WebSocket connection manager (unit tests)
+- [x] WebSocket endpoint integration tests (auth, channel subscription, real-time broadcast)
+- [x] Voice (WebRTC) signaling tests (21 tests — manager unit tests + WS integration tests)

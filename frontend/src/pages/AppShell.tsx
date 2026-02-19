@@ -17,6 +17,10 @@ export interface VoiceSession {
 export default function AppShell() {
   const [voiceSession, setVoiceSession] = useState<VoiceSession | null>(null)
 
+  function handleLeaveVoice() {
+    setVoiceSession(null)
+  }
+
   return (
     <div className="flex h-screen bg-discord-bg text-discord-text overflow-hidden">
       {/* Far-left: server icons */}
@@ -32,7 +36,7 @@ export default function AppShell() {
               <ChannelSidebar
                 voiceSession={voiceSession}
                 onJoinVoice={setVoiceSession}
-                onLeaveVoice={() => setVoiceSession(null)}
+                onLeaveVoice={handleLeaveVoice}
               />
             }
           />
@@ -58,7 +62,7 @@ export default function AppShell() {
         {voiceSession && (
           <VoiceChannelBar
             session={voiceSession}
-            onLeave={() => setVoiceSession(null)}
+            onLeave={handleLeaveVoice}
           />
         )}
       </div>

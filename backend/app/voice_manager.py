@@ -165,6 +165,10 @@ class VoiceManager:
     def get_participants(self, channel_id: uuid.UUID) -> list[dict[str, Any]]:
         return [p.to_dict() for p in self._rooms.get(channel_id, {}).values()]
 
+    def get_participant(self, channel_id: uuid.UUID, user_id: uuid.UUID) -> dict[str, Any] | None:
+        p = self._rooms.get(channel_id, {}).get(user_id)
+        return p.to_dict() if p else None
+
     def get_channel_ids(self) -> list[uuid.UUID]:
         return list(self._rooms.keys())
 

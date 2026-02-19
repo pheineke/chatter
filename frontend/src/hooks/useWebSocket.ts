@@ -6,6 +6,7 @@ export type WSMessage = { type: string; data?: unknown } & Record<string, unknow
 
 interface Options {
   onMessage: (msg: WSMessage) => void
+  onOpen?: () => void
   enabled?: boolean
 }
 
@@ -13,15 +14,18 @@ interface Options {
  * Opens a WebSocket to `path?token=<JWT>` and calls `onMessage` for every
  * incoming JSON frame. Reconnects automatically with exponential back-off.
  */
-export function useWebSocket(path: string, { onMessage, enabled = true }: Options) {
+export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }: Options) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectDelay = useRef(1000)
-  const unmounted = useRef(false)
+  const generation = useRef(0)   // incremented on every cleanup so stale callbacks self-discard
   const onMessageRef = useRef(onMessage)
   onMessageRef.current = onMessage
+  const onOpenRef = useRef(onOpen)
+  onOpenRef.current = onOpen
 
-  const connect = useCallback(() => {
-    if (!enabled || unmounted.current) return
+  const connect = useCallback((gen: number) => {
+    if (generation.current !== gen) return   // a newer generation took over
+    if (!enabled) return
     const token = localStorage.getItem('token')
     if (!token) return
 
@@ -30,6 +34,7 @@ export function useWebSocket(path: string, { onMessage, enabled = true }: Option
     wsRef.current = ws
 
     ws.onmessage = (e) => {
+      if (generation.current !== gen) return
       try {
         const msg = JSON.parse(e.data) as WSMessage
         onMessageRef.current(msg)
@@ -39,23 +44,29 @@ export function useWebSocket(path: string, { onMessage, enabled = true }: Option
     }
 
     ws.onclose = () => {
-      if (unmounted.current) return
+      if (generation.current !== gen) return   // cleanup already ran — don't reconnect
       const delay = reconnectDelay.current
       reconnectDelay.current = Math.min(delay * 2, 30_000)
-      setTimeout(connect, delay)
+      setTimeout(() => connect(gen), delay)
     }
 
     ws.onopen = () => {
+      if (generation.current !== gen) return
       reconnectDelay.current = 1000
+      onOpenRef.current?.()
     }
   }, [path, enabled])
 
   useEffect(() => {
-    unmounted.current = false
-    connect()
+    const gen = ++generation.current
+    connect(gen)
     return () => {
-      unmounted.current = true
-      wsRef.current?.close()
+      generation.current++       // invalidate this generation; disables all callbacks
+      if (wsRef.current) {
+        wsRef.current.onclose = null   // prevent the close handler triggering a reconnect
+        wsRef.current.close()
+        wsRef.current = null
+      }
     }
   }, [connect])
 

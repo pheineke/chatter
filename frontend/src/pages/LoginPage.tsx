@@ -1,11 +1,13 @@
 import { useState, FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icon'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const from = (location.state as any)?.from?.pathname ?? '/channels/@me'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -17,7 +19,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(username, password)
-      navigate('/channels/@me', { replace: true })
+      navigate(from, { replace: true })
     } catch (err: any) {
       setError(err.response?.data?.detail ?? 'Login failed')
     } finally {

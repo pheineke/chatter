@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import auth, users, servers, channels, messages, dms, friends
+from app.routers import auth, users, servers, channels, messages, dms, friends, invites
 from app.routers import ws as ws_router
 from app.routers import voice as voice_router
 
@@ -31,6 +31,7 @@ app.include_router(channels.router)
 app.include_router(messages.router)
 app.include_router(dms.router)
 app.include_router(friends.router)
+app.include_router(invites.router)
 app.include_router(ws_router.router)
 app.include_router(voice_router.router)
 

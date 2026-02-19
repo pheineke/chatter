@@ -1,14 +1,17 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { getChannels, getCategories, createChannel } from '../api/channels'
-import { getMembers } from '../api/servers'
+import { useState, useCallback } from 'react'
+import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence } from '../api/channels'
+import { getMembers, getServer } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
 import { StatusIndicator } from './StatusIndicator'
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
 import { useServerWS } from '../hooks/useServerWS'
-import type { Channel, VoiceParticipant } from '../api/types'
+import { ContextMenu } from './ContextMenu'
+import type { ContextMenuItem } from './ContextMenu'
+import { createInvite } from '../api/invites'
+import type { Channel, VoiceParticipant, Member, User } from '../api/types'
 import type { VoiceSession } from '../pages/AppShell'
 
 interface Props {
@@ -24,6 +27,12 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const qc = useQueryClient()
 
   useServerWS(serverId ?? null)
+
+  const { data: server } = useQuery({
+    queryKey: ['server', serverId],
+    queryFn: () => getServer(serverId!),
+    enabled: !!serverId,
+  })
 
   const { data: channels = [] } = useQuery({
     queryKey: ['channels', serverId],
@@ -43,9 +52,58 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     enabled: !!serverId,
   })
 
+  const { data: voicePresence = {} } = useQuery({
+    queryKey: ['voicePresence', serverId],
+    queryFn: () => getServerVoicePresence(serverId!),
+    enabled: !!serverId,
+    staleTime: 10_000,
+  })
+
   const [showAddChannel, setShowAddChannel] = useState(false)
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text')
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [inviteCopied, setInviteCopied] = useState(false)
+  const [editChannel, setEditChannel] = useState<Channel | null>(null)
+  const [editChannelName, setEditChannelName] = useState('')
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        { label: 'Create Channel', icon: 'hash', onClick: () => setShowAddChannel(true) },
+        { label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite },
+      ],
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleHeaderClick(e: React.MouseEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setContextMenu({
+      x: rect.left,
+      y: rect.bottom + 4,
+      items: [
+        { label: 'Server Settings', icon: 'settings', onClick: () => { /* TODO */ } },
+        { label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite },
+      ],
+    })
+  }
+
+  async function handleCreateInvite() {
+    if (!serverId) return
+    const invite = await createInvite(serverId, { expires_hours: 24 })
+    setInviteLink(`${window.location.origin}/invite/${invite.code}`)
+  }
+
+  function copyInviteLink() {
+    if (!inviteLink) return
+    navigator.clipboard.writeText(inviteLink)
+    setInviteCopied(true)
+    setTimeout(() => setInviteCopied(false), 2000)
+  }
 
   async function handleCreateChannel() {
     if (!serverId || !newChannelName.trim()) return
@@ -53,6 +111,39 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     qc.invalidateQueries({ queryKey: ['channels', serverId] })
     setShowAddChannel(false)
     setNewChannelName('')
+  }
+
+  function openChannelContextMenu(e: React.MouseEvent, ch: Channel) {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Edit Channel',
+          icon: 'edit-2',
+          onClick: () => { setEditChannel(ch); setEditChannelName(ch.title) },
+        },
+        {
+          label: 'Delete Channel',
+          icon: 'trash-2',
+          danger: true,
+          onClick: async () => {
+            if (!serverId) return
+            await deleteChannel(serverId, ch.id)
+            qc.invalidateQueries({ queryKey: ['channels', serverId] })
+          },
+        },
+      ],
+    })
+  }
+
+  async function handleSaveEditChannel() {
+    if (!serverId || !editChannel || !editChannelName.trim()) return
+    await updateChannel(serverId, editChannel.id, { title: editChannelName.trim() })
+    qc.invalidateQueries({ queryKey: ['channels', serverId] })
+    setEditChannel(null)
   }
 
   // Group channels by category (null = no category)
@@ -67,15 +158,19 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   return (
     <div className="flex flex-col h-full">
       {/* Server name header */}
-      <div className="px-4 py-3 font-bold border-b border-black/20 shadow-sm flex items-center justify-between">
-        <span className="truncate">Server</span>
-        <button onClick={() => setShowAddChannel(true)} title="Add Channel" className="text-discord-muted hover:text-discord-text">
-          <Icon name="plus" size={16} />
-        </button>
+      <div
+        className="px-4 py-3 font-bold border-b border-black/20 shadow-sm flex items-center justify-between cursor-pointer hover:bg-discord-input/30 transition-colors select-none"
+        onClick={handleHeaderClick}
+      >
+        <span className="truncate">{server?.title ?? 'Server'}</span>
+        <Icon name="chevron-down" size={16} className="text-discord-muted shrink-0" />
       </div>
 
       {/* Channel list */}
-      <div className="flex-1 overflow-y-auto py-2 space-y-1">
+      <div
+        className="flex-1 overflow-y-auto py-2 space-y-1"
+        onContextMenu={handleContextMenu}
+      >
         {Array.from(grouped.entries()).map(([catId, chs]) => {
           const cat = categories.find((c) => c.id === catId)
           return (
@@ -92,9 +187,13 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   active={ch.id === channelId}
                   serverId={serverId!}
                   voiceSession={voiceSession}
+                  channelPresence={voicePresence[ch.id] ?? []}
+                  members={members}
+                  localUser={user ?? undefined}
                   onJoinVoice={onJoinVoice}
                   onLeaveVoice={onLeaveVoice}
                   navigate={navigate}
+                  onContextMenu={(e) => openChannelContextMenu(e, ch)}
                 />
               ))}
             </div>
@@ -155,6 +254,61 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
           </div>
         </div>
       )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Invite link modal */}
+      {inviteLink && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setInviteLink(null); setInviteCopied(false) }}>
+          <div className="bg-discord-sidebar rounded-lg p-6 w-96" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-1">Invite People</h2>
+            <p className="text-sm text-discord-muted mb-4">Share this link — it expires in 24 hours.</p>
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={inviteLink}
+                className="input flex-1 text-sm font-mono"
+                onFocus={(e) => e.target.select()}
+              />
+              <button className="btn shrink-0 flex items-center gap-1.5" onClick={copyInviteLink}>
+                <Icon name={inviteCopied ? 'checkmark-circle' : 'copy'} size={16} />
+                {inviteCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edit channel modal */}
+      {editChannel && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditChannel(null)}>
+          <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">Edit Channel</h2>
+            <input
+              className="input w-full mb-3"
+              value={editChannelName}
+              onChange={(e) => setEditChannelName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditChannel() }}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button className="btn flex-1" onClick={handleSaveEditChannel} disabled={!editChannelName.trim()}>
+                Save
+              </button>
+              <button className="btn flex-1 bg-discord-input hover:bg-discord-input/70" onClick={() => setEditChannel(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -164,12 +318,16 @@ interface RowProps {
   active: boolean
   serverId: string
   voiceSession: VoiceSession | null
+  channelPresence: VoiceParticipant[]
+  members: Member[]
+  localUser?: User
   onJoinVoice: (s: VoiceSession) => void
   onLeaveVoice: () => void
   navigate: ReturnType<typeof useNavigate>
+  onContextMenu: (e: React.MouseEvent) => void
 }
 
-function ChannelRow({ channel, active, serverId, voiceSession, onJoinVoice, onLeaveVoice, navigate }: RowProps) {
+function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {
   const isVoice = channel.type === 'voice'
   const inThisVoice = voiceSession?.channelId === channel.id
 
@@ -185,17 +343,48 @@ function ChannelRow({ channel, active, serverId, voiceSession, onJoinVoice, onLe
     }
   }
 
+  // Resolve participant user info from the per-channel presence list.
+  // All clients (including non-voice ones) get this from useServerWS + voicePresence query.
+  const participantUsers: { user: User; isSelf: boolean }[] = isVoice
+    ? channelPresence.map((p) => {
+        const isSelf = p.user_id === localUser?.id
+        const m = members.find((m) => m.user_id === p.user_id)
+        const user = isSelf ? localUser! : m?.user
+        return user ? { user, isSelf } : null
+      }).filter(Boolean) as { user: User; isSelf: boolean }[]
+    : []
+
   return (
-    <button
-      onClick={handleClick}
-      className={`w-full flex items-center gap-1.5 px-2 py-1 mx-1 rounded text-sm transition-colors
-        ${active || inThisVoice
-          ? 'bg-discord-input text-discord-text'
-          : 'text-discord-muted hover:bg-discord-input/60 hover:text-discord-text'}`}
-    >
-      <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
-      <span className="truncate">{channel.title}</span>
-      {inThisVoice && <span className="ml-auto text-discord-online text-xs">● Live</span>}
-    </button>
+    <div>
+      <button
+        onClick={handleClick}
+        onContextMenu={onContextMenu}
+        className={`w-full flex items-center gap-1.5 px-2 py-1 mx-1 rounded text-sm transition-colors
+          ${active || inThisVoice
+            ? 'bg-discord-input text-discord-text'
+            : 'text-discord-muted hover:bg-discord-input/60 hover:text-discord-text'}`}
+      >
+        <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
+        <span className="truncate">{channel.title}</span>
+        {inThisVoice && <span className="ml-auto text-discord-online text-xs">● Live</span>}
+      </button>
+
+      {/* Voice participants */}
+      {participantUsers.length > 0 && (
+        <div className="ml-4 mb-1 space-y-0.5">
+          {participantUsers.map(({ user: u, isSelf }) => (
+            <div key={u.id} className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-discord-muted">
+              <div className="relative shrink-0">
+                <UserAvatar user={u} size={20} />
+                <span className="absolute -bottom-0.5 -right-0.5">
+                  <StatusIndicator status={u.status} size={7} />
+                </span>
+              </div>
+              <span className="truncate">{u.username}{isSelf ? ' (you)' : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

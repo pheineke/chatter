@@ -1,5 +1,5 @@
 import client from './client'
-import type { Channel, Category } from './types'
+import type { Channel, Category, VoiceParticipant } from './types'
 
 export async function getChannels(serverId: string): Promise<Channel[]> {
   const { data } = await client.get<Channel[]>(`/servers/${serverId}/channels`)
@@ -34,5 +34,11 @@ export async function getCategories(serverId: string): Promise<Category[]> {
 
 export async function createCategory(serverId: string, title: string): Promise<Category> {
   const { data } = await client.post<Category>(`/servers/${serverId}/categories`, { title })
+  return data
+}
+
+/** Returns a map of channelId → participants for all active voice channels in the server. */
+export async function getServerVoicePresence(serverId: string): Promise<Record<string, VoiceParticipant[]>> {
+  const { data } = await client.get<Record<string, VoiceParticipant[]>>(`/servers/${serverId}/voice-presence`)
   return data
 }

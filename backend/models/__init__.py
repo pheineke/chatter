@@ -5,6 +5,7 @@ from models.channel import Category, Channel, ChannelType, ChannelPermission, Mu
 from models.message import Message, Attachment, Reaction, Mention
 from models.dm import DirectMessage, DMAttachment
 from models.friend import FriendRequest, FriendRequestStatus
+from models.invite import ServerInvite
 
 __all__ = [
     "Base",
@@ -27,4 +28,5 @@ __all__ = [
     "DMAttachment",
     "FriendRequest",
     "FriendRequestStatus",
+    "ServerInvite",
 ]

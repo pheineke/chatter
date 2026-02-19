@@ -1,7 +1,8 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { getMyServers, createServer, joinServer } from '../api/servers'
+import { getMyServers, createServer } from '../api/servers'
+import { joinViaInvite } from '../api/invites'
 import { Icon } from './Icon'
 import type { Server } from '../api/types'
 
@@ -52,12 +53,16 @@ export function ServerSidebar() {
   })
 
   const joinMut = useMutation({
-    mutationFn: () => joinServer(inviteCode),
-    onSuccess: (m) => {
+    mutationFn: () => {
+      // Accept either a bare code or a full invite URL
+      const code = inviteCode.trim().split('/invite/').pop()!.trim()
+      return joinViaInvite(code)
+    },
+    onSuccess: ({ server_id }) => {
       qc.invalidateQueries({ queryKey: ['servers'] })
       setShowJoin(false)
       setInviteCode('')
-      navigate(`/channels/${m.server_id}`)
+      navigate(`/channels/${server_id}`)
     },
   })
 
@@ -112,14 +117,17 @@ export function ServerSidebar() {
       {/* Join server modal */}
       {showJoin && (
         <Modal title="Join Server" onClose={() => setShowJoin(false)}>
+          <p className="text-sm text-discord-muted mb-3">Paste an invite link or code below.</p>
           <input
-            className="input w-full mb-3"
-            placeholder="Invite code"
+            className="input w-full mb-2"
+            placeholder="https://…/invite/abc123  or  abc123"
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && inviteCode.trim()) joinMut.mutate() }}
           />
+          {joinMut.isError && <p className="text-red-400 text-xs mb-2">Invalid or expired invite.</p>}
           <button className="btn w-full" onClick={() => joinMut.mutate()} disabled={!inviteCode.trim() || joinMut.isPending}>
-            Join
+            {joinMut.isPending ? 'Joining…' : 'Join Server'}
           </button>
         </Modal>
       )}

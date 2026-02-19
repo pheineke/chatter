@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.dependencies import CurrentUser, DB
 from app.routers.servers import _get_server_or_404, _require_member, _require_admin
+from app.ws_manager import manager
 from app.schemas.channel import (
     CategoryCreate,
     CategoryUpdate,
@@ -115,6 +116,10 @@ async def create_channel(
     db.add(channel)
     await db.commit()
     await db.refresh(channel)
+    await manager.broadcast_server(
+        server_id,
+        {"type": "channel.created", "data": ChannelRead.model_validate(channel).model_dump(mode="json")},
+    )
     return channel
 
 
