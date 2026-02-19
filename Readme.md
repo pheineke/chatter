@@ -112,6 +112,13 @@ chat/
 - One-to-one private messaging between two users
 - Separate from all servers
 
+### Friends
+
+- Send and receive friend requests
+- Accept or decline incoming requests
+- View a friends list with live status indicators
+- Remove friends
+
 ---
 
 ## Roadmap
@@ -145,3 +152,9 @@ chat/
 
 ### Direct Messages
 - [ ] Private one-to-one DM threads
+
+### Friends
+- [ ] Send and receive friend requests
+- [ ] Accept / decline requests
+- [ ] Friends list with live status
+- [ ] Remove friends
