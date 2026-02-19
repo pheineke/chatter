@@ -54,6 +54,10 @@ coverage.xml
 Thumbs.db
 desktop.ini
 
+# Uploaded media (keep folder, ignore contents)
+backend/static/*
+!backend/static/.gitkeep
+
 # Logs
 *.log
 logs/
