@@ -1,5 +1,17 @@
 fastapi
-uvicorn
+uvicorn[standard]
+pydantic-settings
 python-jose[cryptography]
-passlib[bcrypt]
+bcrypt
 python-multipart
+sqlalchemy[asyncio]
+alembic
+asyncpg
+python-dotenv
+aiofiles
+
+# Testing
+pytest
+pytest-asyncio
+httpx
+aiosqlitewebsockets
