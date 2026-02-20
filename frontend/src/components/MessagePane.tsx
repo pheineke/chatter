@@ -5,15 +5,17 @@ import { getChannels } from '../api/channels'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { MemberSidebar } from './MemberSidebar'
+import { VoiceGridPane } from './VoiceGridPane'
 import { Icon } from './Icon'
 import type { VoiceSession } from '../pages/AppShell'
 
 interface Props {
   voiceSession: VoiceSession | null
   onJoinVoice: (s: VoiceSession) => void
+  onLeaveVoice: () => void
 }
 
-export function MessagePane({ voiceSession, onJoinVoice }: Props) {
+export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) {
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
   const [showMembers, setShowMembers] = useState(true)
 
@@ -35,20 +37,19 @@ export function MessagePane({ voiceSession, onJoinVoice }: Props) {
 
   if (channel?.type === 'voice') {
     const inVoice = voiceSession?.channelId === channelId
+    if (inVoice && voiceSession) {
+      return <VoiceGridPane session={voiceSession} onLeave={onLeaveVoice} />
+    }
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-discord-muted">
         <div className="text-5xl">🔊</div>
         <h2 className="text-xl font-bold text-discord-text">{channel.title}</h2>
         <p className="text-sm">Voice Channel</p>
         <button
-          onClick={() => {
-            if (inVoice) return
-            onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId: serverId! })
-          }}
-          className={`btn ${inVoice ? 'opacity-60 cursor-default' : ''}`}
-          disabled={inVoice}
+          onClick={() => onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId: serverId! })}
+          className="btn"
         >
-          {inVoice ? 'In Voice' : 'Join Voice'}
+          Join Voice
         </button>
       </div>
     )

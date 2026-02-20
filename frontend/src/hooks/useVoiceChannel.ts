@@ -7,7 +7,7 @@ interface UseVoiceChannelOptions {
   userId: string
 }
 
-interface VoiceState {
+export interface VoiceState {
   participants: VoiceParticipant[]
   isMuted: boolean
   isDeafened: boolean
@@ -33,6 +33,8 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   // Map of peerId → RTCPeerConnection
   const peers = useRef<Map<string, RTCPeerConnection>>(new Map())
   const localStream = useRef<MediaStream | null>(null)
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({})
+  const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null)
 
   /**
    * Tie-breaking: the peer with the lexicographically smaller user ID is the
@@ -116,13 +118,18 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     }
 
     pc.ontrack = (e) => {
-      // Attach remote stream to an audio element
-      const existing = document.getElementById(`audio-${peerId}`) as HTMLAudioElement | null
-      const audio = existing ?? document.createElement('audio')
-      audio.id = `audio-${peerId}`
-      audio.autoplay = true
-      audio.srcObject = e.streams[0]
-      if (!existing) document.body.appendChild(audio)
+      const stream = e.streams[0]
+      if (e.track.kind === 'audio') {
+        // Attach audio to a hidden element
+        const existing = document.getElementById(`audio-${peerId}`) as HTMLAudioElement | null
+        const audio = existing ?? document.createElement('audio')
+        audio.id = `audio-${peerId}`
+        audio.autoplay = true
+        audio.srcObject = stream
+        if (!existing) document.body.appendChild(audio)
+      }
+      // Always store the full stream so video tracks are accessible
+      setRemoteStreams(prev => ({ ...prev, [peerId]: stream }))
     }
 
     peers.current.set(peerId, pc)
@@ -174,6 +181,7 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     peers.current.delete(peerId)
     const audio = document.getElementById(`audio-${peerId}`)
     audio?.remove()
+    setRemoteStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
   }
 
   // --- Local media ----------------------------------------------------------
@@ -228,9 +236,18 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
           localStream.current?.addTrack(t)
           peers.current.forEach((pc) => pc.addTrack(t, localStream.current!))
         })
+        setLocalVideoStream(screen)
+        // Auto-stop when user ends sharing via browser UI
+        screen.getVideoTracks()[0]?.addEventListener('ended', () => {
+          setState(s => ({ ...s, isSharingScreen: false }))
+          setLocalVideoStream(null)
+          send({ type: 'screen_share', enabled: false })
+        })
       } catch {
         return
       }
+    } else {
+      setLocalVideoStream(null)
     }
     setState((s) => {
       send({ type: 'screen_share', enabled: !s.isSharingScreen })
@@ -247,9 +264,12 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
           localStream.current?.addTrack(t)
           peers.current.forEach((pc) => pc.addTrack(t, localStream.current!))
         })
+        setLocalVideoStream(cam)
       } catch {
         return
       }
+    } else {
+      setLocalVideoStream(null)
     }
     setState((s) => {
       send({ type: 'webcam', enabled: !s.isSharingWebcam })
@@ -257,5 +277,5 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     })
   }, [state.isSharingWebcam, send])
 
-  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam }
+  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, remoteStreams, localVideoStream, localStream }
 }

@@ -1,6 +1,5 @@
-import { useAuth } from '../contexts/AuthContext'
 import { useQuery } from '@tanstack/react-query'
-import { useVoiceChannel } from '../hooks/useVoiceChannel'
+import { useVoiceCall } from '../contexts/VoiceCallContext'
 import { getMembers } from '../api/servers'
 import { Icon } from './Icon'
 import { UserAvatar } from './UserAvatar'
@@ -37,11 +36,7 @@ function VoiceBtn({
 }
 
 export function VoiceChannelBar({ session, onLeave }: Props) {
-  const { user } = useAuth()
-  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam } = useVoiceChannel({
-    channelId: session.channelId,
-    userId: user?.id ?? '',
-  })
+  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam } = useVoiceCall()
 
   // Fetch server members to resolve participant user info
   const { data: members = [] } = useQuery({
@@ -63,6 +58,8 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
           description: null,
           status: 'offline',
           created_at: '',
+          banner: null,
+          pronouns: null,
         }
         return { user, isMuted: p.is_muted, isDeafened: p.is_deafened }
       })

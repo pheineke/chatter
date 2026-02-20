@@ -367,6 +367,7 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
         onLeaveVoice()
       } else {
         onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId })
+        navigate(`/channels/${serverId}/${channel.id}`)
       }
     } else {
       navigate(`/channels/${serverId}/${channel.id}`)

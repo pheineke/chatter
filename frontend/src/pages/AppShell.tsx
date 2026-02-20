@@ -1,11 +1,13 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { ServerSidebar } from '../components/ServerSidebar'
 import { ChannelSidebar } from '../components/ChannelSidebar'
 import { MessagePane } from '../components/MessagePane'
 import { FriendsPane } from '../components/FriendsPane'
 import { DMPane } from '../components/DMPane'
 import { VoiceChannelBar } from '../components/VoiceChannelBar'
+import { VoiceCallProvider } from '../contexts/VoiceCallContext'
 import { SettingsPage } from './SettingsPage'
 import { ServerSettingsPage } from './ServerSettingsPage'
 
@@ -17,6 +19,7 @@ export interface VoiceSession {
 }
 
 export default function AppShell() {
+  const { user } = useAuth()
   const [voiceSession, setVoiceSession] = useState<VoiceSession | null>(null)
 
   function handleLeaveVoice() {
@@ -29,7 +32,7 @@ export default function AppShell() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path=":serverId/settings" element={<ServerSettingsPage />} />
         <Route path="*" element={
-          <>
+          <VoiceCallProvider session={voiceSession} userId={user?.id ?? ''}>
             {/* Far-left: server icons */}
             <ServerSidebar />
 
@@ -60,7 +63,7 @@ export default function AppShell() {
                   <Route path=":serverId" element={<Navigate to="." replace />} />
                   <Route
                     path=":serverId/:channelId"
-                    element={<MessagePane voiceSession={voiceSession} onJoinVoice={setVoiceSession} />}
+                    element={<MessagePane voiceSession={voiceSession} onJoinVoice={setVoiceSession} onLeaveVoice={handleLeaveVoice} />}
                   />
                 </Routes>
               </div>
@@ -73,7 +76,7 @@ export default function AppShell() {
                 />
               )}
             </div>
-          </>
+          </VoiceCallProvider>
         } />
       </Routes>
     </div>
