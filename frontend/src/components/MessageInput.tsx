@@ -49,12 +49,12 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
 
   return (
     <div className="px-4 pb-4">
-      <div className="flex items-center gap-2 bg-discord-input rounded-lg px-3 py-2">
+      <div className="flex items-end gap-2 bg-discord-input rounded-lg px-3 py-2.5">
         {/* Attachment button */}
         <button
           title="Attach File"
           onClick={() => fileRef.current?.click()}
-          className="text-discord-muted hover:text-discord-text transition-colors"
+          className="text-discord-muted hover:text-discord-text transition-colors shrink-0 self-end pb-[3px]"
         >
           <Icon name="attach-2" size={20} />
         </button>
@@ -62,7 +62,7 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
 
         {/* Text area */}
         <textarea
-          className="flex-1 bg-transparent resize-none outline-none text-sm text-discord-text placeholder:text-discord-muted max-h-36 leading-relaxed"
+          className="flex-1 bg-transparent resize-none outline-none text-sm text-discord-text placeholder:text-discord-muted max-h-36 leading-5 py-0"
           rows={1}
           value={text}
           placeholder={placeholder}
@@ -79,7 +79,7 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
         <button
           onClick={handleSend}
           disabled={!text.trim() || sendMut.isPending}
-          className="text-discord-muted hover:text-discord-text disabled:opacity-30 transition-colors"
+          className="text-discord-muted hover:text-discord-text disabled:opacity-30 transition-colors shrink-0 self-end pb-[3px]"
           title="Send"
         >
           <Icon name="paper-plane" size={20} />
