@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDMs, sendDM } from '../api/dms'
 import { getUser } from '../api/users'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
@@ -10,12 +10,36 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import type { DM } from '../api/types'
 import { format } from 'date-fns'
 
+function ImagePreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-zoom-out"
+      onClick={onClose}
+    >
+      <img
+        src={url}
+        alt="Preview"
+        className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  )
+}
+
 export function DMPane() {
   const { dmUserId } = useParams<{ dmUserId: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const bottomRef = useRef<HTMLDivElement>(null)
   const [text, setText] = useState('')
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const closePreview = useCallback(() => setPreviewUrl(null), [])
 
   const { data: dms = [] } = useQuery({ queryKey: ['dms', dmUserId], queryFn: () => getDMs(dmUserId!), enabled: !!dmUserId })
   const { data: otherUser } = useQuery({ queryKey: ['user', dmUserId], queryFn: () => getUser(dmUserId!), enabled: !!dmUserId })
@@ -39,6 +63,7 @@ export function DMPane() {
   if (!dmUserId) return <div className="flex-1 flex items-center justify-center text-discord-muted">Select a conversation</div>
 
   return (
+    <>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-black/20 shadow-sm shrink-0">
@@ -56,9 +81,31 @@ export function DMPane() {
             <div className="text-xs text-discord-muted mt-1 w-10 shrink-0 text-right">
               {format(new Date(dm.created_at), 'HH:mm')}
             </div>
-            <p className={`text-sm break-words ${dm.sender.id === dmUserId ? 'text-discord-muted' : 'text-discord-text'}`}>
-              {dm.content}
-            </p>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm break-words ${dm.sender.id === dmUserId ? 'text-discord-muted' : 'text-discord-text'}`}>
+                {dm.content}
+              </p>
+              {dm.attachments?.map((att) => {
+                const filename = att.file_path.split('/').pop() ?? att.file_path
+                const url = `/api/static/${att.file_path}`
+                return (
+                  <div key={att.id} className="mt-1">
+                    {att.file_type === 'image' ? (
+                      <img
+                        src={url}
+                        alt={filename}
+                        className="max-w-xs max-h-64 rounded object-cover cursor-zoom-in hover:brightness-90 transition"
+                        onClick={() => setPreviewUrl(url)}
+                      />
+                    ) : (
+                      <a href={url} target="_blank" rel="noreferrer" className="text-discord-mention underline text-sm">
+                        📎 {filename}
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         ))}
         <div ref={bottomRef} />
@@ -78,5 +125,7 @@ export function DMPane() {
         </div>
       </div>
     </div>
+    {previewUrl && <ImagePreviewModal url={previewUrl} onClose={closePreview} />}
+    </>
   )
 }

@@ -1,5 +1,5 @@
 import { format, isToday, isYesterday } from 'date-fns'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { editMessage, deleteMessage, addReaction, removeReaction } from '../api/messages'
 import { UserAvatar } from './UserAvatar'
@@ -46,6 +46,8 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content)
   const [hovered, setHovered] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const closePreview = useCallback(() => setPreviewUrl(null), [])
 
   const editMut = useMutation({
     mutationFn: () => editMessage(channelId, msg.id, editText),
@@ -71,6 +73,7 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
   })
 
   return (
+    <>
     <div
       className={`group flex gap-3 px-4 py-0.5 hover:bg-white/[0.03] relative ${compact ? 'mt-0' : 'mt-3'}`}
       onMouseEnter={() => setHovered(true)}
@@ -124,13 +127,18 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
         {/* Attachments */}
         {msg.attachments?.map((att) => {
           const filename = att.file_path.split('/').pop() ?? att.file_path
-          const isImage = /\.(png|jpg|jpeg|gif|webp)$/i.test(att.file_path)
+          const url = `/api/static/${att.file_path}`
           return (
             <div key={att.id} className="mt-1">
-              {isImage ? (
-                <img src={`/api/attachments/${att.id}`} alt={filename} className="max-w-xs max-h-64 rounded object-cover" />
+              {att.file_type === 'image' ? (
+                <img
+                  src={url}
+                  alt={filename}
+                  className="max-w-xs max-h-64 rounded object-cover cursor-zoom-in hover:brightness-90 transition"
+                  onClick={() => setPreviewUrl(url)}
+                />
               ) : (
-                <a href={`/api/attachments/${att.id}`} target="_blank" rel="noreferrer" className="text-discord-mention underline text-sm">
+                <a href={url} target="_blank" rel="noreferrer" className="text-discord-mention underline text-sm">
                   📎 {filename}
                 </a>
               )}
@@ -173,6 +181,8 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
         </div>
       )}
     </div>
+    {previewUrl && <ImagePreviewModal url={previewUrl} onClose={closePreview} />}
+  </>
   )
 }
 
@@ -185,5 +195,27 @@ function ActionBtn({ title, onClick, className = '', children }: { title: string
     >
       {children}
     </button>
+  )
+}
+
+function ImagePreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-zoom-out"
+      onClick={onClose}
+    >
+      <img
+        src={url}
+        alt="Preview"
+        className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
   )
 }
