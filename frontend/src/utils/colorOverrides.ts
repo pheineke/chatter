@@ -1,6 +1,6 @@
 export const COLOR_SWATCHES: { key: string; label: string; default: string; generate: (v: string) => string }[] = [
   {
-    key: 'accent', label: 'Accent', default: '#7289da',
+    key: 'accent', label: 'Accent', default: '#5865f2',
     generate: v => `
       .bg-discord-mention { background-color: ${v} !important; }
       .text-discord-mention { color: ${v} !important; }
@@ -10,27 +10,27 @@ export const COLOR_SWATCHES: { key: string; label: string; default: string; gene
     `,
   },
   {
-    key: 'bg', label: 'Background', default: '#36393f',
+    key: 'bg', label: 'Background', default: '#313338',
     generate: v => `body { background-color: ${v} !important; } .bg-discord-bg { background-color: ${v} !important; }`,
   },
   {
-    key: 'sidebar', label: 'Sidebar', default: '#2f3136',
+    key: 'sidebar', label: 'Sidebar', default: '#1e1f22',
     generate: v => `.bg-discord-sidebar { background-color: ${v} !important; }`,
   },
   {
-    key: 'servers', label: 'Server Bar', default: '#202225',
+    key: 'servers', label: 'Server Bar', default: '#111214',
     generate: v => `.bg-discord-servers { background-color: ${v} !important; }`,
   },
   {
-    key: 'input', label: 'Input / Surface', default: '#40444b',
+    key: 'input', label: 'Input / Surface', default: '#383a40',
     generate: v => `.bg-discord-input { background-color: ${v} !important; }`,
   },
   {
-    key: 'text', label: 'Text', default: '#dcddde',
+    key: 'text', label: 'Text', default: '#f2f3f5',
     generate: v => `body { color: ${v} !important; } .text-discord-text { color: ${v} !important; }`,
   },
   {
-    key: 'muted', label: 'Muted Text', default: '#72767d',
+    key: 'muted', label: 'Muted Text', default: '#949ba4',
     generate: v => `.text-discord-muted { color: ${v} !important; }`,
   },
 ]
