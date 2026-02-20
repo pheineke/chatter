@@ -7,6 +7,7 @@ import { FriendsPane } from '../components/FriendsPane'
 import { DMPane } from '../components/DMPane'
 import { VoiceChannelBar } from '../components/VoiceChannelBar'
 import { SettingsPage } from './SettingsPage'
+import { ServerSettingsPage } from './ServerSettingsPage'
 
 /** The active voice session, if any (channelId + channelName). */
 export interface VoiceSession {
@@ -26,6 +27,7 @@ export default function AppShell() {
     <div className="flex h-screen bg-discord-bg text-discord-text overflow-hidden">
       <Routes>
         <Route path="settings" element={<SettingsPage />} />
+        <Route path=":serverId/settings" element={<ServerSettingsPage />} />
         <Route path="*" element={
           <>
             {/* Far-left: server icons */}

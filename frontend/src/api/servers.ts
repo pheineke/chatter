@@ -39,6 +39,10 @@ export async function getMembers(serverId: string): Promise<Member[]> {
   return data
 }
 
+export async function kickMember(serverId: string, userId: string): Promise<void> {
+  await client.delete(`/servers/${serverId}/members/${userId}`)
+}
+
 export async function getRoles(serverId: string): Promise<Role[]> {
   const { data } = await client.get<Role[]>(`/servers/${serverId}/roles`)
   return data
@@ -49,6 +53,33 @@ export async function createRole(serverId: string, body: { name: string; color?:
   return data
 }
 
+export async function updateRole(serverId: string, roleId: string, body: { name?: string; color?: string; is_admin?: boolean }): Promise<Role> {
+  const { data } = await client.patch<Role>(`/servers/${serverId}/roles/${roleId}`, body)
+  return data
+}
+
 export async function deleteRole(serverId: string, roleId: string): Promise<void> {
   await client.delete(`/servers/${serverId}/roles/${roleId}`)
+}
+
+export async function assignRole(serverId: string, userId: string, roleId: string): Promise<void> {
+  await client.post(`/servers/${serverId}/members/${userId}/roles/${roleId}`)
+}
+
+export async function removeRole(serverId: string, userId: string, roleId: string): Promise<void> {
+  await client.delete(`/servers/${serverId}/members/${userId}/roles/${roleId}`)
+}
+
+export async function uploadServerIcon(serverId: string, file: File): Promise<Server> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await client.post<Server>(`/servers/${serverId}/image`, form)
+  return data
+}
+
+export async function uploadServerBanner(serverId: string, file: File): Promise<Server> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await client.post<Server>(`/servers/${serverId}/banner`, form)
+  return data
 }

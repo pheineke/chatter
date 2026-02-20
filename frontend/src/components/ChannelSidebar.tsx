@@ -88,7 +88,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       x: rect.left,
       y: rect.bottom + 4,
       items: [
-        { label: 'Server Settings', icon: 'settings', onClick: () => { /* TODO */ } },
+        { label: 'Server Settings', icon: 'settings', onClick: () => navigate(`/channels/${serverId}/settings`) },
         { label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite },
       ],
     })

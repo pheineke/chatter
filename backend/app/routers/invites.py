@@ -150,3 +150,37 @@ async def join_via_invite(code: str, current_user: CurrentUser, db: DB):
         await db.commit()
 
     return {"server_id": str(invite.server_id)}
+
+
+@router.get("/servers/{server_id}/invites", response_model=list[InviteRead])
+async def list_invites(
+    server_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    result = await db.execute(
+        select(ServerInvite)
+        .options(selectinload(ServerInvite.server))
+        .where(ServerInvite.server_id == server_id)
+        .order_by(ServerInvite.created_at.desc())
+    )
+    return [_invite_to_read(i) for i in result.scalars().all()]
+
+
+@router.delete("/invites/{code}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_invite(code: str, current_user: CurrentUser, db: DB):
+    result = await db.execute(
+        select(ServerInvite)
+        .options(selectinload(ServerInvite.server))
+        .where(ServerInvite.code == code)
+    )
+    invite = result.scalar_one_or_none()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    server = await _get_server_or_404(invite.server_id, db)
+    await _require_admin(server, current_user.id, db)
+    await db.delete(invite)
+    await db.commit()
+

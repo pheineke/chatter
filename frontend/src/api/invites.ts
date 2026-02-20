@@ -34,3 +34,12 @@ export async function joinViaInvite(code: string): Promise<{ server_id: string }
   const { data } = await client.post<{ server_id: string }>(`/invites/${code}/join`)
   return data
 }
+
+export async function listInvites(serverId: string): Promise<ServerInvite[]> {
+  const { data } = await client.get<ServerInvite[]>(`/servers/${serverId}/invites`)
+  return data
+}
+
+export async function revokeInvite(code: string): Promise<void> {
+  await client.delete(`/invites/${code}`)
+}
