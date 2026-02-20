@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useMatch } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useCallback } from 'react'
 import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence } from '../api/channels'
@@ -22,7 +22,9 @@ interface Props {
 }
 
 export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Props) {
-  const { serverId, channelId } = useParams<{ serverId: string; channelId?: string }>()
+  const { serverId } = useParams<{ serverId: string }>()
+  const channelMatch = useMatch('/channels/:serverId/:channelId')
+  const channelId = channelMatch?.params.channelId
   const navigate = useNavigate()
   const { user, logout, refreshUser } = useAuth()
   const qc = useQueryClient()
@@ -419,8 +421,8 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
         onContextMenu={onContextMenu}
         className={`w-full flex items-center gap-1.5 px-2 py-1 mx-1 rounded text-sm transition-colors
           ${active && !isVoice
-            ? 'bg-discord-input text-discord-text'
-            : 'text-discord-muted hover:bg-discord-input/60 hover:text-discord-text'}`}
+            ? 'bg-white/10 text-discord-text font-medium'
+            : 'text-discord-muted hover:bg-white/5 hover:text-discord-text'}`}
       >
         <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
         <span className="truncate">{channel.title}</span>
