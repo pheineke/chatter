@@ -33,7 +33,7 @@ export function UserAvatar({ user, size = 40, className = '' }: Props) {
   if (user.avatar) {
     return (
       <img
-        src={user.avatar}
+        src={`/api/static/${user.avatar}`}
         alt={user.username}
         style={style}
         className={`rounded-full object-cover ${className}`}
