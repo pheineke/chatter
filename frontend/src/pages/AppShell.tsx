@@ -32,7 +32,7 @@ export default function AppShell() {
             <ServerSidebar />
 
             {/* Second column: channel/DM list */}
-            <div className="flex flex-col w-60 shrink-0 bg-discord-sidebar">
+            <div className="flex flex-col w-60 shrink-0 bg-discord-sidebar overflow-hidden">
               <Routes>
                 <Route path="@me/*" element={<DMSidebar />} />
                 <Route

@@ -157,7 +157,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   })
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Server name header */}
       <div
         className="px-4 py-3 font-bold border-b border-black/20 shadow-sm flex items-center justify-between cursor-pointer hover:bg-discord-input/30 transition-colors select-none"
@@ -169,7 +169,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
       {/* Channel list */}
       <div
-        className="flex-1 overflow-y-auto py-2 space-y-1"
+        className="flex-1 overflow-y-auto py-2 space-y-1 scrollbar-none"
         onContextMenu={handleContextMenu}
       >
         {Array.from(grouped.entries()).map(([catId, chs]) => {
