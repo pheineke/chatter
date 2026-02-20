@@ -161,7 +161,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     <div className="flex flex-col h-full overflow-hidden">
       {/* Server name header */}
       <div
-        className="px-4 py-3 font-bold border-b border-black/20 shadow-sm flex items-center justify-between cursor-pointer hover:bg-discord-input/30 transition-colors select-none"
+        className="px-4 font-bold border-b border-black/20 shadow-sm flex items-center justify-between cursor-pointer hover:bg-discord-input/30 transition-colors select-none h-12 shrink-0"
         onClick={handleHeaderClick}
       >
         <span className="truncate">{server?.title ?? 'Server'}</span>

@@ -58,5 +58,7 @@ class RoleRead(RoleBase):
 class MemberRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    user_id: uuid.UUID
+    server_id: uuid.UUID
     user: UserRead
     joined_at: datetime

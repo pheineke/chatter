@@ -1,8 +1,11 @@
 import { useParams } from 'react-router-dom'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getChannels } from '../api/channels'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { MemberSidebar } from './MemberSidebar'
+import { Icon } from './Icon'
 import type { VoiceSession } from '../pages/AppShell'
 
 interface Props {
@@ -12,6 +15,7 @@ interface Props {
 
 export function MessagePane({ voiceSession, onJoinVoice }: Props) {
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
+  const [showMembers, setShowMembers] = useState(true)
 
   const { data: channels = [] } = useQuery({
     queryKey: ['channels', serverId],
@@ -53,19 +57,34 @@ export function MessagePane({ voiceSession, onJoinVoice }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* Channel header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-black/20 shadow-sm shrink-0">
+      <div className="flex items-center gap-2 px-4 border-b border-black/20 shadow-sm shrink-0 h-12">
         <span className="text-discord-muted font-semibold">#</span>
         <span className="font-bold">{channel?.title ?? channelId}</span>
+        <div className="flex-1" />
+        <button
+          onClick={() => setShowMembers(v => !v)}
+          title="Toggle member list"
+          className={`p-1.5 rounded transition-colors ${showMembers ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+        >
+          <Icon name="people" size={20} />
+        </button>
       </div>
 
-      {/* Messages */}
-      <MessageList channelId={channelId} />
+      {/* Body: messages + optional member sidebar */}
+      <div className="flex flex-1 min-h-0">
+        <div className="flex flex-col flex-1 min-w-0 min-h-0">
+          {/* Messages */}
+          <MessageList channelId={channelId} />
 
-      {/* Input */}
-      <MessageInput
-        channelId={channelId}
-        placeholder={`Message #${channel?.title ?? channelId}`}
-      />
+          {/* Input */}
+          <MessageInput
+            channelId={channelId}
+            placeholder={`Message #${channel?.title ?? channelId}`}
+          />
+        </div>
+
+        {showMembers && serverId && <MemberSidebar serverId={serverId} />}
+      </div>
     </div>
   )
 }

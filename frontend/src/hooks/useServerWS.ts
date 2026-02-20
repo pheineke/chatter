@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
-import type { Channel, VoiceParticipant } from '../api/types'
+import type { Channel, Member, VoiceParticipant } from '../api/types'
 
 /** Voice presence query key for a given server. */
 const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
@@ -81,6 +81,15 @@ export function useServerWS(serverId: string | null) {
               ),
             }
           })
+          break
+        }
+        case 'user.status_changed': {
+          const { user_id, status } = msg.data as { user_id: string; status: string }
+          qc.setQueryData<Member[]>(['members', serverId], (old = []) =>
+            old.map(m =>
+              m.user.id === user_id ? { ...m, user: { ...m.user, status: status as Member['user']['status'] } } : m
+            )
+          )
           break
         }
         default:

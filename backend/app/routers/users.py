@@ -8,7 +8,9 @@ from sqlalchemy import select
 from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.schemas.user import UserRead, UserUpdate
+from app.ws_manager import manager
 from models.user import User, UserStatus
+from models.server import ServerMember
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -22,6 +24,7 @@ async def get_me(current_user: CurrentUser):
 
 @router.patch("/me", response_model=UserRead)
 async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB):
+    status_changed = body.status is not None and body.status != current_user.status
     if body.description is not None:
         current_user.description = body.description
     if body.status is not None:
@@ -33,6 +36,20 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB):
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
+
+    # Broadcast status change to all servers the user is a member of
+    if status_changed:
+        result = await db.execute(
+            select(ServerMember.server_id).where(ServerMember.user_id == current_user.id)
+        )
+        server_ids = result.scalars().all()
+        event = {
+            "type": "user.status_changed",
+            "data": {"user_id": str(current_user.id), "status": current_user.status.value},
+        }
+        for sid in server_ids:
+            await manager.broadcast_server(sid, event)
+
     return current_user
 
 
