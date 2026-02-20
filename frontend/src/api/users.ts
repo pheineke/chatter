@@ -19,7 +19,7 @@ export async function getMe(): Promise<User> {
   return data
 }
 
-export async function updateMe(patch: { description?: string; status?: string }): Promise<User> {
+export async function updateMe(patch: Partial<User>): Promise<User> {
   const { data } = await client.patch<User>('/users/me', patch)
   return data
 }
@@ -28,6 +28,13 @@ export async function uploadAvatar(file: File): Promise<User> {
   const form = new FormData()
   form.append('file', file)
   const { data } = await client.post<User>('/users/me/avatar', form)
+  return data
+}
+
+export async function uploadBanner(file: File): Promise<User> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await client.post<User>('/users/me/banner', form)
   return data
 }
 

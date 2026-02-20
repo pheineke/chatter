@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getDMs, sendDM } from '../api/dms'
 import { getUser } from '../api/users'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
@@ -36,6 +37,8 @@ export function DMPane() {
   const { dmUserId } = useParams<{ dmUserId: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const isSelf = !!user && user.id === dmUserId
   const bottomRef = useRef<HTMLDivElement>(null)
   const [text, setText] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -112,18 +115,20 @@ export function DMPane() {
       </div>
 
       {/* Input */}
-      <div className="px-4 pb-4">
-        <div className="flex items-end gap-2 bg-discord-input rounded-lg px-3 py-2">
-          <textarea
-            className="flex-1 bg-transparent resize-none outline-none text-sm text-discord-text placeholder:text-discord-muted max-h-36"
-            rows={1}
-            value={text}
-            placeholder={`Message ${otherUser?.username ?? '…'}`}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (text.trim()) sendMut.mutate() } }}
-          />
+      {!isSelf && (
+        <div className="px-4 pb-4">
+          <div className="flex items-end gap-2 bg-discord-input rounded-lg px-3 py-2">
+            <textarea
+              className="flex-1 bg-transparent resize-none outline-none text-sm text-discord-text placeholder:text-discord-muted max-h-36"
+              rows={1}
+              value={text}
+              placeholder={`Message ${otherUser?.username ?? '…'}`}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (text.trim()) sendMut.mutate() } }}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
     {previewUrl && <ImagePreviewModal url={previewUrl} onClose={closePreview} />}
     </>

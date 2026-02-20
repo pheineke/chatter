@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { editMessage, deleteMessage, addReaction, removeReaction } from '../api/messages'
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
+import { ProfileCard } from './ProfileCard'
 import type { Message } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -48,6 +49,14 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
   const [hovered, setHovered] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const closePreview = useCallback(() => setPreviewUrl(null), [])
+  const [cardPos, setCardPos] = useState<{ x: number; y: number } | null>(null)
+
+  const handleUserClick = useCallback((e: React.MouseEvent) => {
+     e.stopPropagation()
+     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+     // Spawn slightly to the right/bottom
+     setCardPos({ x: rect.right + 12, y: rect.top })
+  }, [])
 
   const editMut = useMutation({
     mutationFn: () => editMessage(channelId, msg.id, editText),
@@ -80,7 +89,7 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
       onMouseLeave={() => setHovered(false)}
     >
       {/* Avatar / timestamp column */}
-      <div className="w-10 shrink-0 flex justify-center">
+      <div className="w-10 shrink-0 flex justify-center select-none cursor-pointer" onClick={handleUserClick}>
         {compact ? (
           <span className="text-[10px] text-discord-muted opacity-0 group-hover:opacity-100 mt-1 leading-tight select-none">
             {format(new Date(msg.created_at), 'HH:mm')}
@@ -94,7 +103,10 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
       <div className="flex-1 min-w-0">
         {!compact && (
           <div className="flex items-baseline gap-2 mb-0.5">
-            <span className="font-semibold text-white hover:underline cursor-pointer">
+            <span 
+              className="font-semibold text-white hover:underline cursor-pointer"
+              onClick={handleUserClick}
+            >
               {msg.author.username}
             </span>
             <span className="text-xs text-discord-muted">{formatTime(msg.created_at)}</span>
@@ -182,6 +194,13 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
       )}
     </div>
     {previewUrl && <ImagePreviewModal url={previewUrl} onClose={closePreview} />}
+    {cardPos && (
+      <ProfileCard 
+        userId={msg.author.id} 
+        onClose={() => setCardPos(null)} 
+        position={cardPos}
+      />
+    )}
   </>
   )
 }

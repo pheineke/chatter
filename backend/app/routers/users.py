@@ -26,6 +26,11 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB):
         current_user.description = body.description
     if body.status is not None:
         current_user.status = body.status
+    if body.pronouns is not None:
+        current_user.pronouns = body.pronouns
+    if body.banner is not None:
+        current_user.banner = body.banner
+    db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
     return current_user
@@ -39,9 +44,7 @@ async def upload_avatar(
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Unsupported file type")
-    if file.size and file.size > settings.max_upload_size:
-        raise HTTPException(status_code=400, detail="File too large")
-
+    
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"avatars/{current_user.id}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
@@ -51,6 +54,31 @@ async def upload_avatar(
         await f.write(await file.read())
 
     current_user.avatar = filename
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.post("/me/banner", response_model=UserRead)
+async def upload_banner(
+    current_user: CurrentUser,
+    db: DB,
+    file: UploadFile = File(...),
+):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+    
+    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
+    filename = f"banners/{current_user.id}.{ext}"
+    dest = os.path.join(settings.static_dir, filename)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+
+    async with aiofiles.open(dest, "wb") as f:
+        await f.write(await file.read())
+
+    current_user.banner = filename
+    db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
     return current_user

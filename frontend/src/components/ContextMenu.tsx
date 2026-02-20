@@ -7,6 +7,7 @@ export interface ContextMenuItem {
   icon: string
   onClick: () => void
   danger?: boolean
+  active?: boolean
 }
 
 interface Props {
@@ -63,10 +64,13 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
           className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors
             ${item.danger
               ? 'text-red-400 hover:bg-red-500 hover:text-white'
-              : 'text-discord-text hover:bg-discord-mention'}`}
+              : item.active
+                ? 'text-discord-text bg-discord-mention/30'
+                : 'text-discord-text hover:bg-discord-mention'}`}
         >
           <Icon name={item.icon} size={16} className="shrink-0" />
-          {item.label}
+          <span className="flex-1">{item.label}</span>
+          {item.active && <Icon name="checkmark" size={14} className="shrink-0 text-discord-mention" />}
         </button>
       ))}
     </div>,

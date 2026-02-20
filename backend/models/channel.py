@@ -1,8 +1,7 @@
 import uuid
 import enum
 
-from sqlalchemy import String, Text, ForeignKey, Boolean, Integer, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Text, ForeignKey, Boolean, Integer, Enum, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -16,7 +15,7 @@ class ChannelType(str, enum.Enum):
 class Category(Base):
     __tablename__ = "categories"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     server_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("servers.id", ondelete="CASCADE"), nullable=False
     )
@@ -30,7 +29,7 @@ class Category(Base):
 class Channel(Base):
     __tablename__ = "channels"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     server_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("servers.id", ondelete="CASCADE"), nullable=False
     )

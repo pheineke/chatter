@@ -2,8 +2,7 @@ import uuid
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Enum, Text, DateTime
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Enum, Text, DateTime, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -19,10 +18,12 @@ class UserStatus(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    banner: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pronouns: Mapped[str | None] = mapped_column(String(50), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), default=UserStatus.offline)
     created_at: Mapped[datetime] = mapped_column(

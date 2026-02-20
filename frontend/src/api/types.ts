@@ -6,7 +6,9 @@ export interface User {
   id: string
   username: string
   avatar: string | null
+  banner: string | null
   description: string | null
+  pronouns: string | null
   status: UserStatus
   created_at: string
 }

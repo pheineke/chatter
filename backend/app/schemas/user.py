@@ -9,6 +9,7 @@ from models.user import UserStatus
 class UserBase(BaseModel):
     username: str
     description: str | None = None
+    pronouns: str | None = None
     status: UserStatus = UserStatus.offline
 
 
@@ -19,7 +20,9 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     description: str | None = None
+    pronouns: str | None = None
     status: UserStatus | None = None
+    banner: str | None = None
 
 
 class UserRead(UserBase):
@@ -27,6 +30,7 @@ class UserRead(UserBase):
 
     id: uuid.UUID
     avatar: str | None
+    banner: str | None
     created_at: datetime
 
 

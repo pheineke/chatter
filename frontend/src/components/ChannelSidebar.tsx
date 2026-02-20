@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence } from '../api/channels'
 import { getMembers, getServer } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,6 +8,7 @@ import { StatusIndicator } from './StatusIndicator'
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
 import { useServerWS } from '../hooks/useServerWS'
+import { updateMe } from '../api/users'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import { createInvite } from '../api/invites'
@@ -23,7 +24,7 @@ interface Props {
 export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Props) {
   const { serverId, channelId } = useParams<{ serverId: string; channelId?: string }>()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, refreshUser } = useAuth()
   const qc = useQueryClient()
 
   useServerWS(serverId ?? null)
@@ -204,22 +205,49 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
       {/* User panel */}
       <div className="p-2 bg-discord-bg flex items-center gap-2">
-        <div className="relative">
-          <UserAvatar user={user} size={32} />
-          {user && (
-            <span className="absolute -bottom-0.5 -right-0.5">
-              <StatusIndicator status={user.status} size={10} />
-            </span>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{user?.username}</div>
-          <div className="text-xs text-discord-muted truncate capitalize">{user?.status}</div>
+        <div 
+          className="flex items-center gap-2 flex-1 min-w-0 hover:bg-discord-input/40 p-1 rounded cursor-pointer transition-colors"
+          onClick={(e) => {
+            if (!user) return
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            const statuses: { label: string; value: string; icon: string }[] = [
+              { label: 'Online',  value: 'online',  icon: 'ellipse' },
+              { label: 'Away',    value: 'away',    icon: 'time' },
+              { label: 'Do Not Disturb', value: 'busy', icon: 'remove-circle' },
+              { label: 'Offline', value: 'offline', icon: 'ellipse' },
+            ]
+            setContextMenu({
+              x: rect.left,
+              y: rect.top - 4,
+              items: statuses.map(s => ({
+                label: s.label,
+                icon: s.icon,
+                active: user.status === s.value,
+                onClick: async () => {
+                  await updateMe({ status: s.value as any })
+                  await refreshUser()
+                },
+              })),
+            })
+          }}
+        >
+          <div className="relative">
+            <UserAvatar user={user} size={32} />
+            {user && (
+              <span className="absolute -bottom-0.5 -right-0.5">
+                <StatusIndicator status={user.status} size={10} />
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold truncate">{user?.username}</div>
+            <div className="text-xs text-discord-muted truncate capitalize">{user?.status}</div>
+          </div>
         </div>
         <button
           title="User Settings"
           onClick={() => navigate('/channels/settings')}
-          className="text-discord-muted hover:text-discord-text leading-none p-1"
+          className="text-discord-muted hover:text-discord-text leading-none p-2 rounded hover:bg-discord-input/40 transition-colors"
         >
           <Icon name="settings" size={18} />
         </button>
@@ -331,6 +359,7 @@ interface RowProps {
 function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {
   const isVoice = channel.type === 'voice'
   const inThisVoice = voiceSession?.channelId === channel.id
+  const [activeProfile, setActiveProfile] = useState<{ id: string; pos: { x: number; y: number } } | null>(null)
 
   function handleClick() {
     if (isVoice) {
@@ -342,6 +371,12 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
     } else {
       navigate(`/channels/${serverId}/${channel.id}`)
     }
+  }
+
+  function handleUserClick(e: React.MouseEvent, userId: string) {
+    e.stopPropagation()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setActiveProfile({ id: userId, pos: { x: rect.right + 12, y: rect.top } })
   }
 
   // Resolve participant user info from the per-channel presence list.
@@ -361,6 +396,8 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
             description: null,
             status: 'offline',
             created_at: '',
+            banner: null,
+            pronouns: null,
           }
         }
         return { user, isSelf }
@@ -368,6 +405,7 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
     : []
 
   return (
+    <>
     <div>
       <button
         onClick={handleClick}
@@ -386,7 +424,11 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
       {participantUsers.length > 0 && (
         <div className="ml-4 mb-1 space-y-0.5">
           {participantUsers.map(({ user: u, isSelf }) => (
-            <div key={u.id} className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-discord-muted">
+            <div 
+              key={u.id} 
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-discord-muted hover:bg-discord-input/40 cursor-pointer"
+              onClick={(e) => handleUserClick(e, u.id)}
+            >
               <div className="relative shrink-0">
                 <UserAvatar user={u} size={20} />
                 <span className="absolute -bottom-0.5 -right-0.5">
@@ -399,5 +441,13 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
         </div>
       )}
     </div>
+    {activeProfile && (
+       <ProfileCard 
+          userId={activeProfile.id} 
+          onClose={() => setActiveProfile(null)} 
+          position={activeProfile.pos} 
+       />
+    )}
+    </>
   )
 }
