@@ -82,4 +82,14 @@ Clicking on an active voice channel in the sidebar should switch the main conten
     -   **Offline**: Users who are offline are displayed at the bottom, typically with lower opacity or a greyed-out appearance.
 -   **Role Grouping**: (Optional) Users should be grouped by their highest role (e.g., Admin, Moderator, Member) within the Online/Offline sections.
 
+## 5. Feature Requests: Messaging
 
+### 5.1. Reply to Messages
+See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec.md)
+
+- **Hover / context-menu** to enter reply mode.
+- **Reply banner** above the composer showing "Replying to @Username" with a cancel (✕) button and Escape shortcut.
+- Replied messages render a **quoted header** (small avatar + username + truncated preview) above the reply body.
+- Clicking the quote **jumps to** the original message with a brief highlight.
+- Deleted originals show a tombstone: *"Original message was deleted"*.
+- Flat list only — no nested threading.
