@@ -14,6 +14,7 @@ import type { ContextMenuItem } from './ContextMenu'
 import { createInvite } from '../api/invites'
 import type { Channel, VoiceParticipant, Member, User } from '../api/types'
 import type { VoiceSession } from '../pages/AppShell'
+import { ProfileCard } from './ProfileCard'
 
 interface Props {
   voiceSession: VoiceSession | null
