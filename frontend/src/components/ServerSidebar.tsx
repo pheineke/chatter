@@ -23,7 +23,7 @@ function ServerIcon({ server, active }: { server: Server; active: boolean }) {
         ${active ? 'rounded-2xl bg-discord-mention text-white' : 'bg-discord-input text-discord-text hover:rounded-2xl hover:bg-discord-mention hover:text-white'}`}
     >
       {server.image ? (
-        <img src={server.image} alt={server.title} className="w-full h-full rounded-[inherit] object-cover" />
+        <img src={`/api/static/${server.image}`} alt={server.title} className="w-full h-full rounded-[inherit] object-cover" />
       ) : (
         initials
       )}
