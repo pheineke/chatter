@@ -89,7 +89,7 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
                 </div>
                 <span className="truncate">{u.username}</span>
                 {isMuted && <Icon name="mic-off" size={12} className="text-discord-muted shrink-0 opacity-60" />}
-                {isDeafened && <Icon name="bell-off" size={12} className="text-discord-muted shrink-0 opacity-60" />}
+                {isDeafened && <Icon name="headphones-off" size={12} className="text-discord-muted shrink-0 opacity-60" />}
               </div>
             ))}
           </div>
@@ -102,7 +102,7 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
           <Icon name={state.isMuted ? 'mic-off' : 'mic'} size={18} />
         </VoiceBtn>
         <VoiceBtn title={state.isDeafened ? 'Undeafen' : 'Deafen'} active={state.isDeafened} onClick={toggleDeafen}>
-          <Icon name={state.isDeafened ? 'bell-off' : 'bell'} size={18} />
+          <Icon name={state.isDeafened ? 'headphones-off' : 'headphones'} size={18} />
         </VoiceBtn>
         <VoiceBtn title={state.isSharingScreen ? 'Stop Screen Share' : 'Share Screen'} active={state.isSharingScreen} onClick={toggleScreenShare}>
           <Icon name="monitor" size={18} />

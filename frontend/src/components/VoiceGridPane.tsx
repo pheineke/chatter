@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { getMembers } from '../api/servers'
@@ -99,7 +100,7 @@ function ParticipantCard({
         )}
         {tile.isDeafened && (
           <span className="w-5 h-5 rounded-full bg-discord-bg/80 flex items-center justify-center">
-            <Icon name="bell-off" size={11} className="text-red-400" />
+            <Icon name="headphones-off" size={11} className="text-red-400" />
           </span>
         )}
       </div>
@@ -166,6 +167,24 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   const { user: selfUser } = useAuth()
   const { state, remoteStreams, localVideoStream, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam } = useVoiceCall()
   const [focused, setFocused] = useState<string | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+
+  // Exit fullscreen when theater mode ends
+  function clearFocused() {
+    setFocused(null)
+    setFullscreen(false)
+  }
+
+  // ESC exits fullscreen first, then theater
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      if (fullscreen) { setFullscreen(false) }
+      else { clearFocused() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
 
   const { data: members = [] } = useQuery({
     queryKey: ['members', session.serverId],
@@ -256,7 +275,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
 
   // Validate focus — if the focused tile no longer exists (stream ended), clear
   useEffect(() => {
-    if (focused && !tiles.find(t => t.id === focused)) setFocused(null)
+    if (focused && !tiles.find(t => t.id === focused)) clearFocused()
   })
 
   // Participant count label ──────────────────────────────────────────────────
@@ -273,7 +292,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
         </span>
         {theaterTile && (
           <button
-            onClick={() => setFocused(null)}
+            onClick={clearFocused}
             className="ml-auto flex items-center gap-1 text-xs text-discord-muted hover:text-discord-text transition-colors"
           >
             <Icon name="minimize-2" size={13} /> Exit Theater
@@ -287,8 +306,16 @@ export function VoiceGridPane({ session, onLeave }: Props) {
           // ── Theater mode ────────────────────────────────────────────────
           <div className="flex flex-col h-full gap-3">
             {/* Focused video */}
-            <div className="flex-1 min-h-0 rounded-xl overflow-hidden bg-black border border-white/10">
-              <VideoCard tile={theaterTile} focused onClick={() => setFocused(null)} />
+            <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-black border border-white/10">
+              <VideoCard tile={theaterTile} focused onClick={clearFocused} />
+              {/* Fullscreen button — bottom right */}
+              <button
+                onClick={() => setFullscreen(true)}
+                title="Fullscreen (Esc to exit)"
+                className="absolute bottom-3 right-3 w-8 h-8 rounded-lg bg-black/60 hover:bg-black/90 flex items-center justify-center text-white/70 hover:text-white transition-colors z-10"
+              >
+                <Icon name="maximize" size={16} />
+              </button>
             </div>
             {/* Filmstrip */}
             {filmstripTiles.length > 0 && (
@@ -344,7 +371,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
           active={state.isDeafened}
           onClick={toggleDeafen}
         >
-          <Icon name={state.isDeafened ? 'bell-off' : 'bell'} size={20} />
+          <Icon name={state.isDeafened ? 'headphones-off' : 'headphones'} size={20} />
         </CtrlBtn>
         <CtrlBtn
           title={state.isSharingScreen ? 'Stop Sharing' : 'Share Screen'}
@@ -364,6 +391,42 @@ export function VoiceGridPane({ session, onLeave }: Props) {
           <Icon name="phone-off" size={20} />
         </CtrlBtn>
       </div>
+
+      {/* Fullscreen overlay — rendered in a portal so it covers the entire viewport */}
+      {fullscreen && theaterTile && createPortal(
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* Top bar */}
+          <div className="flex items-center gap-3 px-4 py-3 shrink-0">
+            <span className="text-white/80 text-sm font-semibold truncate">{theaterTile.label}</span>
+            <span className="text-[10px] uppercase font-bold text-white/50 bg-white/10 px-2 py-0.5 rounded-full">
+              {theaterTile.tileType === 'screen' ? 'Screen' : 'Cam'}
+            </span>
+            <button
+              onClick={() => setFullscreen(false)}
+              title="Exit fullscreen (Esc)"
+              className="ml-auto w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+            >
+              <Icon name="minimize-2" size={18} />
+            </button>
+          </div>
+
+          {/* Video */}
+          <div className="flex-1 min-h-0 flex items-center justify-center">
+            <VideoEl stream={theaterTile.stream} muted={theaterTile.label.startsWith('Your')} />
+          </div>
+
+          {/* Bottom bar */}
+          <div className="flex items-center justify-end px-4 py-3 shrink-0">
+            <button
+              onClick={() => setFullscreen(false)}
+              className="flex items-center gap-2 text-sm text-white/60 hover:text-white border border-white/20 hover:border-white/40 px-4 py-2 rounded-lg transition-colors"
+            >
+              <Icon name="minimize-2" size={15} /> Exit Fullscreen
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
