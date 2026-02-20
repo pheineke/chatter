@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './index.css'
+import { applyColorOverrides, loadColorOverrides } from './utils/colorOverrides'
+
+// Apply persisted color theme before first render
+applyColorOverrides(loadColorOverrides())
 
 const queryClient = new QueryClient({
   defaultOptions: {

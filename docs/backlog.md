@@ -1,8 +1,6 @@
 # Project Backlog & Issues
 
 ## 1. Known Issues / Bugs
-- **Image Attachments Not Rendering**: Currently, image attachments in chat messages are not displayed inline. They need to be rendered as thumbnails or full images within the message bubble.
-- **Image Preview Overlay**: Clicking an image attachment should open it in a full-screen or modal overlay for better viewing.
 
 ## 2. Feature Requests: User Profiles
 
