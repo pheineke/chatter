@@ -65,7 +65,7 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
       })
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 bg-discord-bg/80 border-t border-black/20 shrink-0">
+    <div className="flex items-center justify-between px-3 py-2 h-14 bg-discord-bg/80 border-t border-black/20 shrink-0">
       {/* Left: connection info + participant list */}
       <div className="flex flex-col min-w-0 gap-1">
         <div>

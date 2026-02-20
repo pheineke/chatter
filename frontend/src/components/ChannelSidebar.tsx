@@ -207,7 +207,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       </div>
 
       {/* User panel */}
-      <div className="p-2 bg-discord-bg flex items-center gap-2">
+      <div className="px-3 py-2 h-14 bg-discord-bg border-t border-black/20 flex items-center gap-2 shrink-0">
         <div 
           className="flex items-center gap-2 flex-1 min-w-0 hover:bg-discord-input/40 p-1 rounded cursor-pointer transition-colors"
           onClick={(e) => {
