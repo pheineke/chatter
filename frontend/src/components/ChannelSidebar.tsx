@@ -421,7 +421,7 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
         onClick={handleClick}
         onContextMenu={onContextMenu}
         className={`w-full flex items-center gap-1.5 px-2 py-1 mx-1 rounded text-sm transition-colors
-          ${active && !isVoice
+          ${active
             ? 'bg-white/10 text-discord-text font-medium'
             : 'text-discord-muted hover:bg-white/5 hover:text-discord-text'}`}
       >
