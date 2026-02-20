@@ -116,3 +116,17 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 - Optional **WebSocket gateway** for real-time events (`message_create`, `message_delete`, etc.).
 - **"API Tokens" tab** in account settings — create, copy (one-time reveal), and revoke tokens.
 - Python `httpx` / `requests` example in spec.
+
+## 7. Feature Requests: Client Sounds
+
+### 7.1. Sound Effects Integration
+See full spec: [`docs/specs/client_sounds_spec.md`](specs/client_sounds_spec.md)
+
+- Implement a global sound manager to play notification sounds.
+- **Events**:
+  - Join/Leave channel (self & others)
+  - Mute/Unmute (self)
+  - Deafen/Undeafen (self)
+  - Incoming Message (when not focused)
+- **Settings**: Respect user preferences for toggling individual sounds.
+- **Assets**: Use provided `frontend/public/sounds/` files.
