@@ -84,7 +84,17 @@ Clicking on an active voice channel in the sidebar should switch the main conten
 
 ## 5. Feature Requests: Messaging
 
-### 5.1. Reply to Messages
+### 5.1. Message Reactions
+See full spec: [`docs/specs/message_reactions_spec.md`](specs/message_reactions_spec.md)
+
+- **Hover action bar** (😊＋ icon) or right-click context menu opens the emoji picker.
+- **Full emoji picker** — category nav bar, search, recently used (last 36), skin tone selector, 36×36 px grid with name tooltip.
+- **Reaction pills** below message body — emoji + count, highlighted if current user reacted, ＋ add button.
+- **Hover tooltip** — shows "Liked by Josh, Anna, and 3 more" after 400 ms delay.
+- **Right-click a pill** — opens a persistent Reactors Popover with full scrollable list of avatars + names.
+- WebSocket events `reaction.added` / `reaction.removed` for real-time pill updates.
+
+### 5.2. Reply to Messages
 See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec.md)
 
 - **Hover / context-menu** to enter reply mode.
