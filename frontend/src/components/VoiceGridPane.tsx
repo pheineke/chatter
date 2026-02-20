@@ -45,28 +45,6 @@ function VideoEl({ stream, muted = false }: { stream: MediaStream; muted?: boole
 
 // ─── Control button ─────────────────────────────────────────────────────────
 
-function CtrlBtn({
-  title, active, danger, onClick, children,
-}: {
-  title: string; active?: boolean; danger?: boolean; onClick: () => void; children: React.ReactNode
-}) {
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors
-        ${danger
-          ? 'bg-red-600 hover:bg-red-500 text-white'
-          : active
-            ? 'bg-discord-mention text-white hover:bg-discord-mention/80'
-            : 'bg-discord-input text-discord-muted hover:bg-discord-input/60 hover:text-discord-text'
-        }`}
-    >
-      {children}
-    </button>
-  )
-}
-
 // ─── Participant tile card ───────────────────────────────────────────────────
 
 function ParticipantCard({
@@ -165,7 +143,7 @@ interface Props {
 
 export function VoiceGridPane({ session, onLeave }: Props) {
   const { user: selfUser } = useAuth()
-  const { state, remoteStreams, localVideoStream, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam } = useVoiceCall()
+  const { state, remoteStreams, localVideoStream } = useVoiceCall()
   const [focused, setFocused] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
 
@@ -355,41 +333,6 @@ export function VoiceGridPane({ session, onLeave }: Props) {
             )}
           </div>
         )}
-      </div>
-
-      {/* Bottom controls */}
-      <div className="flex items-center justify-center gap-3 px-4 py-4 border-t border-black/20 shrink-0">
-        <CtrlBtn
-          title={state.isMuted ? 'Unmute' : 'Mute'}
-          active={state.isMuted}
-          onClick={toggleMute}
-        >
-          <Icon name={state.isMuted ? 'mic-off' : 'mic'} size={20} />
-        </CtrlBtn>
-        <CtrlBtn
-          title={state.isDeafened ? 'Undeafen' : 'Deafen'}
-          active={state.isDeafened}
-          onClick={toggleDeafen}
-        >
-          <Icon name={state.isDeafened ? 'headphones-off' : 'headphones'} size={20} />
-        </CtrlBtn>
-        <CtrlBtn
-          title={state.isSharingScreen ? 'Stop Sharing' : 'Share Screen'}
-          active={state.isSharingScreen}
-          onClick={toggleScreenShare}
-        >
-          <Icon name="monitor" size={20} />
-        </CtrlBtn>
-        <CtrlBtn
-          title={state.isSharingWebcam ? 'Turn Off Camera' : 'Turn On Camera'}
-          active={state.isSharingWebcam}
-          onClick={toggleWebcam}
-        >
-          <Icon name="camera" size={20} />
-        </CtrlBtn>
-        <CtrlBtn title="Leave Voice" danger onClick={onLeave}>
-          <Icon name="phone-off" size={20} />
-        </CtrlBtn>
       </div>
 
       {/* Fullscreen overlay — rendered in a portal so it covers the entire viewport */}
