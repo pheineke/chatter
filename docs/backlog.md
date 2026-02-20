@@ -103,3 +103,16 @@ See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec
 - Clicking the quote **jumps to** the original message with a brief highlight.
 - Deleted originals show a tombstone: *"Original message was deleted"*.
 - Flat list only — no nested threading.
+
+## 6. Feature Requests: Bot / API Access
+
+### 6.1. Personal API Tokens & Bot Support
+See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
+
+- Users can generate **named personal API tokens** (max 5) in account settings.
+- Tokens authenticate via `Authorization: Bot <token>` header on all existing REST endpoints.
+- Token is shown **once** at creation (SHA-256 hashed in DB, never stored raw).
+- Bots can send/read messages, list servers/channels/members, and send DMs.
+- Optional **WebSocket gateway** for real-time events (`message_create`, `message_delete`, etc.).
+- **"API Tokens" tab** in account settings — create, copy (one-time reveal), and revoke tokens.
+- Python `httpx` / `requests` example in spec.
