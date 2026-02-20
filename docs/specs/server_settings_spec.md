@@ -80,10 +80,36 @@ The sidebar is divided into categories. The header of the first category is the 
 **Features:**
 - **Invite List:** Table displaying:
   - **Creator:** User who generated the link.
-  - **Code:** The invite code.
-  - **Uses:** Number of times used.
-  - **Expires:** Time remaining.
+  - **Code:** The invite code with a copy button.
+  - **Uses:** Number of times used (e.g. `3 / 10`, or `5` if unlimited).
+  - **Expires:** Remaining time or "Never".
 - **Revoke:** Button to delete an invite immediately.
+- **Create Invite:** Button/form to generate a new invite with the following options:
+
+#### Expiry Options
+Dropdown with fixed presets (default: **1 day**):
+
+| Label    | Value         |
+|----------|---------------|
+| 1 Hour   | 1 hour        |
+| 6 Hours  | 6 hours       |
+| 12 Hours | 12 hours      |
+| 1 Day    | 24 hours      |
+| 7 Days   | 168 hours     |
+| Never    | No expiry     |
+
+#### Max Uses Options
+Dropdown with fixed presets (default: **No limit**):
+
+| Label    | Value |
+|----------|-------|
+| No limit | 0     |
+| 1 use    | 1     |
+| 5 uses   | 5     |
+| 10 uses  | 10    |
+| 25 uses  | 25    |
+| 50 uses  | 50    |
+| 100 uses | 100   |
 
 ### 3.6. Moderation: Audit Log
 **Goal:** Track administrative actions.
