@@ -363,9 +363,15 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
 
   function handleClick() {
     if (isVoice) {
-      if (inThisVoice) {
+      if (inThisVoice && active) {
+        // Already connected AND viewing this channel → disconnect, stay on page
+        // (MessagePane will flip to "Join Voice" view)
         onLeaveVoice()
+      } else if (inThisVoice && !active) {
+        // Connected but viewing another channel → navigate to the voice grid
+        navigate(`/channels/${serverId}/${channel.id}`)
       } else {
+        // Not connected → join and navigate to the voice grid
         onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId })
         navigate(`/channels/${serverId}/${channel.id}`)
       }
@@ -418,7 +424,14 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
       >
         <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
         <span className="truncate">{channel.title}</span>
-        {inThisVoice && <span className="ml-auto text-discord-online text-xs">● Live</span>}
+        {inThisVoice && active && (
+          <span className="ml-auto text-red-400 text-xs flex items-center gap-0.5">
+            <Icon name="phone-off" size={11} /> Leave
+          </span>
+        )}
+        {inThisVoice && !active && (
+          <span className="ml-auto text-discord-online text-xs">● Live</span>
+        )}
       </button>
 
       {/* Voice participants */}
