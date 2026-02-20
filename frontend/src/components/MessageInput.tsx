@@ -49,12 +49,12 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
 
   return (
     <div className="px-4 pb-4">
-      <div className="flex items-end gap-2 bg-discord-input rounded-lg px-3 py-2">
+      <div className="flex items-center gap-2 bg-discord-input rounded-lg px-3 py-2">
         {/* Attachment button */}
         <button
           title="Attach File"
           onClick={() => fileRef.current?.click()}
-          className="text-discord-muted hover:text-discord-text transition-colors pb-0.5"
+          className="text-discord-muted hover:text-discord-text transition-colors"
         >
           <Icon name="attach-2" size={20} />
         </button>
@@ -79,7 +79,7 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
         <button
           onClick={handleSend}
           disabled={!text.trim() || sendMut.isPending}
-          className="text-discord-muted hover:text-discord-text disabled:opacity-30 transition-colors pb-0.5"
+          className="text-discord-muted hover:text-discord-text disabled:opacity-30 transition-colors"
           title="Send"
         >
           <Icon name="paper-plane" size={20} />
