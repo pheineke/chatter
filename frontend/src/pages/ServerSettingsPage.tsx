@@ -152,7 +152,18 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
   const iconRef  = useRef<HTMLInputElement>(null)
   const bannerRef = useRef<HTMLInputElement>(null)
 
+  // Sync local state when server data changes (e.g. after save invalidates the query)
+  useEffect(() => {
+    setName(server.title)
+    setDesc(server.description ?? '')
+  }, [server.title, server.description])
+
   const isDirty = name !== server.title || desc !== (server.description ?? '')
+
+  function handleDiscard() {
+    setName(server.title)
+    setDesc(server.description ?? '')
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -248,10 +259,19 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
 
       {isDirty && (
         <div className="sticky bottom-0 flex items-center justify-between bg-discord-servers border border-white/10 rounded-lg px-4 py-3 shadow-xl">
-          <span className="text-sm text-discord-muted">You have unsaved changes</span>
-          <button className="btn" onClick={handleSave} disabled={saving}>
-            {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save Changes'}
-          </button>
+          <span className="text-sm text-discord-muted">Careful — you have unsaved changes!</span>
+          <div className="flex items-center gap-2">
+            <button
+              className="px-4 py-1.5 rounded text-sm font-semibold text-discord-muted hover:text-discord-text hover:bg-white/5 transition-colors"
+              onClick={handleDiscard}
+              disabled={saving}
+            >
+              Discard Changes
+            </button>
+            <button className="btn" onClick={handleSave} disabled={saving}>
+              {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
         </div>
       )}
     </div>
