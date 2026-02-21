@@ -47,3 +47,12 @@ export async function getUserByUsername(username: string): Promise<User> {
   const { data } = await client.get<User>('/users/search', { params: { username } })
   return data
 }
+
+export async function getNote(userId: string): Promise<string> {
+  const { data } = await client.get<{ content: string }>(`/users/${userId}/note`)
+  return data.content
+}
+
+export async function setNote(userId: string, content: string): Promise<void> {
+  await client.put(`/users/${userId}/note`, { content })
+}

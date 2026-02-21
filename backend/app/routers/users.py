@@ -3,6 +3,7 @@ import uuid
 
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile, File, status
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.config import settings
@@ -11,6 +12,7 @@ from app.schemas.user import UserRead, UserUpdate
 from app.ws_manager import manager
 from models.user import User, UserStatus
 from models.server import ServerMember
+from models.note import UserNote
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -123,3 +125,37 @@ async def get_user(user_id: uuid.UUID, db: DB, current_user: CurrentUser):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+
+class NoteBody(BaseModel):
+    content: str = ""
+
+
+@router.get("/{user_id}/note", response_model=NoteBody)
+async def get_note(user_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    result = await db.execute(
+        select(UserNote).where(
+            UserNote.owner_id == current_user.id,
+            UserNote.target_id == user_id,
+        )
+    )
+    note = result.scalar_one_or_none()
+    return NoteBody(content=note.content if note else "")
+
+
+@router.put("/{user_id}/note", response_model=NoteBody)
+async def set_note(user_id: uuid.UUID, body: NoteBody, current_user: CurrentUser, db: DB):
+    result = await db.execute(
+        select(UserNote).where(
+            UserNote.owner_id == current_user.id,
+            UserNote.target_id == user_id,
+        )
+    )
+    note = result.scalar_one_or_none()
+    if note is None:
+        note = UserNote(owner_id=current_user.id, target_id=user_id, content=body.content)
+        db.add(note)
+    else:
+        note.content = body.content
+    await db.commit()
+    return NoteBody(content=note.content)

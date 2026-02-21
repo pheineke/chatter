@@ -2,8 +2,9 @@ import { useNavigate } from 'react-router-dom'
 import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
 import { Icon } from './Icon'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getUser } from '../api/users'
+import { getNote, setNote } from '../api/users'
 import { getDMs, sendDM } from '../api/dms'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '../api/types'
@@ -40,12 +41,44 @@ interface Props {
 
 export function ProfileCard({ userId, onClose, position }: Props) {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const ref = useRef<HTMLDivElement>(null)
   const [msg, setMsg] = useState('')
+  const [noteText, setNoteText] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { user: currentUser } = useAuth()
   const isSelf = !!currentUser && currentUser.id === userId
 
   const { data: user } = useQuery({ queryKey: ['user', userId], queryFn: () => getUser(userId) })
+
+  const { data: savedNote } = useQuery({
+    queryKey: ['note', userId],
+    queryFn: () => getNote(userId),
+    enabled: !isSelf,
+  })
+
+  // Sync textarea when note data loads
+  useEffect(() => {
+    if (savedNote !== undefined) setNoteText(savedNote)
+  }, [savedNote])
+
+  const noteMut = useMutation({
+    mutationFn: (content: string) => setNote(userId, content),
+    onSuccess: () => {
+      setNoteSaving(false)
+      qc.invalidateQueries({ queryKey: ['note', userId] })
+    },
+  })
+
+  function handleNoteChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setNoteText(e.target.value)
+    setNoteSaving(true)
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      noteMut.mutate(e.target.value)
+    }, 800)
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -113,8 +146,19 @@ export function ProfileCard({ userId, onClose, position }: Props) {
              </div>
 
              <div className="mt-4 border-t border-discord-input pt-2">
-                 <div className="text-xs font-bold text-discord-muted uppercase mb-1">Note</div>
-                 <input className="input w-full text-xs h-8 bg-transparent border-0 px-0 placeholder:text-discord-muted" placeholder="Click to add a note" />
+                 <div className="flex items-center justify-between mb-1">
+                   <div className="text-xs font-bold text-discord-muted uppercase">Note</div>
+                   {noteSaving && <span className="text-[10px] text-discord-muted">Saving…</span>}
+                 </div>
+                 {isSelf ? null : (
+                   <textarea
+                     className="input w-full text-xs bg-black/20 border-0 px-2 py-1.5 placeholder:text-discord-muted resize-none"
+                     rows={2}
+                     value={noteText}
+                     onChange={handleNoteChange}
+                     placeholder="Click to add a note"
+                   />
+                 )}
              </div>
 
              <form onSubmit={handleMessage} className="mt-4">

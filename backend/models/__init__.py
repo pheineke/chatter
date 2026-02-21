@@ -7,6 +7,7 @@ from models.dm import DirectMessage, DMAttachment
 from models.dm_channel import DMChannel
 from models.friend import FriendRequest, FriendRequestStatus
 from models.invite import ServerInvite
+from models.note import UserNote
 
 __all__ = [
     "Base",
@@ -31,4 +32,5 @@ __all__ = [
     "FriendRequest",
     "FriendRequestStatus",
     "ServerInvite",
+    "UserNote",
 ]
