@@ -60,7 +60,11 @@ export default function AppShell() {
                   <Route index element={<Navigate to="@me" replace />} />
                   <Route path="@me" element={<FriendsPane />} />
                   <Route path="@me/:dmUserId" element={<DMPane />} />
-                  <Route path=":serverId" element={<Navigate to="." replace />} />
+                  <Route path=":serverId" element={
+                    <div className="flex-1 flex items-center justify-center text-discord-muted">
+                      Select a channel to start chatting.
+                    </div>
+                  } />
                   <Route
                     path=":serverId/:channelId"
                     element={<MessagePane voiceSession={voiceSession} onJoinVoice={setVoiceSession} onLeaveVoice={handleLeaveVoice} />}
