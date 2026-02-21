@@ -366,12 +366,8 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
 
   function handleClick() {
     if (isVoice) {
-      if (inThisVoice && active) {
-        // Already connected AND viewing this channel → disconnect, stay on page
-        // (MessagePane will flip to "Join Voice" view)
-        onLeaveVoice()
-      } else if (inThisVoice && !active) {
-        // Connected but viewing another channel → navigate to the voice grid
+      if (inThisVoice) {
+        // Already connected → just navigate to the voice grid
         navigate(`/channels/${serverId}/${channel.id}`)
       } else {
         // Not connected → join and navigate to the voice grid
@@ -391,7 +387,7 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
 
   // Resolve participant user info from the per-channel presence list.
   // All clients (including non-voice ones) get this from useServerWS + voicePresence query.
-  const participantUsers: { user: User; isSelf: boolean }[] = isVoice
+  const participantUsers: { user: User; isSelf: boolean; isSpeaking: boolean }[] = isVoice
     ? channelPresence.map((p) => {
         const isSelf = p.user_id === localUser?.id
         const m = members.find((m) => m.user_id === p.user_id)
@@ -410,7 +406,7 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
             pronouns: null,
           }
         }
-        return { user, isSelf }
+        return { user, isSelf, isSpeaking: p.is_speaking ?? false }
       })
     : []
 
@@ -427,12 +423,7 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
       >
         <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
         <span className="truncate">{channel.title}</span>
-        {inThisVoice && active && (
-          <span className="ml-auto text-red-400 text-xs flex items-center gap-0.5">
-            <Icon name="phone-off" size={11} /> Leave
-          </span>
-        )}
-        {inThisVoice && !active && (
+        {inThisVoice && (
           <span className="ml-auto text-discord-online text-xs">● Live</span>
         )}
       </button>
@@ -440,19 +431,21 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
       {/* Voice participants */}
       {participantUsers.length > 0 && (
         <div className="ml-4 mb-1 space-y-0.5">
-          {participantUsers.map(({ user: u, isSelf }) => (
+          {participantUsers.map(({ user: u, isSelf, isSpeaking }) => (
             <div 
               key={u.id} 
               className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-discord-muted hover:bg-discord-input/40 cursor-pointer"
               onClick={(e) => handleUserClick(e, u.id)}
             >
-              <div className="relative shrink-0">
+              <div className={`relative shrink-0 rounded-full transition-all ${
+                isSpeaking ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-discord-sidebar' : ''
+              }`}>
                 <UserAvatar user={u} size={20} />
                 <span className="absolute -bottom-0.5 -right-0.5">
                   <StatusIndicator status={u.status} size={7} />
                 </span>
               </div>
-              <span className="truncate">{u.username}{isSelf ? ' (you)' : ''}</span>
+              <span className={`truncate transition-colors ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>
             </div>
           ))}
         </div>

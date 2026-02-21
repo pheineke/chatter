@@ -7,7 +7,6 @@ import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
 import { Icon } from './Icon'
 import { useVoiceCall } from '../contexts/VoiceCallContext'
-import { useSpeaking } from '../hooks/useSpeaking'
 import type { VoiceSession } from '../pages/AppShell'
 import type { User } from '../api/types'
 
@@ -258,8 +257,7 @@ interface Props {
 
 export function VoiceGridPane({ session, onLeave }: Props) {
   const { user: selfUser } = useAuth()
-  const { state, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream, sendSpeaking, toggleWebcam } = useVoiceCall()
-  const isSelfSpeaking = useSpeaking(localStream, sendSpeaking)
+  const { state, remoteStreams, remoteScreenAudioStreams, localVideoStream, toggleWebcam, isSelfSpeaking } = useVoiceCall()
   const [focused, setFocused] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
   // Tile IDs the user has explicitly activated (clicked to watch/listen).

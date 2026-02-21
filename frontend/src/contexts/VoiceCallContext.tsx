@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { MutableRefObject } from 'react'
 import { useVoiceChannel } from '../hooks/useVoiceChannel'
+import { useSpeaking } from '../hooks/useSpeaking'
 import type { VoiceState } from '../hooks/useVoiceChannel'
 import type { VoiceSession } from '../pages/AppShell'
 
@@ -13,13 +14,12 @@ interface VoiceCallContextValue {
   toggleScreenShare: () => Promise<void>
   toggleWebcam: () => Promise<void>
   remoteStreams: Record<string, MediaStream>
-  /** Screen-share audio streams keyed by peer userId — rendered as separate audio source tiles. */
   remoteScreenAudioStreams: Record<string, MediaStream>
   localVideoStream: MediaStream | null
-  /** Ref to the local microphone stream — used for speaking detection. */
   localStream: MutableRefObject<MediaStream | null>
-  /** Send a speaking state update to the server. */
   sendSpeaking: (isSpeaking: boolean) => void
+  /** Whether the local user is currently speaking (detected via Web Audio API). */
+  isSelfSpeaking: boolean
 }
 
 const VoiceCallContext = createContext<VoiceCallContextValue | null>(null)
@@ -40,8 +40,12 @@ export function VoiceCallProvider({ session, userId, children }: ProviderProps) 
   const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream } =
     useVoiceChannel({ channelId: session?.channelId ?? null, userId })
 
+  // Speaking detection lives here so it runs for the full voice session,
+  // not just while VoiceGridPane is mounted.
+  const isSelfSpeaking = useSpeaking(localStream, sendSpeaking)
+
   return (
-    <VoiceCallContext.Provider value={{ state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream }}>
+    <VoiceCallContext.Provider value={{ state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream, isSelfSpeaking }}>
       {children}
     </VoiceCallContext.Provider>
   )

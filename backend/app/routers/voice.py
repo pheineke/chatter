@@ -252,14 +252,13 @@ async def voice_ws(
                 val = msg.get("is_speaking")
                 if isinstance(val, bool):
                     await voice_manager.update_state(channel_id, user_id, is_speaking=val)
-                    # Broadcast only within the voice channel room (not server-wide)
-                    # to keep speaking updates cheap and contained.
                     participant_data = voice_manager.get_participant(channel_id, user_id)
                     if participant_data:
-                        await voice_manager._broadcast_all(
-                            channel_id,
-                            {"type": "voice.state_changed", "data": participant_data},
-                        )
+                        payload = {"type": "voice.state_changed", "channel_id": str(channel_id), "data": participant_data}
+                        # Voice channel: update peer speaking indicators
+                        await voice_manager._broadcast_all(channel_id, payload)
+                        # Server WS: update sidebar speaking indicators for all viewers
+                        await ws_manager.broadcast_server(channel.server_id, payload)
 
             # -- Unknown message types → silently ignore ------------------
 

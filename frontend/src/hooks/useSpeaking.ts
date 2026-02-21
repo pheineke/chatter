@@ -90,6 +90,11 @@ export function useSpeaking(
 
     return () => {
       clearInterval(timerId)
+      // If the user was speaking when the hook unmounts (e.g. navigating away),
+      // send a final false so the server clears the speaking state.
+      if (speakingRef.current) {
+        onSpeakingChangeRef.current(false)
+      }
       ctxRef.current?.close()
       ctxRef.current = null
       analyserRef.current = null
