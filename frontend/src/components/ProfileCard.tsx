@@ -5,7 +5,8 @@ import { Icon } from './Icon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getUser } from '../api/users'
 import { getNote, setNote } from '../api/users'
-import { getDMs, sendDM } from '../api/dms'
+import { getDMChannel } from '../api/dms'
+import { sendMessage } from '../api/messages'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -101,7 +102,8 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   async function handleMessage(e: React.FormEvent) {
     e.preventDefault()
     if (!user || !msg.trim()) return
-    await sendDM(user.id, msg)
+    const { channel_id } = await getDMChannel(user.id)
+    await sendMessage(channel_id, msg.trim())
     setMsg('')
     onClose()
     navigate(`/channels/@me/${user.id}`)
