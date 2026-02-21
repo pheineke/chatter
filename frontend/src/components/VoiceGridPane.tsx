@@ -22,6 +22,8 @@ interface ParticipantTile {
   isSharingScreen: boolean
   isSharingWebcam: boolean
   isSelf: boolean
+  /** Live webcam stream — when present, replaces the avatar with video. */
+  webcamStream?: MediaStream
 }
 
 interface VideoTile {
@@ -69,41 +71,77 @@ function ParticipantCard({
 }: {
   tile: ParticipantTile; compact?: boolean; isSpeaking?: boolean; onClick?: () => void
 }) {
+  const hasVideo = !!tile.webcamStream
+
   return (
     <div
-      className={`relative flex flex-col items-center justify-center rounded-xl bg-discord-sidebar transition-all
+      className={`relative flex flex-col items-center justify-center rounded-xl overflow-hidden transition-all
+        ${hasVideo ? 'bg-black' : 'bg-discord-sidebar'}
         ${isSpeaking ? 'border-2 border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.25)]' : 'border border-white/5'}
         ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}
       onClick={onClick}
     >
-      <div className="relative">
-        <UserAvatar user={tile.user} size={compact ? 40 : 64} />
-        <span className="absolute -bottom-1 -right-1">
-          <StatusIndicator status={tile.user.status} size={compact ? 9 : 13} />
-        </span>
-      </div>
-      {!compact && (
-        <span className="mt-2 text-sm font-semibold text-discord-text truncate max-w-full px-2">
-          {tile.user.username}{tile.isSelf ? ' (You)' : ''}
-        </span>
-      )}
-      {/* Muted / deafened badges */}
-      <div className={`absolute flex gap-1 ${compact ? 'bottom-1 right-1' : 'bottom-2 right-2'}`}>
-        {tile.isMuted && (
-          <span className="w-5 h-5 rounded-full bg-discord-bg/80 flex items-center justify-center">
-            <Icon name="mic-off" size={11} className="text-red-400" />
-          </span>
-        )}
-        {tile.isDeafened && (
-          <span className="w-5 h-5 rounded-full bg-discord-bg/80 flex items-center justify-center">
-            <Icon name="headphones-off" size={11} className="text-red-400" />
-          </span>
-        )}
-      </div>
-      {compact && (
-        <span className="mt-1 text-[10px] text-discord-muted truncate max-w-[88px] px-1 text-center leading-none">
-          {tile.user.username}
-        </span>
+      {hasVideo ? (
+        <>
+          {/* Live webcam fills the tile */}
+          <VideoEl stream={tile.webcamStream!} />
+          {/* Name + avatar overlay at the bottom */}
+          <div className="absolute bottom-0 left-0 right-0 flex items-center gap-1.5 px-2 py-1.5 bg-gradient-to-t from-black/70 to-transparent">
+            {!compact && (
+              <>
+                <UserAvatar user={tile.user} size={20} />
+                <span className="text-xs font-semibold text-white truncate">
+                  {tile.user.username}{tile.isSelf ? ' (You)' : ''}
+                </span>
+              </>
+            )}
+            {/* Badges */}
+            <div className="flex gap-1 ml-auto">
+              {tile.isMuted && (
+                <span className="w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
+                  <Icon name="mic-off" size={9} className="text-red-400" />
+                </span>
+              )}
+              {tile.isDeafened && (
+                <span className="w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
+                  <Icon name="headphones-off" size={9} className="text-red-400" />
+                </span>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="relative">
+            <UserAvatar user={tile.user} size={compact ? 40 : 64} />
+            <span className="absolute -bottom-1 -right-1">
+              <StatusIndicator status={tile.user.status} size={compact ? 9 : 13} />
+            </span>
+          </div>
+          {!compact && (
+            <span className="mt-2 text-sm font-semibold text-discord-text truncate max-w-full px-2">
+              {tile.user.username}{tile.isSelf ? ' (You)' : ''}
+            </span>
+          )}
+          {/* Muted / deafened badges */}
+          <div className={`absolute flex gap-1 ${compact ? 'bottom-1 right-1' : 'bottom-2 right-2'}`}>
+            {tile.isMuted && (
+              <span className="w-5 h-5 rounded-full bg-discord-bg/80 flex items-center justify-center">
+                <Icon name="mic-off" size={11} className="text-red-400" />
+              </span>
+            )}
+            {tile.isDeafened && (
+              <span className="w-5 h-5 rounded-full bg-discord-bg/80 flex items-center justify-center">
+                <Icon name="headphones-off" size={11} className="text-red-400" />
+              </span>
+            )}
+          </div>
+          {compact && (
+            <span className="mt-1 text-[10px] text-discord-muted truncate max-w-[88px] px-1 text-center leading-none">
+              {tile.user.username}
+            </span>
+          )}
+        </>
       )}
     </div>
   )
@@ -214,7 +252,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   // Tile IDs the user has explicitly activated (clicked to watch/listen).
   // Local tiles are pre-seeded so the user always sees their own streams.
   const [activeTiles, setActiveTiles] = useState<Set<string>>(
-    () => new Set(['screen-local', 'webcam-local'])
+    () => new Set(['screen-local'])
   )
   const activateTile   = (id: string) => setActiveTiles(prev => new Set([...prev, id]))
   const deactivateTile = (id: string) => {
@@ -260,6 +298,10 @@ export function VoiceGridPane({ session, onLeave }: Props) {
       isSharingScreen: state.isSharingScreen,
       isSharingWebcam: state.isSharingWebcam,
       isSelf: true,
+      // Show local webcam preview inside the tile (only when not screen-sharing,
+      // since screen-share uses its own VideoTile)
+      webcamStream: state.isSharingWebcam && !state.isSharingScreen && localVideoStream
+        ? localVideoStream : undefined,
     })
   }
 
@@ -285,6 +327,9 @@ export function VoiceGridPane({ session, onLeave }: Props) {
       isSharingScreen: p.is_sharing_screen,
       isSharingWebcam: p.is_sharing_webcam,
       isSelf: false,
+      // Embed webcam directly in the participant tile (not a separate VideoTile)
+      webcamStream: p.is_sharing_webcam && !p.is_sharing_screen && remoteStreams[p.user_id]
+        ? remoteStreams[p.user_id] : undefined,
     })
     // Remote screen share tile — audioStream carries system audio if the user shared it
     if (p.is_sharing_screen && remoteStreams[p.user_id]) {
@@ -298,27 +343,17 @@ export function VoiceGridPane({ session, onLeave }: Props) {
         isLocal: false,
       })
     }
-    // Remote webcam tile
-    if (p.is_sharing_webcam && !p.is_sharing_screen && remoteStreams[p.user_id]) {
-      tiles.push({
-        kind: 'video',
-        id: `webcam-${p.user_id}`,
-        label: `${user.username}'s Camera`,
-        stream: remoteStreams[p.user_id],
-        tileType: 'webcam',
-        isLocal: false,
-      })
-    }
+    // Webcam is now embedded in the participant tile — no separate VideoTile needed
   })
 
-  // Local screen share / webcam tile — always active (user sees their own preview)
-  if (localVideoStream) {
+  // Local screen share tile — always active (user sees their own preview)
+  if (localVideoStream && state.isSharingScreen && state.isSharingScreen) {
     tiles.push({
       kind: 'video',
-      id: state.isSharingScreen ? 'screen-local' : 'webcam-local',
-      label: state.isSharingScreen ? 'Your Screen' : 'Your Camera',
+      id: 'screen-local',
+      label: 'Your Screen',
       stream: localVideoStream,
-      tileType: state.isSharingScreen ? 'screen' : 'webcam',
+      tileType: 'screen',
       isLocal: true,
     })
   }
@@ -340,7 +375,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   useEffect(() => {
     const tileIds = new Set(tiles.map(t => t.id))
     setActiveTiles(prev => {
-      const pruned = new Set([...prev].filter(id => tileIds.has(id) || id === 'screen-local' || id === 'webcam-local'))
+      const pruned = new Set([...prev].filter(id => tileIds.has(id) || id === 'screen-local'))
       return pruned.size === prev.size ? prev : pruned
     })
   })
