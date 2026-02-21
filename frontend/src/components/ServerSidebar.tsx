@@ -168,6 +168,7 @@ export function ServerSidebar() {
             placeholder="Server name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={50}
           />
           <div className="flex gap-2">
             <button className="btn flex-1" onClick={() => createMut.mutate()} disabled={!name.trim() || createMut.isPending}>

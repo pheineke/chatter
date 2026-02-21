@@ -1,13 +1,13 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.user import UserRead
 
 
 class ServerBase(BaseModel):
-    title: str
+    title: str = Field(min_length=1, max_length=50)
     description: str | None = None
 
 
@@ -16,7 +16,7 @@ class ServerCreate(ServerBase):
 
 
 class ServerUpdate(BaseModel):
-    title: str | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=50)
     description: str | None = None
 
 

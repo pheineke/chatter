@@ -242,7 +242,7 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
             className="input w-full"
             value={name}
             onChange={e => setName(e.target.value)}
-            maxLength={100}
+            maxLength={50}
           />
         </div>
         <div>
