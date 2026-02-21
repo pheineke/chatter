@@ -17,10 +17,24 @@ export async function createChannel(
 export async function updateChannel(
   serverId: string,
   channelId: string,
-  patch: { title?: string; description?: string },
+  patch: { title?: string; description?: string | null },
 ): Promise<Channel> {
   const { data } = await client.patch<Channel>(`/servers/${serverId}/channels/${channelId}`, patch)
   return data
+}
+
+export async function reorderChannels(
+  serverId: string,
+  items: { id: string; position: number; category_id: string | null }[],
+): Promise<void> {
+  await client.put(`/servers/${serverId}/channels/reorder`, items)
+}
+
+export async function reorderCategories(
+  serverId: string,
+  items: { id: string; position: number }[],
+): Promise<void> {
+  await client.put(`/servers/${serverId}/categories/reorder`, items)
 }
 
 export async function deleteChannel(serverId: string, channelId: string): Promise<void> {

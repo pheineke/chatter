@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
-import type { Channel, Member, VoiceParticipant } from '../api/types'
+import type { Channel, Category, Member, VoiceParticipant } from '../api/types'
 
 /** Voice presence query key for a given server. */
 const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
@@ -81,6 +81,16 @@ export function useServerWS(serverId: string | null) {
               ),
             }
           })
+          break
+        }
+        case 'channels.reordered': {
+          const updated = msg.data as Channel[]
+          qc.setQueryData<Channel[]>(['channels', serverId], () => updated)
+          break
+        }
+        case 'categories.reordered': {
+          const updated = msg.data as Category[]
+          qc.setQueryData<Category[]>(['categories', serverId], () => updated)
           break
         }
         case 'user.status_changed': {

@@ -45,6 +45,17 @@ class ChannelUpdate(BaseModel):
     category_id: uuid.UUID | None = None
 
 
+class ChannelReorderItem(BaseModel):
+    id: uuid.UUID
+    position: int
+    category_id: uuid.UUID | None = None
+
+
+class CategoryReorderItem(BaseModel):
+    id: uuid.UUID
+    position: int
+
+
 class ChannelRead(ChannelBase):
     model_config = ConfigDict(from_attributes=True)
 

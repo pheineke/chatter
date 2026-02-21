@@ -11,9 +11,11 @@ from app.schemas.channel import (
     CategoryCreate,
     CategoryUpdate,
     CategoryRead,
+    CategoryReorderItem,
     ChannelCreate,
     ChannelUpdate,
     ChannelRead,
+    ChannelReorderItem,
     ChannelPermissionRead,
     ChannelPermissionSet,
 )
@@ -45,6 +47,33 @@ async def create_category(
     await db.commit()
     await db.refresh(category)
     return category
+
+
+@router.put("/categories/reorder", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder_categories(
+    server_id: uuid.UUID,
+    body: List[CategoryReorderItem],
+    current_user: CurrentUser,
+    db: DB,
+):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    for item in body:
+        result = await db.execute(
+            select(Category).where(Category.id == item.id, Category.server_id == server_id)
+        )
+        cat = result.scalar_one_or_none()
+        if cat:
+            cat.position = item.position
+    await db.commit()
+    result = await db.execute(
+        select(Category).where(Category.server_id == server_id).order_by(Category.position)
+    )
+    updated_cats = result.scalars().all()
+    await manager.broadcast_server(
+        server_id,
+        {"type": "categories.reordered", "data": [CategoryRead.model_validate(c).model_dump(mode="json") for c in updated_cats]},
+    )
 
 
 @router.patch("/categories/{category_id}", response_model=CategoryRead)
@@ -121,6 +150,34 @@ async def create_channel(
         {"type": "channel.created", "data": ChannelRead.model_validate(channel).model_dump(mode="json")},
     )
     return channel
+
+
+@router.put("/channels/reorder", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder_channels(
+    server_id: uuid.UUID,
+    body: List[ChannelReorderItem],
+    current_user: CurrentUser,
+    db: DB,
+):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    for item in body:
+        result = await db.execute(
+            select(Channel).where(Channel.id == item.id, Channel.server_id == server_id)
+        )
+        ch = result.scalar_one_or_none()
+        if ch:
+            ch.position = item.position
+            ch.category_id = item.category_id
+    await db.commit()
+    result = await db.execute(
+        select(Channel).where(Channel.server_id == server_id).order_by(Channel.position)
+    )
+    updated_channels = result.scalars().all()
+    await manager.broadcast_server(
+        server_id,
+        {"type": "channels.reordered", "data": [ChannelRead.model_validate(c).model_dump(mode="json") for c in updated_channels]},
+    )
 
 
 @router.patch("/channels/{channel_id}", response_model=ChannelRead)

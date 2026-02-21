@@ -1,13 +1,17 @@
 import { useNavigate, useParams, useMatch } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, useRef, useCallback } from 'react'
-import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence } from '../api/channels'
+import { useState, useRef, useCallback, type ReactNode } from 'react'
+import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories } from '../api/channels'
 import { getMembers, getServer } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
 import { StatusIndicator } from './StatusIndicator'
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
 import { useServerWS } from '../hooks/useServerWS'
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { updateMe } from '../api/users'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
@@ -80,6 +84,9 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [editChannel, setEditChannel] = useState<Channel | null>(null)
   const [editChannelName, setEditChannelName] = useState('')
   const [editChannelDesc, setEditChannelDesc] = useState('')
+  const [dragId, setDragId] = useState<string | null>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -159,14 +166,79 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     setEditChannel(null)
   }
 
-  // Group channels by category (null = no category)
-  const grouped = new Map<string | null, Channel[]>()
-  grouped.set(null, [])
-  categories.forEach((c) => grouped.set(c.id, []))
-  channels.forEach((ch) => {
+  // Build sorted flat list: [cat:A, ch:1, ch:2, cat:B, ch:3, ch:4, ...]
+  const sortedCats = [...categories].sort((a, b) => a.position - b.position)
+  const byCategory = new Map<string | null, Channel[]>()
+  sortedCats.forEach(c => byCategory.set(c.id, []))
+  byCategory.set(null, [])
+  channels.forEach(ch => {
     const key = ch.category_id ?? null
-    grouped.set(key, [...(grouped.get(key) ?? []), ch])
+    byCategory.set(key, [...(byCategory.get(key) ?? []), ch])
   })
+  byCategory.forEach((v, k) => byCategory.set(k, [...v].sort((a, b) => a.position - b.position)))
+  const flatIds: string[] = []
+  sortedCats.forEach(cat => {
+    flatIds.push(`cat:${cat.id}`)
+    byCategory.get(cat.id)?.forEach(ch => flatIds.push(`ch:${ch.id}`))
+  })
+  byCategory.get(null)?.forEach(ch => flatIds.push(`ch:${ch.id}`))
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    setDragId(null)
+    if (!over || active.id === over.id || !serverId) return
+    const activeStr = active.id as string
+    const overStr = over.id as string
+
+    if (activeStr.startsWith('cat:') && overStr.startsWith('cat:')) {
+      // Reorder categories: arrayMove on sorted cat IDs
+      const catIds = sortedCats.map(c => c.id)
+      const oldIdx = catIds.indexOf(activeStr.replace('cat:', ''))
+      const newIdx = catIds.indexOf(overStr.replace('cat:', ''))
+      if (oldIdx === -1 || newIdx === -1) return
+      const newCatIds = arrayMove(catIds, oldIdx, newIdx)
+      const catUpdates = newCatIds.map((id, pos) => ({ id, position: pos }))
+      qc.setQueryData<typeof categories>(['categories', serverId], old =>
+        old?.map(c => ({ ...c, position: catUpdates.find(u => u.id === c.id)?.position ?? c.position }))
+          .sort((a, b) => a.position - b.position) ?? []
+      )
+      reorderCategories(serverId, catUpdates).catch(() => {
+        qc.invalidateQueries({ queryKey: ['categories', serverId] })
+      })
+      return
+    }
+
+    if (activeStr.startsWith('ch:')) {
+      // Reorder / move channel
+      const oldIdx = flatIds.indexOf(activeStr)
+      const newIdx = flatIds.indexOf(overStr)
+      if (oldIdx === -1 || newIdx === -1) return
+      const newFlatIds = arrayMove(flatIds, oldIdx, newIdx)
+      // Rebuild category assignments from new position in flat list
+      let currentCatId: string | null = null
+      const catChannelCount = new Map<string | null, number>()
+      const chanUpdates: { id: string; position: number; category_id: string | null }[] = []
+      for (const id of newFlatIds) {
+        if (id.startsWith('cat:')) {
+          currentCatId = id.replace('cat:', '')
+        } else {
+          const chId = id.replace('ch:', '')
+          const pos = catChannelCount.get(currentCatId) ?? 0
+          catChannelCount.set(currentCatId, pos + 1)
+          chanUpdates.push({ id: chId, position: pos, category_id: currentCatId })
+        }
+      }
+      qc.setQueryData<typeof channels>(['channels', serverId], old =>
+        old?.map(ch => {
+          const upd = chanUpdates.find(u => u.id === ch.id)
+          return upd ? { ...ch, position: upd.position, category_id: upd.category_id } : ch
+        }) ?? []
+      )
+      reorderChannels(serverId, chanUpdates).catch(() => {
+        qc.invalidateQueries({ queryKey: ['channels', serverId] })
+      })
+    }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -181,21 +253,87 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
       {/* Channel list */}
       <div
-        className="flex-1 overflow-y-auto py-2 space-y-1 scrollbar-none"
+        className="flex-1 overflow-y-auto py-2 scrollbar-none"
         onContextMenu={handleContextMenu}
       >
-        {Array.from(grouped.entries()).map(([catId, chs]) => {
-          const cat = categories.find((c) => c.id === catId)
-          return (
-            <div key={catId ?? 'no-cat'}>
-              {cat && (
-                <div className="px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider">
-                  {cat.title}
-                </div>
-              )}
-              {chs.map((ch) => (
+        {isAdmin ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={e => setDragId(e.active.id as string)}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={flatIds} strategy={verticalListSortingStrategy}>
+              {flatIds.map(itemId => {
+                if (itemId.startsWith('cat:')) {
+                  const cat = categories.find(c => c.id === itemId.replace('cat:', ''))
+                  if (!cat) return null
+                  return <SortableCatHeader key={itemId} id={itemId} title={cat.title} />
+                }
+                const ch = channels.find(c => c.id === itemId.replace('ch:', ''))
+                if (!ch) return null
+                return (
+                  <SortableChannelItem key={itemId} id={itemId}>
+                    <ChannelRow
+                      channel={ch}
+                      active={ch.id === channelId}
+                      serverId={serverId!}
+                      voiceSession={voiceSession}
+                      channelPresence={voicePresence[ch.id] ?? []}
+                      members={members}
+                      localUser={user ?? undefined}
+                      onJoinVoice={onJoinVoice}
+                      onLeaveVoice={onLeaveVoice}
+                      navigate={navigate}
+                      onContextMenu={e => openChannelContextMenu(e, ch)}
+                    />
+                  </SortableChannelItem>
+                )
+              })}
+            </SortableContext>
+            <DragOverlay dropAnimation={null}>
+              {dragId && (() => {
+                if (dragId.startsWith('ch:')) {
+                  const ch = channels.find(c => c.id === dragId.replace('ch:', ''))
+                  if (!ch) return null
+                  return (
+                    <div className="bg-discord-input/90 rounded px-2 py-1 mx-1 flex items-center gap-1.5 text-sm text-discord-text shadow-xl cursor-grabbing">
+                      <Icon name={ch.type === 'voice' ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
+                      <span className="truncate">{ch.title}</span>
+                    </div>
+                  )
+                }
+                if (dragId.startsWith('cat:')) {
+                  const cat = categories.find(c => c.id === dragId.replace('cat:', ''))
+                  if (!cat) return null
+                  return (
+                    <div className="px-3 py-1 text-xs font-semibold uppercase text-discord-muted tracking-wider bg-discord-sidebar shadow-xl rounded cursor-grabbing">
+                      {cat.title}
+                    </div>
+                  )
+                }
+                return null
+              })()}
+            </DragOverlay>
+          </DndContext>
+        ) : (
+          /* Non-admin: read-only ordered list */
+          <>
+            {flatIds.map(itemId => {
+              if (itemId.startsWith('cat:')) {
+                const cat = categories.find(c => c.id === itemId.replace('cat:', ''))
+                if (!cat) return null
+                return (
+                  <div key={itemId} className="px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider">
+                    {cat.title}
+                  </div>
+                )
+              }
+              const ch = channels.find(c => c.id === itemId.replace('ch:', ''))
+              if (!ch) return null
+              return (
                 <ChannelRow
-                  key={ch.id}
+                  key={itemId}
                   channel={ch}
                   active={ch.id === channelId}
                   serverId={serverId!}
@@ -206,12 +344,11 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   onJoinVoice={onJoinVoice}
                   onLeaveVoice={onLeaveVoice}
                   navigate={navigate}
-                  onContextMenu={(e) => openChannelContextMenu(e, ch)}
                 />
-              ))}
-            </div>
-          )
-        })}
+              )
+            })}
+          </>
+        )}
       </div>
 
       {/* User panel */}
@@ -477,5 +614,37 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
        />
     )}
     </>
+  )
+}
+
+// ---- Drag-and-drop wrappers (used only in admin mode) ----------------------
+
+function SortableCatHeader({ id, title }: { id: string; title: string }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider cursor-grab active:cursor-grabbing select-none ${isDragging ? 'opacity-0' : ''}`}
+      {...listeners}
+      {...attributes}
+    >
+      {title}
+    </div>
+  )
+}
+
+function SortableChannelItem({ id, children }: { id: string; children: ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={isDragging ? 'opacity-0' : ''}
+      {...listeners}
+      {...attributes}
+    >
+      {children}
+    </div>
   )
 }
