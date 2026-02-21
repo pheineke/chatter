@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMatch } from 'react-router-dom'
 import { useWebSocket } from './useWebSocket'
 import { getConversations } from '../api/dms'
-import type { DMConversation, Message } from '../api/types'
+import type { DMConversation, Friend, Message, UserStatus } from '../api/types'
 
 const LAST_READ_KEY = 'dmLastRead'
 
@@ -47,6 +47,25 @@ export function useUnreadDMs(): boolean {
 
   const { send } = useWebSocket('/ws/me', {
     onMessage(msg) {
+      if (msg.type === 'user.status_changed') {
+        const { user_id, status } = msg.data as { user_id: string; status: UserStatus }
+        // Patch friends list
+        qc.setQueryData<Friend[]>(['friends'], old =>
+          old?.map(f =>
+            f.user.id === user_id ? { ...f, user: { ...f.user, status } } : f
+          )
+        )
+        // Patch DM conversation list (status dot in DM sidebar)
+        qc.setQueryData<DMConversation[]>(['dmConversations'], old =>
+          old?.map(c =>
+            c.other_user.id === user_id
+              ? { ...c, other_user: { ...c.other_user, status } }
+              : c
+          )
+        )
+        return
+      }
+
       if (msg.type !== 'message.created') return
       const data = msg.data as Message
 
