@@ -79,6 +79,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [inviteCopied, setInviteCopied] = useState(false)
   const [editChannel, setEditChannel] = useState<Channel | null>(null)
   const [editChannelName, setEditChannelName] = useState('')
+  const [editChannelDesc, setEditChannelDesc] = useState('')
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -132,7 +133,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         {
           label: 'Edit Channel',
           icon: 'edit-2',
-          onClick: () => { setEditChannel(ch); setEditChannelName(ch.title) },
+          onClick: () => { setEditChannel(ch); setEditChannelName(ch.title); setEditChannelDesc(ch.description ?? '') },
         },
         {
           label: 'Delete Channel',
@@ -150,7 +151,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
   async function handleSaveEditChannel() {
     if (!serverId || !editChannel || !editChannelName.trim()) return
-    await updateChannel(serverId, editChannel.id, { title: editChannelName.trim() })
+    await updateChannel(serverId, editChannel.id, {
+      title: editChannelName.trim(),
+      description: editChannelDesc.trim() || null,
+    })
     qc.invalidateQueries({ queryKey: ['channels', serverId] })
     setEditChannel(null)
   }
@@ -327,12 +331,22 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditChannel(null)}>
           <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Edit Channel</h2>
+            <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Channel Name</label>
             <input
               className="input w-full mb-3"
               value={editChannelName}
               onChange={(e) => setEditChannelName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditChannel() }}
               autoFocus
+            />
+            <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Channel Topic <span className="normal-case font-normal">(optional)</span></label>
+            <textarea
+              className="input w-full mb-4 resize-none text-sm"
+              rows={3}
+              placeholder="Add a topic…"
+              value={editChannelDesc}
+              onChange={(e) => setEditChannelDesc(e.target.value)}
+              maxLength={1024}
             />
             <div className="flex gap-2">
               <button className="btn flex-1" onClick={handleSaveEditChannel} disabled={!editChannelName.trim()}>

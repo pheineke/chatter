@@ -69,14 +69,25 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
   return (
     <div className="flex flex-col h-full">
       {/* Channel header */}
-      <div className="flex items-center gap-2 px-4 border-b border-black/20 shadow-sm shrink-0 h-12">
-        <span className="text-discord-muted font-semibold">#</span>
-        <span className="font-bold">{channel?.title ?? channelId}</span>
+      <div className="flex items-center gap-2 px-4 border-b border-black/20 shadow-sm shrink-0 h-12 min-w-0">
+        <span className="text-discord-muted font-semibold shrink-0">#</span>
+        <span className="font-bold shrink-0">{channel?.title ?? channelId}</span>
+        {channel?.description && (
+          <>
+            <div className="w-px h-5 bg-white/20 shrink-0 mx-1" />
+            <span
+              className="text-sm text-discord-muted truncate"
+              title={channel.description}
+            >
+              {channel.description}
+            </span>
+          </>
+        )}
         <div className="flex-1" />
         <button
           onClick={() => setShowMembers(v => !v)}
           title="Toggle member list"
-          className={`p-1.5 rounded transition-colors ${showMembers ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+          className={`p-1.5 rounded transition-colors shrink-0 ${showMembers ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
         >
           <Icon name="people" size={20} />
         </button>
