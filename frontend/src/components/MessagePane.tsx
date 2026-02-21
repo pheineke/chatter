@@ -19,7 +19,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
   const [showMembers, setShowMembers] = useState(true)
 
-  const { data: channels = [] } = useQuery({
+  const { data: channels = [], isLoading: channelsLoading } = useQuery({
     queryKey: ['channels', serverId],
     queryFn: () => getChannels(serverId!),
     enabled: !!serverId,
@@ -35,11 +35,22 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
     )
   }
 
+  // If we're already in a voice session for this channel, show the grid immediately
+  // (don't wait for the channels query — we know it's a voice channel).
+  if (voiceSession?.channelId === channelId) {
+    return <VoiceGridPane session={voiceSession} onLeave={onLeaveVoice} />
+  }
+
+  // Still loading channel list — don't render a text-channel layout for a voice channel
+  if (channelsLoading && !channel) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-discord-muted">
+        <Icon name="loader" size={24} className="animate-spin" />
+      </div>
+    )
+  }
+
   if (channel?.type === 'voice') {
-    const inVoice = voiceSession?.channelId === channelId
-    if (inVoice && voiceSession) {
-      return <VoiceGridPane session={voiceSession} onLeave={onLeaveVoice} />
-    }
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-discord-muted">
         <div className="text-5xl">🔊</div>

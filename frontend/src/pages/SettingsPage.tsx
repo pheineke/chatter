@@ -510,7 +510,7 @@ function VoiceTab() {
             </div>
           )}
           {cameraOn && (
-            <button className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white text-xs py-0.5 px-2 rounded transition-colors" onClick={stopCameraRef.current}>Stop</button>
+            <button className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white text-xs py-0.5 px-2 rounded transition-colors" onClick={() => stopCameraRef.current()}>Stop</button>
           )}
         </div>
       </div>

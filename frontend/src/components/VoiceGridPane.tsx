@@ -67,15 +67,16 @@ function AudioEl({ stream }: { stream: MediaStream }) {
 // ─── Participant tile card ───────────────────────────────────────────────────
 
 function ParticipantCard({
-  tile, compact = false, isSpeaking = false, onClick,
+  tile, compact = false, isSpeaking = false, onClick, onStopCamera,
 }: {
-  tile: ParticipantTile; compact?: boolean; isSpeaking?: boolean; onClick?: () => void
+  tile: ParticipantTile; compact?: boolean; isSpeaking?: boolean
+  onClick?: () => void; onStopCamera?: () => void
 }) {
   const hasVideo = !!tile.webcamStream
 
   return (
     <div
-      className={`relative flex flex-col items-center justify-center rounded-xl overflow-hidden transition-all
+      className={`relative flex flex-col items-center justify-center rounded-xl overflow-hidden transition-all group
         ${hasVideo ? 'bg-black' : 'bg-discord-sidebar'}
         ${isSpeaking ? 'border-2 border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.25)]' : 'border border-white/5'}
         ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}
@@ -85,6 +86,18 @@ function ParticipantCard({
         <>
           {/* Live webcam fills the tile */}
           <VideoEl stream={tile.webcamStream!} />
+          {/* Stop camera button — top-right corner, appears on hover */}
+          {onStopCamera && (
+            <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                title="Stop camera"
+                className="text-[10px] font-bold text-white bg-red-600/80 hover:bg-red-600 px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors"
+                onClick={e => { e.stopPropagation(); onStopCamera() }}
+              >
+                <Icon name="x" size={10} /> Stop
+              </button>
+            </div>
+          )}
           {/* Name + avatar overlay at the bottom */}
           <div className="absolute bottom-0 left-0 right-0 flex items-center gap-1.5 px-2 py-1.5 bg-gradient-to-t from-black/70 to-transparent">
             {!compact && (
@@ -245,7 +258,7 @@ interface Props {
 
 export function VoiceGridPane({ session, onLeave }: Props) {
   const { user: selfUser } = useAuth()
-  const { state, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream, sendSpeaking } = useVoiceCall()
+  const { state, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream, sendSpeaking, toggleWebcam } = useVoiceCall()
   const isSelfSpeaking = useSpeaking(localStream, sendSpeaking)
   const [focused, setFocused] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
@@ -443,6 +456,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                       tile={t}
                       compact
                       isSpeaking={t.isSelf ? isSelfSpeaking : state.participants.find(p => p.user_id === t.user.id)?.is_speaking ?? false}
+                      onStopCamera={t.isSelf && t.webcamStream ? toggleWebcam : undefined}
                     />
                   )
                 )}
@@ -467,6 +481,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                   key={t.id}
                   tile={t}
                   isSpeaking={t.isSelf ? isSelfSpeaking : state.participants.find(p => p.user_id === t.user.id)?.is_speaking ?? false}
+                  onStopCamera={t.isSelf && t.webcamStream ? toggleWebcam : undefined}
                 />
               )
             )}
