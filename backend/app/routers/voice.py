@@ -248,6 +248,19 @@ async def voice_ws(
                     await voice_manager.update_state(channel_id, user_id, is_sharing_webcam=val)
                     await _broadcast_state_change(channel, channel_id, user_id)
 
+            elif msg_type == "speaking":
+                val = msg.get("is_speaking")
+                if isinstance(val, bool):
+                    await voice_manager.update_state(channel_id, user_id, is_speaking=val)
+                    # Broadcast only within the voice channel room (not server-wide)
+                    # to keep speaking updates cheap and contained.
+                    participant_data = voice_manager.get_participant(channel_id, user_id)
+                    if participant_data:
+                        await voice_manager._broadcast_all(
+                            channel_id,
+                            {"type": "voice.state_changed", "data": participant_data},
+                        )
+
             # -- Unknown message types → silently ignore ------------------
 
     except WebSocketDisconnect:

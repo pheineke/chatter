@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../contexts/AuthContext'
 import { useVoiceCall } from '../contexts/VoiceCallContext'
+import { useSpeaking } from '../hooks/useSpeaking'
 import { getMembers } from '../api/servers'
 import { Icon } from './Icon'
 import { UserAvatar } from './UserAvatar'
@@ -36,7 +38,9 @@ function VoiceBtn({
 }
 
 export function VoiceChannelBar({ session, onLeave }: Props) {
-  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam } = useVoiceCall()
+  const { user: selfUser } = useAuth()
+  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, localStream, sendSpeaking } = useVoiceCall()
+  const isSelfSpeaking = useSpeaking(localStream, sendSpeaking)
 
   // Fetch server members to resolve participant user info
   const { data: members = [] } = useQuery({
@@ -64,8 +68,18 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
         return { user, isMuted: p.is_muted, isDeafened: p.is_deafened }
       })
 
+  // Always build a combined list: self first, then remote participants
+  const allParticipants = [
+    ...(selfUser ? [{ user: selfUser, isMuted: state.isMuted, isDeafened: state.isDeafened, isSelf: true, isSpeaking: isSelfSpeaking }] : []),
+    ...participantUsers.map(p => ({
+      ...p,
+      isSelf: false,
+      isSpeaking: state.participants.find(sp => sp.user_id === p.user.id)?.is_speaking ?? false,
+    })),
+  ]
+
   return (
-    <div className="flex items-center justify-between px-3 py-2 h-14 bg-discord-bg/80 border-t border-black/20 shrink-0">
+    <div className="flex items-center justify-between px-3 py-2 bg-discord-bg/80 border-t border-black/20 shrink-0" style={{ minHeight: '3.5rem' }}>
       {/* Left: connection info + participant list */}
       <div className="flex flex-col min-w-0 gap-1">
         <div>
@@ -76,24 +90,24 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
           <span className="text-discord-muted text-xs truncate"># {session.channelName}</span>
         </div>
 
-        {/* Participant avatars + names */}
-        {participantUsers.length > 0 && (
-          <div className="flex flex-col gap-0.5">
-            {participantUsers.map(({ user: u, isMuted, isDeafened }) => (
-              <div key={u.id} className="flex items-center gap-1.5 text-xs text-discord-muted">
-                <div className="relative shrink-0">
-                  <UserAvatar user={u} size={20} />
-                  <span className="absolute -bottom-0.5 -right-0.5">
-                    <StatusIndicator status={u.status} size={7} />
-                  </span>
-                </div>
-                <span className="truncate">{u.username}</span>
-                {isMuted && <Icon name="mic-off" size={12} className="text-discord-muted shrink-0 opacity-60" />}
-                {isDeafened && <Icon name="headphones-off" size={12} className="text-discord-muted shrink-0 opacity-60" />}
+        {/* Participant avatars + names — always shown (includes self) */}
+        <div className="flex flex-col gap-0.5">
+          {allParticipants.map(({ user: u, isMuted, isDeafened, isSelf, isSpeaking }) => (
+            <div key={u.id} className="flex items-center gap-1.5 text-xs text-discord-muted">
+              <div className={`relative shrink-0 rounded-full transition-all ${
+                isSpeaking ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-discord-bg' : ''
+              }`}>
+                <UserAvatar user={u} size={20} />
+                <span className="absolute -bottom-0.5 -right-0.5">
+                  <StatusIndicator status={u.status} size={7} />
+                </span>
               </div>
-            ))}
-          </div>
-        )}
+              <span className="truncate">{u.username}{isSelf ? ' (You)' : ''}</span>
+              {isMuted && <Icon name="mic-off" size={12} className="text-discord-muted shrink-0 opacity-60" />}
+              {isDeafened && <Icon name="headphones-off" size={12} className="text-discord-muted shrink-0 opacity-60" />}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Right: controls */}

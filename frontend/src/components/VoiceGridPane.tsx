@@ -7,6 +7,7 @@ import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
 import { Icon } from './Icon'
 import { useVoiceCall } from '../contexts/VoiceCallContext'
+import { useSpeaking } from '../hooks/useSpeaking'
 import type { VoiceSession } from '../pages/AppShell'
 import type { User } from '../api/types'
 
@@ -48,13 +49,14 @@ function VideoEl({ stream, muted = false }: { stream: MediaStream; muted?: boole
 // ─── Participant tile card ───────────────────────────────────────────────────
 
 function ParticipantCard({
-  tile, compact = false, onClick,
+  tile, compact = false, isSpeaking = false, onClick,
 }: {
-  tile: ParticipantTile; compact?: boolean; onClick?: () => void
+  tile: ParticipantTile; compact?: boolean; isSpeaking?: boolean; onClick?: () => void
 }) {
   return (
     <div
-      className={`relative flex flex-col items-center justify-center rounded-xl bg-discord-sidebar border border-white/5 transition-colors
+      className={`relative flex flex-col items-center justify-center rounded-xl bg-discord-sidebar transition-all
+        ${isSpeaking ? 'border-2 border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.25)]' : 'border border-white/5'}
         ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}
       onClick={onClick}
     >
@@ -143,7 +145,8 @@ interface Props {
 
 export function VoiceGridPane({ session, onLeave }: Props) {
   const { user: selfUser } = useAuth()
-  const { state, remoteStreams, localVideoStream } = useVoiceCall()
+  const { state, remoteStreams, localVideoStream, localStream, sendSpeaking } = useVoiceCall()
+  const isSelfSpeaking = useSpeaking(localStream, sendSpeaking)
   const [focused, setFocused] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
 
@@ -311,6 +314,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                       key={t.id}
                       tile={t}
                       compact
+                      isSpeaking={t.isSelf ? isSelfSpeaking : state.participants.find(p => p.user_id === t.user.id)?.is_speaking ?? false}
                     />
                   )
                 )}
@@ -328,7 +332,11 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                   onClick={() => setFocused(t.id)}
                 />
               ) : (
-                <ParticipantCard key={t.id} tile={t} />
+                <ParticipantCard
+                  key={t.id}
+                  tile={t}
+                  isSpeaking={t.isSelf ? isSelfSpeaking : state.participants.find(p => p.user_id === t.user.id)?.is_speaking ?? false}
+                />
               )
             )}
           </div>

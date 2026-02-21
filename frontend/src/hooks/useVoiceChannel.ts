@@ -33,8 +33,14 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   // Map of peerId → RTCPeerConnection
   const peers = useRef<Map<string, RTCPeerConnection>>(new Map())
   const localStream = useRef<MediaStream | null>(null)
+  // ICE candidates received before setRemoteDescription is applied are queued here
+  const iceCandidateQueue = useRef<Map<string, RTCIceCandidateInit[]>>(new Map())
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({})
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null)
+  // Only open the voice WebSocket after the local audio stream has been acquired
+  // (or the attempt has definitively failed). This ensures localStream.current is
+  // populated before the first offer/answer exchange happens.
+  const [streamReady, setStreamReady] = useState(false)
 
   /**
    * Tie-breaking: the peer with the lexicographically smaller user ID is the
@@ -45,9 +51,9 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   const isImpolite = useCallback((peerId: string) => userId < peerId, [userId])
 
   const { send } = useWebSocket(
-    channelId ? `/ws/voice/${channelId}` : '',
+    channelId && streamReady ? `/ws/voice/${channelId}` : '',
     {
-      enabled: channelId !== null,
+      enabled: channelId !== null && streamReady,
       onMessage: (msg) => {
         switch (msg.type) {
           case 'voice.members': {
@@ -103,86 +109,139 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
 
   // --- WebRTC helpers -------------------------------------------------------
 
-  function createPeer(peerId: string): RTCPeerConnection {
+  /**
+   * Flush any ICE candidates that arrived before setRemoteDescription was
+   * called. Must be called immediately after every setRemoteDescription.
+   */
+  const flushIceCandidates = useCallback(async (peerId: string) => {
+    const pc = peers.current.get(peerId)
+    if (!pc) return
+    const queued = iceCandidateQueue.current.get(peerId) ?? []
+    iceCandidateQueue.current.delete(peerId)
+    for (const candidate of queued) {
+      try { await pc.addIceCandidate(candidate) } catch { /* ignore stale/out-of-order */ }
+    }
+  }, [])
+
+  /**
+   * Build and register a new RTCPeerConnection for `peerId`.
+   * Memoised so that initiateCall / handleOffer always close over the same
+   * stable function — avoiding subtle issues if the component re-renders
+   * between the call being initiated and the answer arriving.
+   */
+  const createPeer = useCallback((peerId: string): RTCPeerConnection => {
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
     })
 
-    // Add local tracks
-    localStream.current?.getTracks().forEach((t) => pc.addTrack(t, localStream.current!))
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        send({ type: 'ice_candidate', to: peerId, candidate: e.candidate.toJSON() })
-      }
+    // Add every local audio track so the remote side receives our mic.
+    const stream = localStream.current
+    if (stream) {
+      stream.getAudioTracks().forEach(track => pc.addTrack(track, stream))
     }
 
-    pc.ontrack = (e) => {
-      const stream = e.streams[0]
-      if (e.track.kind === 'audio') {
-        // Attach audio to a hidden element
-        const existing = document.getElementById(`audio-${peerId}`) as HTMLAudioElement | null
-        const audio = existing ?? document.createElement('audio')
-        audio.id = `audio-${peerId}`
-        audio.autoplay = true
-        audio.srcObject = stream
-        if (!existing) document.body.appendChild(audio)
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) send({ type: 'ice_candidate', to: peerId, candidate: candidate.toJSON() })
+    }
+
+    // Automatically attempt ICE restart if the connection drops.
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed') pc.restartIce()
+    }
+
+    pc.ontrack = ({ track, streams }) => {
+      // e.streams[0] can be undefined if the sender didn't bundle the track
+      // into a named stream — fall back to wrapping it ourselves.
+      const remoteStream = streams[0] ?? new MediaStream([track])
+
+      if (track.kind === 'audio') {
+        const elId = `audio-${peerId}`
+        let audio = document.getElementById(elId) as HTMLAudioElement | null
+        if (!audio) {
+          audio = Object.assign(document.createElement('audio'), {
+            id: elId,
+            autoplay: true,
+          })
+          document.body.appendChild(audio)
+        }
+        audio.srcObject = remoteStream
+        // Explicit play() is required — autoplay alone is blocked by browser policy.
+        const tryPlay = () =>
+          audio!.play().catch(() => document.addEventListener('click', tryPlay, { once: true }))
+        tryPlay()
       }
-      // Always store the full stream so video tracks are accessible
-      setRemoteStreams(prev => ({ ...prev, [peerId]: stream }))
+
+      setRemoteStreams(prev => {
+        // Keep audio stream reference stable: only overwrite if we don't have
+        // one yet, or if this is a video track update.
+        if (track.kind === 'video' || !prev[peerId]) {
+          return { ...prev, [peerId]: remoteStream }
+        }
+        return prev
+      })
     }
 
     peers.current.set(peerId, pc)
     return pc
-  }
+  }, [send])
 
   const initiateCall = useCallback(async (peerId: string) => {
     const pc = createPeer(peerId)
-    const offer = await pc.createOffer()
+    // offerToReceiveAudio ensures the SDP has an active audio m-section even
+    // if the local mic is currently muted (track enabled=false still adds the
+    // track; the remote side still sees the sendrecv direction).
+    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
     await pc.setLocalDescription(offer)
     send({ type: 'offer', to: peerId, sdp: offer.sdp })
-  }, [send])
+  }, [createPeer, send])
 
   const handleOffer = useCallback(async (peerId: string, sdp: string) => {
-    // If we already have a peer for this ID (e.g. from a previous session),
-    // tear it down before renegotiating.
+    // Tear down any previous connection for this peer (e.g. after a reconnect).
     if (peers.current.has(peerId)) {
       peers.current.get(peerId)!.close()
       peers.current.delete(peerId)
     }
     const pc = createPeer(peerId)
     await pc.setRemoteDescription({ type: 'offer', sdp })
+    // Flush candidates that arrived before setRemoteDescription.
+    await flushIceCandidates(peerId)
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     send({ type: 'answer', to: peerId, sdp: answer.sdp })
-  }, [send])
+  }, [createPeer, flushIceCandidates, send])
 
   const handleAnswer = useCallback(async (peerId: string, sdp: string) => {
     const pc = peers.current.get(peerId)
     if (!pc) return
-    // Only apply the answer when we are in the right state
     if (pc.signalingState === 'have-local-offer') {
       await pc.setRemoteDescription({ type: 'answer', sdp })
+      await flushIceCandidates(peerId)
     }
-  }, [])
+  }, [flushIceCandidates])
 
   const handleIce = useCallback(async (peerId: string, candidate: RTCIceCandidateInit) => {
     const pc = peers.current.get(peerId)
-    if (!pc || pc.remoteDescription == null) return
-    try {
-      await pc.addIceCandidate(candidate)
-    } catch {
-      // Silently ignore stale / out-of-order ICE candidates
+    if (!pc) return
+    if (pc.remoteDescription == null) {
+      // Remote description not yet applied — queue the candidate.
+      const q = iceCandidateQueue.current.get(peerId) ?? []
+      q.push(candidate)
+      iceCandidateQueue.current.set(peerId, q)
+      return
     }
+    try { await pc.addIceCandidate(candidate) } catch { /* ignore stale candidates */ }
   }, [])
 
-  function cleanupPeer(peerId: string) {
+  const cleanupPeer = useCallback((peerId: string) => {
     peers.current.get(peerId)?.close()
     peers.current.delete(peerId)
-    const audio = document.getElementById(`audio-${peerId}`)
-    audio?.remove()
+    iceCandidateQueue.current.delete(peerId)
+    document.getElementById(`audio-${peerId}`)?.remove()
     setRemoteStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
-  }
+  }, [])
 
   // --- Local media ----------------------------------------------------------
 
@@ -192,15 +251,25 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       localStream.current = stream
     } catch {
       console.warn('Microphone access denied')
+    } finally {
+      // Signal that the media acquisition attempt is complete (success or failure)
+      // so the WebSocket connection can now be opened safely.
+      setStreamReady(true)
     }
   }, [])
 
   useEffect(() => {
-    if (channelId) acquireMedia()
+    if (!channelId) return
+    // Reset streamReady so the WebSocket waits for the new stream on every
+    // channel join (including when switching channels).
+    setStreamReady(false)
+    acquireMedia()
     return () => {
       localStream.current?.getTracks().forEach((t) => t.stop())
+      localStream.current = null
       peers.current.forEach((pc) => pc.close())
       peers.current.clear()
+      iceCandidateQueue.current.clear()
     }
   }, [channelId, acquireMedia])
 
@@ -225,6 +294,10 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       send({ type: 'deafen', is_deafened: next })
       return { ...s, isDeafened: next }
     })
+  }, [send])
+
+  const sendSpeaking = useCallback((isSpeaking: boolean) => {
+    send({ type: 'speaking', is_speaking: isSpeaking })
   }, [send])
 
   const toggleScreenShare = useCallback(async () => {
@@ -277,5 +350,5 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     })
   }, [state.isSharingWebcam, send])
 
-  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, remoteStreams, localVideoStream, localStream }
+  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, localVideoStream, localStream }
 }

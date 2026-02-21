@@ -12,3 +12,4 @@ class VoiceParticipantRead(BaseModel):
     is_deafened: bool
     is_sharing_screen: bool
     is_sharing_webcam: bool
+    is_speaking: bool = False

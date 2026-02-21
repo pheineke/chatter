@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { MutableRefObject } from 'react'
 import { useVoiceChannel } from '../hooks/useVoiceChannel'
 import type { VoiceState } from '../hooks/useVoiceChannel'
 import type { VoiceSession } from '../pages/AppShell'
@@ -13,6 +14,10 @@ interface VoiceCallContextValue {
   toggleWebcam: () => Promise<void>
   remoteStreams: Record<string, MediaStream>
   localVideoStream: MediaStream | null
+  /** Ref to the local microphone stream — used for speaking detection. */
+  localStream: MutableRefObject<MediaStream | null>
+  /** Send a speaking state update to the server. */
+  sendSpeaking: (isSpeaking: boolean) => void
 }
 
 const VoiceCallContext = createContext<VoiceCallContextValue | null>(null)
@@ -30,11 +35,11 @@ interface ProviderProps {
 }
 
 export function VoiceCallProvider({ session, userId, children }: ProviderProps) {
-  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, remoteStreams, localVideoStream } =
+  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, localVideoStream, localStream } =
     useVoiceChannel({ channelId: session?.channelId ?? null, userId })
 
   return (
-    <VoiceCallContext.Provider value={{ state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, remoteStreams, localVideoStream }}>
+    <VoiceCallContext.Provider value={{ state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, localVideoStream, localStream }}>
       {children}
     </VoiceCallContext.Provider>
   )

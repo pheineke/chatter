@@ -54,6 +54,7 @@ class VoiceParticipant:
     is_deafened: bool = False
     is_sharing_screen: bool = False
     is_sharing_webcam: bool = False
+    is_speaking: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -64,6 +65,7 @@ class VoiceParticipant:
             "is_deafened": self.is_deafened,
             "is_sharing_screen": self.is_sharing_screen,
             "is_sharing_webcam": self.is_sharing_webcam,
+            "is_speaking": self.is_speaking,
         }
 
 
@@ -138,6 +140,7 @@ class VoiceManager:
         is_deafened: bool | None = None,
         is_sharing_screen: bool | None = None,
         is_sharing_webcam: bool | None = None,
+        is_speaking: bool | None = None,
     ) -> None:
         participant = self._rooms.get(channel_id, {}).get(user_id)
         if participant is None:
@@ -150,6 +153,8 @@ class VoiceManager:
             participant.is_sharing_screen = is_sharing_screen
         if is_sharing_webcam is not None:
             participant.is_sharing_webcam = is_sharing_webcam
+        if is_speaking is not None:
+            participant.is_speaking = is_speaking
 
         await self._broadcast_all(
             channel_id,

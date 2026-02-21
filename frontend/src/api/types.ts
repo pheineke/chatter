@@ -140,4 +140,5 @@ export interface VoiceParticipant {
   is_deafened: boolean
   is_sharing_screen: boolean
   is_sharing_webcam: boolean
+  is_speaking: boolean
 }
