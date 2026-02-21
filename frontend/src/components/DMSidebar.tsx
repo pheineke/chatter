@@ -2,8 +2,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useMatch } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { getConversations } from '../api/dms'
+import { updateMe } from '../api/users'
+import { useAuth } from '../contexts/AuthContext'
 import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
+import { Icon } from './Icon'
+import { ContextMenu } from './ContextMenu'
+import type { ContextMenuItem } from './ContextMenu'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { DMConversation, Message } from '../api/types'
 
@@ -20,9 +25,10 @@ function saveLastRead(data: Record<string, string>) {
 export function DMSidebar() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { user, refreshUser } = useAuth()
   const match = useMatch('/channels/@me/:dmUserId')
   const activeDmUserId = match?.params.dmUserId ?? null
-
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
   const [lastRead, setLastRead] = useState<Record<string, string>>(loadLastRead)
 
   const { data: conversations = [] } = useQuery({
@@ -109,6 +115,65 @@ export function DMSidebar() {
           <p className="text-xs text-discord-muted px-2 py-1">No conversations yet.</p>
         )}
       </div>
+
+      {/* User panel */}
+      <div className="px-3 py-2 h-14 bg-discord-bg border-t border-black/20 flex items-center gap-2 shrink-0">
+        <div
+          className="flex items-center gap-2 flex-1 min-w-0 hover:bg-discord-input/40 p-1 rounded cursor-pointer transition-colors"
+          onClick={(e) => {
+            if (!user) return
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            const statuses: { label: string; value: string; icon: string }[] = [
+              { label: 'Online',         value: 'online',  icon: 'ellipse' },
+              { label: 'Away',           value: 'away',    icon: 'time' },
+              { label: 'Do Not Disturb', value: 'busy',    icon: 'remove-circle' },
+              { label: 'Offline',        value: 'offline', icon: 'ellipse' },
+            ]
+            setContextMenu({
+              x: rect.left,
+              y: rect.top - 4,
+              items: statuses.map(s => ({
+                label: s.label,
+                icon: s.icon,
+                active: user.status === s.value,
+                onClick: async () => {
+                  await updateMe({ status: s.value as any })
+                  await refreshUser()
+                },
+              })),
+            })
+          }}
+        >
+          <div className="relative">
+            <UserAvatar user={user} size={32} />
+            {user && (
+              <span className="absolute -bottom-0.5 -right-0.5">
+                <StatusIndicator status={user.status} size={10} />
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold truncate">{user?.username}</div>
+            <div className="text-xs text-discord-muted truncate capitalize">{user?.status}</div>
+          </div>
+        </div>
+        <button
+          title="User Settings"
+          onClick={() => navigate('/channels/settings')}
+          className="text-discord-muted hover:text-discord-text leading-none p-2 rounded hover:bg-discord-input/40 transition-colors"
+        >
+          <Icon name="settings" size={18} />
+        </button>
+      </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }
