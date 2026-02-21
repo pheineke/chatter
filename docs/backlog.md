@@ -14,10 +14,11 @@
 - ~~**Users cannot see other participants' cameras in voice channels**~~ ✅ Fixed — Camera streams use the same WebRTC renegotiation pipeline as screen sharing; `remoteStreams` is updated via `ontrack` and rendered as a webcam tile in `VoiceGridPane`.
 - ~~**Users cannot hear each other in voice channels**~~ ✅ Fixed — WebRTC peer connections now correctly exchange audio tracks; AudioContext autoplay policy and ICE candidate queueing resolved.
 - ~~**Screen sharing does not work**~~ ✅ Fixed — Rewrote `toggleScreenShare`/`toggleWebcam` with proper `RTCRtpSender` tracking and `onnegotiationneeded`-driven renegotiation; `handleOffer` now handles renegotiation without tearing down the existing peer connection.
-- **Voice-connected footer bar goes off-screen** — The footer bar showing active voice channel users overflows off the bottom of the viewport.
+- ~~**Voice-connected footer bar goes off-screen**~~ ✅ Fixed — Removed the user listing from the footer bar, resolving the overflow issue.
 - **Right-clicking a server icon does not show context menu** — Right-clicking the server icon in the sidebar should open a context menu with options for "Invite to Server" and "Server Settings".
 - **Adding a note to a user in the profile card does not work** — The note field in the profile card popout does not save or persist user notes.
 - **GIF avatars should only animate on hover** — Animated GIF user avatars should display as a static frame by default and only play the animation when hovering over the user's avatar in chat messages or the profile card.
+- **Image resolution for avatars and banners is not limited** — Currently, server/profile avatars and banners can be uploaded at any resolution. These should be constrained (e.g., max 1024x1024 for avatars, 1920x1080 for banners) to optimize storage and bandwidth.
 
 ## 2. Feature Requests: User Profiles
 
