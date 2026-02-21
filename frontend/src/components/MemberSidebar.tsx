@@ -78,7 +78,6 @@ export function MemberSidebar({ serverId }: Props) {
     grouped.push({ role: null, members: ungroupedOnline })
   }
 
-  const offlineSorted = [...offline].sort((a, b) => a.user.username.localeCompare(b.user.username))
 
   return (
     <div className="w-60 shrink-0 bg-discord-sidebar flex flex-col h-full overflow-y-auto border-l border-black/20">
@@ -91,7 +90,7 @@ export function MemberSidebar({ serverId }: Props) {
       {grouped.map(({ role, members: grpMembers }) => (
         <Section
           key={role?.id ?? '__online__'}
-          label={role?.name ?? 'Members'}
+          label={role?.name ?? 'Online'}
           color={role?.color ?? undefined}
           members={grpMembers}
           onClickMember={handleClick}
