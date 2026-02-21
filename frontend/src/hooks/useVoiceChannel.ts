@@ -53,9 +53,11 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     stream: MediaStream
     track: MediaStreamTrack
   }>>(new Map())
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({})
+  const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({})
+  const [remoteWebcamStreams, setRemoteWebcamStreams] = useState<Record<string, MediaStream>>({})
   const [remoteScreenAudioStreams, setRemoteScreenAudioStreams] = useState<Record<string, MediaStream>>({})
-  const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null)
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null)
+  const [localWebcamStream, setLocalWebcamStream] = useState<MediaStream | null>(null)
   // Only open the voice WebSocket after the local audio stream has been acquired
   // (or the attempt has definitively failed). This ensures localStream.current is
   // populated before the first offer/answer exchange happens.
@@ -239,10 +241,20 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       }
 
       if (track.kind === 'video') {
-        setRemoteStreams(prev => ({ ...prev, [peerId]: remoteStream }))
-        track.addEventListener('ended', () => {
-          setRemoteStreams(prev => { const n = { ...prev }; delete n[peerId]; return n })
-        }, { once: true })
+        // contentHint 'detail' is set by the sender on screen-share tracks;
+        // '' or 'motion' means webcam. Route accordingly.
+        const isScreen = track.contentHint === 'detail'
+        if (isScreen) {
+          setRemoteScreenStreams(prev => ({ ...prev, [peerId]: remoteStream }))
+          track.addEventListener('ended', () => {
+            setRemoteScreenStreams(prev => { const n = { ...prev }; delete n[peerId]; return n })
+          }, { once: true })
+        } else {
+          setRemoteWebcamStreams(prev => ({ ...prev, [peerId]: remoteStream }))
+          track.addEventListener('ended', () => {
+            setRemoteWebcamStreams(prev => { const n = { ...prev }; delete n[peerId]; return n })
+          }, { once: true })
+        }
 
         // Check if an audio track for this same stream arrived earlier and was
         // tentatively routed as mic audio. If so, upgrade it to screen audio.
@@ -358,7 +370,8 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     // Remove all audio elements for this peer (mic audio)
     document.querySelectorAll<HTMLAudioElement>(`audio[data-peer="${peerId}"]`)
       .forEach(el => el.remove())
-    setRemoteStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
+    setRemoteScreenStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
+    setRemoteWebcamStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
     setRemoteScreenAudioStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
     // Clean up any pending audio that hadn't been resolved for this peer
     pendingStreamAudio.current.forEach((entry, streamId) => {
@@ -438,7 +451,7 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   const stopScreenShare = useCallback(() => {
     screenStreamRef.current?.getTracks().forEach(t => t.stop())
     screenStreamRef.current = null
-    setLocalVideoStream(null)
+    setLocalScreenStream(null)
     // Remove all screen senders (video + optional audio) — onnegotiationneeded fires automatically.
     peers.current.forEach((pc, peerId) => {
       const senders = screenSenders.current.get(peerId) ?? []
@@ -464,8 +477,10 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       return  // user cancelled or permission denied
     }
     const [videoTrack] = screenStream.getVideoTracks()
+    // Mark as screen content so receivers can distinguish from webcam
+    videoTrack.contentHint = 'detail'
     screenStreamRef.current = screenStream
-    setLocalVideoStream(screenStream)
+    setLocalScreenStream(screenStream)
     setState(s => ({ ...s, isSharingScreen: true }))
     send({ type: 'screen_share', enabled: true })
     // Add ALL tracks (video + any captured audio) to every existing peer connection.
@@ -481,7 +496,7 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   const stopWebcam = useCallback(() => {
     webcamStreamRef.current?.getTracks().forEach(t => t.stop())
     webcamStreamRef.current = null
-    setLocalVideoStream(null)
+    setLocalWebcamStream(null)
     peers.current.forEach((pc, peerId) => {
       const sender = webcamSenders.current.get(peerId)
       if (sender) { try { pc.removeTrack(sender) } catch { /* ignore */ } }
@@ -503,8 +518,10 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       return
     }
     const [videoTrack] = camStream.getVideoTracks()
+    // Mark as motion/webcam content so receivers can distinguish from screen share
+    videoTrack.contentHint = 'motion'
     webcamStreamRef.current = camStream
-    setLocalVideoStream(camStream)
+    setLocalWebcamStream(camStream)
     setState(s => ({ ...s, isSharingWebcam: true }))
     send({ type: 'webcam', enabled: true })
     peers.current.forEach((pc, peerId) => {
@@ -514,5 +531,5 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     videoTrack.addEventListener('ended', () => stopWebcam(), { once: true })
   }, [state.isSharingWebcam, stopWebcam, send])
 
-  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream }
+  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteScreenStreams, remoteWebcamStreams, remoteScreenAudioStreams, localScreenStream, localWebcamStream, localStream }
 }

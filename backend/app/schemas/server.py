@@ -62,3 +62,4 @@ class MemberRead(BaseModel):
     server_id: uuid.UUID
     user: UserRead
     joined_at: datetime
+    roles: list[RoleRead] = []

@@ -10,6 +10,7 @@ from models.base import Base
 class ChannelType(str, enum.Enum):
     text = "text"
     voice = "voice"
+    dm = "dm"
 
 
 class Category(Base):
@@ -30,8 +31,8 @@ class Channel(Base):
     __tablename__ = "channels"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    server_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("servers.id", ondelete="CASCADE"), nullable=False
+    server_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("servers.id", ondelete="CASCADE"), nullable=True
     )
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True

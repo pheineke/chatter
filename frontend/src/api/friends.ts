@@ -26,6 +26,10 @@ export async function declineFriendRequest(requestId: string): Promise<FriendReq
   return data
 }
 
+export async function cancelFriendRequest(requestId: string): Promise<void> {
+  await client.delete(`/friends/requests/${requestId}`)
+}
+
 export async function removeFriend(userId: string): Promise<void> {
   await client.delete(`/friends/${userId}`)
 }

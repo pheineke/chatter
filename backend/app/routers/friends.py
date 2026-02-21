@@ -93,10 +93,16 @@ async def accept_request(request_id: uuid.UUID, current_user: CurrentUser, db: D
     if fr.status != FriendRequestStatus.pending:
         raise HTTPException(status_code=400, detail="Request is no longer pending")
     fr.status = FriendRequestStatus.accepted
+    sender_id = fr.sender_id
     await db.commit()
-    await db.refresh(fr)
+    result = await db.execute(
+        select(FriendRequest)
+        .options(selectinload(FriendRequest.sender), selectinload(FriendRequest.recipient))
+        .where(FriendRequest.id == request_id)
+    )
+    fr = result.scalar_one()
     await manager.broadcast_user(
-        fr.sender_id,
+        sender_id,
         {"type": "friend_request.accepted", "data": FriendRequestRead.model_validate(fr).model_dump(mode="json")},
     )
     return fr
@@ -117,13 +123,36 @@ async def decline_request(request_id: uuid.UUID, current_user: CurrentUser, db: 
     if fr.status != FriendRequestStatus.pending:
         raise HTTPException(status_code=400, detail="Request is no longer pending")
     fr.status = FriendRequestStatus.declined
+    sender_id = fr.sender_id
     await db.commit()
-    await db.refresh(fr)
+    result = await db.execute(
+        select(FriendRequest)
+        .options(selectinload(FriendRequest.sender), selectinload(FriendRequest.recipient))
+        .where(FriendRequest.id == request_id)
+    )
+    fr = result.scalar_one()
     await manager.broadcast_user(
-        fr.sender_id,
+        sender_id,
         {"type": "friend_request.declined", "data": FriendRequestRead.model_validate(fr).model_dump(mode="json")},
     )
     return fr
+
+
+@router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_request(request_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    """Allow the sender to cancel their own pending friend request."""
+    result = await db.execute(
+        select(FriendRequest).where(FriendRequest.id == request_id)
+    )
+    fr = result.scalar_one_or_none()
+    if not fr:
+        raise HTTPException(status_code=404, detail="Friend request not found")
+    if fr.sender_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot cancel a request you did not send")
+    if fr.status != FriendRequestStatus.pending:
+        raise HTTPException(status_code=400, detail="Request is no longer pending")
+    await db.delete(fr)
+    await db.commit()
 
 
 @router.get("/", response_model=List[FriendRead])

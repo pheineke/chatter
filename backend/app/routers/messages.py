@@ -5,7 +5,7 @@ from typing import List
 
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, status
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, or_
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
@@ -13,7 +13,8 @@ from app.dependencies import CurrentUser, DB
 from app.routers.servers import _require_member
 from app.schemas.message import MessageCreate, MessageUpdate, MessageRead
 from app.ws_manager import manager
-from models.channel import Channel
+from models.channel import Channel, ChannelType
+from models.dm_channel import DMChannel
 from models.message import Message, Attachment, Reaction, Mention
 from models.server import Role, ServerMember
 from models.user import User
@@ -64,6 +65,29 @@ async def _get_channel_or_404(channel_id: uuid.UUID, db) -> Channel:
     return ch
 
 
+async def _require_channel_access(channel: Channel, user_id: uuid.UUID, db) -> None:
+    """Verify user can access the channel (server member or DM participant)."""
+    if channel.type == ChannelType.dm:
+        result = await db.execute(
+            select(DMChannel).where(
+                DMChannel.channel_id == channel.id,
+                or_(DMChannel.user_a_id == user_id, DMChannel.user_b_id == user_id),
+            )
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(status_code=403, detail="Not a participant of this DM")
+    else:
+        await _require_member(channel.server_id, user_id, db)
+
+
+async def _get_dm_participants(channel_id: uuid.UUID, db) -> tuple[uuid.UUID, uuid.UUID]:
+    result = await db.execute(select(DMChannel).where(DMChannel.channel_id == channel_id))
+    dmc = result.scalar_one_or_none()
+    if not dmc:
+        return ()
+    return (dmc.user_a_id, dmc.user_b_id)
+
+
 async def _get_message_or_404(message_id: uuid.UUID, db) -> Message:
     result = await db.execute(
         select(Message)
@@ -93,7 +117,7 @@ async def list_messages(
     limit: int = Query(50, ge=1, le=100),
 ):
     channel = await _get_channel_or_404(channel_id, db)
-    await _require_member(channel.server_id, current_user.id, db)
+    await _require_channel_access(channel, current_user.id, db)
 
     query = (
         select(Message)
@@ -123,7 +147,7 @@ async def send_message(
     channel_id: uuid.UUID, body: MessageCreate, current_user: CurrentUser, db: DB
 ):
     channel = await _get_channel_or_404(channel_id, db)
-    await _require_member(channel.server_id, current_user.id, db)
+    await _require_channel_access(channel, current_user.id, db)
 
     msg = Message(
         channel_id=channel_id,
@@ -134,7 +158,8 @@ async def send_message(
     db.add(msg)
     await db.flush()
 
-    await _parse_and_save_mentions(body.content, msg.id, channel.server_id, db)
+    if channel.server_id:
+        await _parse_and_save_mentions(body.content, msg.id, channel.server_id, db)
 
     result = await db.execute(
         select(Message)
@@ -149,10 +174,13 @@ async def send_message(
     )
     await db.commit()
     sent = result.scalar_one()
-    await manager.broadcast_channel(
-        channel_id,
-        {"type": "message.created", "data": MessageRead.model_validate(sent).model_dump(mode="json")},
-    )
+    event = {"type": "message.created", "data": MessageRead.model_validate(sent).model_dump(mode="json")}
+    await manager.broadcast_channel(channel_id, event)
+    # For DM channels also push to each participant's personal room
+    if channel.type == ChannelType.dm:
+        participants = await _get_dm_participants(channel_id, db)
+        for uid in participants:
+            await manager.broadcast_user(uid, event)
     return sent
 
 
@@ -169,7 +197,8 @@ async def edit_message(
     # Re-parse mentions: delete old ones then insert new ones
     await db.execute(delete(Mention).where(Mention.message_id == message_id))
     channel = await _get_channel_or_404(channel_id, db)
-    await _parse_and_save_mentions(body.content, message_id, channel.server_id, db)
+    if channel.server_id:
+        await _parse_and_save_mentions(body.content, message_id, channel.server_id, db)
     await db.commit()
     db.expire_all()
     updated = await _get_message_or_404(message_id, db)
@@ -190,8 +219,10 @@ async def delete_message(
 
     channel = await _get_channel_or_404(channel_id, db)
 
-    # Author can delete their own; admin can delete any
+    # Author can delete their own; for server channels admin can delete any
     if msg.author_id != current_user.id:
+        if channel.type == ChannelType.dm:
+            raise HTTPException(status_code=403, detail="Cannot delete another user's message")
         from app.routers.servers import _require_admin, _get_server_or_404
         server = await _get_server_or_404(channel.server_id, db)
         await _require_admin(server, current_user.id, db)

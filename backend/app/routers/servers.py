@@ -17,6 +17,7 @@ from app.schemas.server import (
     RoleRead,
     MemberRead,
 )
+from app.schemas.user import UserRead
 from app.ws_manager import manager
 from models.server import Server, ServerMember, Role, UserRole
 from models.user import User
@@ -161,7 +162,34 @@ async def list_members(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
         .options(selectinload(ServerMember.user))
         .where(ServerMember.server_id == server_id)
     )
-    return result.scalars().all()
+    members = result.scalars().all()
+
+    if not members:
+        return []
+
+    # Load role assignments for all members in one query, filter to this server
+    from collections import defaultdict
+    user_ids = [m.user_id for m in members]
+    roles_result = await db.execute(
+        select(UserRole)
+        .options(selectinload(UserRole.role))
+        .where(UserRole.user_id.in_(user_ids))
+    )
+    user_role_map: dict[uuid.UUID, list[RoleRead]] = defaultdict(list)
+    for ur in roles_result.scalars().all():
+        if ur.role.server_id == server_id:
+            user_role_map[ur.user_id].append(RoleRead.model_validate(ur.role))
+
+    return [
+        MemberRead(
+            user_id=m.user_id,
+            server_id=m.server_id,
+            user=UserRead.model_validate(m.user),
+            joined_at=m.joined_at,
+            roles=sorted(user_role_map.get(m.user_id, []), key=lambda r: r.position, reverse=True),
+        )
+        for m in members
+    ]
 
 
 @router.post("/{server_id}/join", response_model=MemberRead)
@@ -303,6 +331,10 @@ async def assign_role(
     if not existing.scalar_one_or_none():
         db.add(UserRole(user_id=user_id, role_id=role_id))
         await db.commit()
+        await manager.broadcast_server(
+            server_id,
+            {"type": "role.assigned", "data": {"server_id": str(server_id), "user_id": str(user_id), "role_id": str(role_id)}},
+        )
 
 
 @router.delete(
@@ -320,3 +352,7 @@ async def remove_role(
     if user_role:
         await db.delete(user_role)
         await db.commit()
+        await manager.broadcast_server(
+            server_id,
+            {"type": "role.removed", "data": {"server_id": str(server_id), "user_id": str(user_id), "role_id": str(role_id)}},
+        )

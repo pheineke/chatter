@@ -1,6 +1,11 @@
 import client from './client'
 import type { DM } from './types'
 
+export async function getDMChannel(userId: string): Promise<{ channel_id: string }> {
+  const { data } = await client.get<{ channel_id: string }>(`/dms/${userId}/channel`)
+  return data
+}
+
 export async function getDMs(userId: string, before?: string, limit = 50): Promise<DM[]> {
   const { data } = await client.get<DM[]>(`/dms/${userId}`, { params: { before, limit } })
   return data

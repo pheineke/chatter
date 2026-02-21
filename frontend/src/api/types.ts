@@ -44,6 +44,7 @@ export interface Member {
   server_id: string
   joined_at: string
   user: User
+  roles: Role[]
 }
 
 // ---- Channels --------------------------------------------------------------

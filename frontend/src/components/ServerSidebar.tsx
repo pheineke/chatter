@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { getMyServers, createServer } from '../api/servers'
 import { joinViaInvite } from '../api/invites'
 import { Icon } from './Icon'
+import { ContextMenu } from './ContextMenu'
+import { createInvite } from '../api/invites'
 import type { Server } from '../api/types'
 
-function ServerIcon({ server, active }: { server: Server; active: boolean }) {
+function ServerIcon({ server, active, onContextMenu }: { server: Server; active: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
   const navigate = useNavigate()
   const initials = server.title
     .split(/\s+/)
@@ -19,6 +21,7 @@ function ServerIcon({ server, active }: { server: Server; active: boolean }) {
     <button
       title={server.title}
       onClick={() => navigate(`/channels/${server.id}`)}
+      onContextMenu={onContextMenu}
       className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-150 select-none
         ${active ? 'rounded-2xl bg-discord-mention text-white' : 'bg-discord-input text-discord-text hover:rounded-2xl hover:bg-discord-mention hover:text-white'}`}
     >
@@ -39,8 +42,23 @@ export function ServerSidebar() {
   const [showJoin, setShowJoin] = useState(false)
   const [name, setName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; serverId: string } | null>(null)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [inviteCopied, setInviteCopied] = useState(false)
 
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers })
+
+  const handleCreateInvite = async (sId: string) => {
+    const invite = await createInvite(sId, { expires_hours: 24 })
+    setInviteLink(`${window.location.origin}/invite/${invite.code}`)
+  }
+
+  const copyInviteLink = () => {
+    if (!inviteLink) return
+    navigator.clipboard.writeText(inviteLink)
+    setInviteCopied(true)
+    setTimeout(() => setInviteCopied(false), 2000)
+  }
 
   const createMut = useMutation({
     mutationFn: () => createServer(name),
@@ -80,7 +98,15 @@ export function ServerSidebar() {
       <div className="w-8 h-px bg-discord-input" />
 
       {servers.map((s) => (
-        <ServerIcon key={s.id} server={s} active={s.id === serverId} />
+        <ServerIcon 
+          key={s.id} 
+          server={s} 
+          active={s.id === serverId} 
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setContextMenu({ x: e.clientX, y: e.clientY, serverId: s.id })
+          }}
+        />
       ))}
 
       <div className="w-8 h-px bg-discord-input" />
@@ -93,6 +119,46 @@ export function ServerSidebar() {
       >
         <Icon name="plus" size={24} />
       </button>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'Server Settings',
+              icon: 'settings',
+              onClick: () => navigate(`/channels/${contextMenu.serverId}/settings`),
+            },
+            {
+              label: 'Invite to Server',
+              icon: 'person-add',
+              onClick: () => handleCreateInvite(contextMenu.serverId),
+            },
+          ]}
+        />
+      )}
+
+      {/* Invite Link Modal */}
+      {inviteLink && (
+        <Modal title="Invite People" onClose={() => { setInviteLink(null); setInviteCopied(false) }} className="w-96">
+          <p className="text-sm text-discord-muted mb-4">Share this link — it expires in 24 hours.</p>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={inviteLink}
+              className="input flex-1 text-sm font-mono"
+              onFocus={(e) => e.target.select()}
+            />
+            <button className="btn shrink-0 flex items-center gap-1.5" onClick={copyInviteLink}>
+              <Icon name={inviteCopied ? 'checkmark-circle' : 'copy'} size={16} />
+              {inviteCopied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {/* Create server modal */}
       {showCreate && (
@@ -135,10 +201,10 @@ export function ServerSidebar() {
   )
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, onClose, children, className = 'w-80' }: { title: string; onClose: () => void; children: React.ReactNode; className?: string }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
+      <div className={`bg-discord-sidebar rounded-lg p-6 ${className}`} onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold mb-4">{title}</h2>
         {children}
       </div>

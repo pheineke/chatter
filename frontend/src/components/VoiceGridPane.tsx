@@ -257,7 +257,7 @@ interface Props {
 
 export function VoiceGridPane({ session, onLeave }: Props) {
   const { user: selfUser } = useAuth()
-  const { state, remoteStreams, remoteScreenAudioStreams, localVideoStream, toggleWebcam, isSelfSpeaking } = useVoiceCall()
+  const { state, remoteScreenStreams, remoteWebcamStreams, remoteScreenAudioStreams, localScreenStream, localWebcamStream, toggleWebcam, isSelfSpeaking } = useVoiceCall()
   const [focused, setFocused] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
   // Tile IDs the user has explicitly activated (clicked to watch/listen).
@@ -309,10 +309,8 @@ export function VoiceGridPane({ session, onLeave }: Props) {
       isSharingScreen: state.isSharingScreen,
       isSharingWebcam: state.isSharingWebcam,
       isSelf: true,
-      // Show local webcam preview inside the tile (only when not screen-sharing,
-      // since screen-share uses its own VideoTile)
-      webcamStream: state.isSharingWebcam && !state.isSharingScreen && localVideoStream
-        ? localVideoStream : undefined,
+      // Always show webcam in the participant tile, regardless of screen-sharing state
+      webcamStream: state.isSharingWebcam ? localWebcamStream ?? undefined : undefined,
     })
   }
 
@@ -338,17 +336,17 @@ export function VoiceGridPane({ session, onLeave }: Props) {
       isSharingScreen: p.is_sharing_screen,
       isSharingWebcam: p.is_sharing_webcam,
       isSelf: false,
-      // Embed webcam directly in the participant tile (not a separate VideoTile)
-      webcamStream: p.is_sharing_webcam && !p.is_sharing_screen && remoteStreams[p.user_id]
-        ? remoteStreams[p.user_id] : undefined,
+      // Webcam always goes in the participant tile — independent of screen-sharing state
+      webcamStream: p.is_sharing_webcam && remoteWebcamStreams[p.user_id]
+        ? remoteWebcamStreams[p.user_id] : undefined,
     })
     // Remote screen share tile — audioStream carries system audio if the user shared it
-    if (p.is_sharing_screen && remoteStreams[p.user_id]) {
+    if (p.is_sharing_screen && remoteScreenStreams[p.user_id]) {
       tiles.push({
         kind: 'video',
         id: `screen-${p.user_id}`,
         label: `${user.username}'s Screen`,
-        stream: remoteStreams[p.user_id],
+        stream: remoteScreenStreams[p.user_id],
         audioStream: remoteScreenAudioStreams[p.user_id],
         tileType: 'screen',
         isLocal: false,
@@ -358,12 +356,12 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   })
 
   // Local screen share tile — always active (user sees their own preview)
-  if (localVideoStream && state.isSharingScreen && state.isSharingScreen) {
+  if (localScreenStream && state.isSharingScreen) {
     tiles.push({
       kind: 'video',
       id: 'screen-local',
       label: 'Your Screen',
-      stream: localVideoStream,
+      stream: localScreenStream,
       tileType: 'screen',
       isLocal: true,
     })

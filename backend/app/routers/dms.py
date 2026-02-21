@@ -11,9 +11,43 @@ from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.schemas.message import DMCreate, DMRead
 from app.ws_manager import manager
+from models.channel import Channel, ChannelType
 from models.dm import DirectMessage, DMAttachment
+from models.dm_channel import DMChannel
 
 router = APIRouter(prefix="/dms", tags=["direct_messages"])
+
+ALLOWED_ATTACHMENT_TYPES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp",
+    "audio/mpeg", "audio/ogg", "audio/wav",
+}
+
+
+@router.get("/{user_id}/channel")
+async def get_or_create_dm_channel(user_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    """Get or create a shared DM channel for two users. Returns { channel_id }."""
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot DM yourself")
+
+    # Normalise pair so (a,b) and (b,a) always map to the same row
+    a, b = sorted([current_user.id, user_id])
+
+    result = await db.execute(
+        select(DMChannel).where(DMChannel.user_a_id == a, DMChannel.user_b_id == b)
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        return {"channel_id": str(existing.channel_id)}
+
+    # Create the backing Channel row (no server)
+    channel = Channel(type=ChannelType.dm, title="dm")
+    db.add(channel)
+    await db.flush()
+
+    dm_chan = DMChannel(channel_id=channel.id, user_a_id=a, user_b_id=b)
+    db.add(dm_chan)
+    await db.commit()
+    return {"channel_id": str(channel.id)}
 
 ALLOWED_ATTACHMENT_TYPES = {
     "image/jpeg", "image/png", "image/gif", "image/webp",

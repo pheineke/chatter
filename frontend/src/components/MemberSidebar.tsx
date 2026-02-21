@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { getMembers } from '../api/servers'
+import { getMembers, getRoles } from '../api/servers'
 import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
 import { ProfileCard } from './ProfileCard'
 import { useState } from 'react'
-import type { Member } from '../api/types'
+import type { Member, Role } from '../api/types'
 
 interface Props {
   serverId: string
@@ -14,36 +14,96 @@ export function MemberSidebar({ serverId }: Props) {
   const { data: members = [] } = useQuery<Member[]>({
     queryKey: ['members', serverId],
     queryFn: () => getMembers(serverId),
-    refetchInterval: 30_000,
+  })
+
+  const { data: roles = [] } = useQuery<Role[]>({
+    queryKey: ['roles', serverId],
+    queryFn: () => getRoles(serverId),
   })
 
   const [activeProfile, setActiveProfile] = useState<{ userId: string; position: { x: number; y: number } } | null>(null)
 
-  const online  = members.filter(m => m.user.status !== 'offline')
-  const offline = members.filter(m => m.user.status === 'offline')
-
   function handleClick(member: Member, e: React.MouseEvent) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    // Position card to the left of the sidebar
     setActiveProfile({ userId: member.user.id, position: { x: rect.left - 328, y: rect.top } })
   }
 
+  // Split online / offline
+  const online  = members.filter(m => m.user.status !== 'offline')
+  const offline = members.filter(m => m.user.status === 'offline')
+
+  // Build hoisted-role groups for online members.
+  // A role is "hoisted" if it has a color (non-null); Discord also has an explicit
+  // hoist flag but we use color as the proxy here.
+  // Sort roles by position descending (highest position = most prominent)
+  const hoistedRoles = [...roles]
+    .filter(r => r.color !== null)
+    .sort((a, b) => b.position - a.position)
+
+  // Map role id → role
+  const roleMap = Object.fromEntries(roles.map(r => [r.id, r]))
+
+  // For each online member, find their highest-position hoisted role (if any)
+  function topHoistedRole(m: Member): Role | null {
+    if (!m.roles.length) return null
+    const hoisted = m.roles
+      .map(r => roleMap[r.id])
+      .filter((r): r is Role => !!r && r.color !== null)
+    if (!hoisted.length) return null
+    return hoisted.reduce((best, r) => r.position > best.position ? r : best)
+  }
+
+  // Group online members by their top hoisted role
+  const grouped: { role: Role | null; members: Member[] }[] = []
+  const seenInGroup = new Set<string>()
+
+  for (const role of hoistedRoles) {
+    const group = online
+      .filter(m => {
+        const top = topHoistedRole(m)
+        return top?.id === role.id
+      })
+      .sort((a, b) => a.user.username.localeCompare(b.user.username))
+    if (group.length) {
+      grouped.push({ role, members: group })
+      group.forEach(m => seenInGroup.add(m.user.id))
+    }
+  }
+
+  // Remaining online members with no hoisted role
+  const ungroupedOnline = online
+    .filter(m => !seenInGroup.has(m.user.id))
+    .sort((a, b) => a.user.username.localeCompare(b.user.username))
+  if (ungroupedOnline.length) {
+    grouped.push({ role: null, members: ungroupedOnline })
+  }
+
+  const offlineSorted = [...offline].sort((a, b) => a.user.username.localeCompare(b.user.username))
+
   return (
-    <div
-      className="w-60 shrink-0 bg-discord-sidebar flex flex-col h-full overflow-y-auto border-l border-black/20"
-    >
+    <div className="w-60 shrink-0 bg-discord-sidebar flex flex-col h-full overflow-y-auto border-l border-black/20">
       <div className="px-3 flex items-center h-12 shrink-0 border-b border-black/20 shadow-sm">
         <span className="text-xs font-bold uppercase text-discord-muted tracking-wider">
           Members — {members.length}
         </span>
       </div>
 
-      {online.length > 0 && (
-        <Section label="Online" members={online} onClickMember={handleClick} />
-      )}
+      {grouped.map(({ role, members: grpMembers }) => (
+        <Section
+          key={role?.id ?? '__online__'}
+          label={role?.name ?? 'Members'}
+          color={role?.color ?? undefined}
+          members={grpMembers}
+          onClickMember={handleClick}
+        />
+      ))}
 
-      {offline.length > 0 && (
-        <Section label="Offline" members={offline} onClickMember={handleClick} />
+      {offlineSorted.length > 0 && (
+        <Section
+          label="Offline"
+          members={offlineSorted}
+          onClickMember={handleClick}
+        />
       )}
 
       {activeProfile && (
@@ -57,10 +117,18 @@ export function MemberSidebar({ serverId }: Props) {
   )
 }
 
-function Section({ label, members, onClickMember }: { label: string; members: Member[]; onClickMember: (m: Member, e: React.MouseEvent) => void }) {
+function Section({ label, color, members, onClickMember }: {
+  label: string
+  color?: string
+  members: Member[]
+  onClickMember: (m: Member, e: React.MouseEvent) => void
+}) {
   return (
     <div className="mb-2">
-      <div className="px-3 py-1 text-[11px] font-bold uppercase text-discord-muted tracking-wider">
+      <div className="px-3 py-1 flex items-center gap-1.5 text-[11px] font-bold uppercase text-discord-muted tracking-wider">
+        {color && (
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        )}
         {label} — {members.length}
       </div>
       {members.map(m => (
@@ -71,6 +139,13 @@ function Section({ label, members, onClickMember }: { label: string; members: Me
 }
 
 function MemberRow({ member, onClick }: { member: Member; onClick: (e: React.MouseEvent) => void }) {
+  // Pick the highest-position role with a color to render as the name's color
+  const nameColor = member.roles.reduce<string | null>((best, r) => {
+    if (!r.color) return best
+    if (best === null) return r.color
+    return r.position > (member.roles.find(x => x.color === best)?.position ?? -1) ? r.color : best
+  }, null)
+
   return (
     <button
       onClick={onClick}
@@ -83,9 +158,12 @@ function MemberRow({ member, onClick }: { member: Member; onClick: (e: React.Mou
           <StatusIndicator status={member.user.status} size={11} />
         </span>
       </div>
-      <span className={`text-sm font-medium truncate ${
-        member.user.status === 'offline' ? 'text-discord-muted' : 'text-discord-text'
-      } group-hover:text-white transition-colors`}>
+      <span
+        className={`text-sm font-medium truncate transition-colors ${
+          member.user.status === 'offline' ? 'text-discord-muted' : 'text-discord-text'
+        } group-hover:text-white`}
+        style={nameColor && member.user.status !== 'offline' ? { color: nameColor } : undefined}
+      >
         {member.user.username}
       </span>
     </button>

@@ -13,9 +13,11 @@ interface VoiceCallContextValue {
   toggleDeafen: () => void
   toggleScreenShare: () => Promise<void>
   toggleWebcam: () => Promise<void>
-  remoteStreams: Record<string, MediaStream>
+  remoteScreenStreams: Record<string, MediaStream>
+  remoteWebcamStreams: Record<string, MediaStream>
   remoteScreenAudioStreams: Record<string, MediaStream>
-  localVideoStream: MediaStream | null
+  localScreenStream: MediaStream | null
+  localWebcamStream: MediaStream | null
   localStream: MutableRefObject<MediaStream | null>
   sendSpeaking: (isSpeaking: boolean) => void
   /** Whether the local user is currently speaking (detected via Web Audio API). */
@@ -37,7 +39,7 @@ interface ProviderProps {
 }
 
 export function VoiceCallProvider({ session, userId, children }: ProviderProps) {
-  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream } =
+  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteScreenStreams, remoteWebcamStreams, remoteScreenAudioStreams, localScreenStream, localWebcamStream, localStream } =
     useVoiceChannel({ channelId: session?.channelId ?? null, userId })
 
   // Speaking detection lives here so it runs for the full voice session,
@@ -45,7 +47,7 @@ export function VoiceCallProvider({ session, userId, children }: ProviderProps) 
   const isSelfSpeaking = useSpeaking(localStream, sendSpeaking)
 
   return (
-    <VoiceCallContext.Provider value={{ state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream, isSelfSpeaking }}>
+    <VoiceCallContext.Provider value={{ state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteScreenStreams, remoteWebcamStreams, remoteScreenAudioStreams, localScreenStream, localWebcamStream, localStream, isSelfSpeaking }}>
       {children}
     </VoiceCallContext.Provider>
   )

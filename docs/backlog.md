@@ -8,17 +8,23 @@
 - **Server settings lack a save button** — Changes made in server settings are not persisted; a save/confirm button needs to be added.
 - **Voice & Video page shows a grey/blank screen** — Navigating to the voice/video page renders an empty grey page instead of the expected UI.
 - **Server name length is not limited** — There is no maximum length enforced on server names; a reasonable cap should be added.
-- **Friend requests do not work** — Sending a friend request fails, likely because the form requires a user ID but users have no way to find their own ID. The user ID should be visible on the profile card.
-- **Copy button in invite modal does not work** — Clicking the copy button in the invite link modal has no effect.
+- **Friend requests do not work** — Sending/accepting a friend request fails. Sending fails because the form requires a user ID but users have no way to find their own ID (user ID should be visible on the profile card). Accepting friend requests also appears to have no effect or fails.
+- ~~**Copy button in invite modal does not work**~~ ✅ Fixed — Copying now uses `navigator.clipboard.writeText` and provides visual feedback.
 - **New users receive all roles (including admin) on server join** — Every new member is incorrectly assigned all existing roles. New members should receive no roles by default unless a role is explicitly configured to be assigned on join.
 - ~~**Users cannot see other participants' cameras in voice channels**~~ ✅ Fixed — Camera streams use the same WebRTC renegotiation pipeline as screen sharing; `remoteStreams` is updated via `ontrack` and rendered as a webcam tile in `VoiceGridPane`.
 - ~~**Users cannot hear each other in voice channels**~~ ✅ Fixed — WebRTC peer connections now correctly exchange audio tracks; AudioContext autoplay policy and ICE candidate queueing resolved.
 - ~~**Screen sharing does not work**~~ ✅ Fixed — Rewrote `toggleScreenShare`/`toggleWebcam` with proper `RTCRtpSender` tracking and `onnegotiationneeded`-driven renegotiation; `handleOffer` now handles renegotiation without tearing down the existing peer connection.
 - ~~**Voice-connected footer bar goes off-screen**~~ ✅ Fixed — Removed the user listing from the footer bar, resolving the overflow issue.
-- **Right-clicking a server icon does not show context menu** — Right-clicking the server icon in the sidebar should open a context menu with options for "Invite to Server" and "Server Settings".
+- ~~**Right-clicking a server icon does not show context menu**~~ ✅ Fixed — Context menu added to server sidebar icons for "Invite to Server" and "Server Settings".
+- **Pending invites require a page reload** — Newly created or accepted invites are not reflected in real-time and require a manual refresh.
 - **Adding a note to a user in the profile card does not work** — The note field in the profile card popout does not save or persist user notes.
 - **GIF avatars should only animate on hover** — Animated GIF user avatars should display as a static frame by default and only play the animation when hovering over the user's avatar in chat messages or the profile card.
 - **Image resolution for avatars and banners is not limited** — Currently, server/profile avatars and banners can be uploaded at any resolution. These should be constrained (e.g., max 1024x1024 for avatars, 1920x1080 for banners) to optimize storage and bandwidth.
+- **Emoji picker is not implemented** — The message action bar reaction button hardcodes `👍` instead of opening a picker. The full picker is specced in `docs/specs/message_reactions_spec.md` but the component does not exist yet.
+- **Message replies UI is not implemented** — The backend model and `reply_to_id` field exist and the spec is written (`docs/specs/message_replies_spec.md`), but `MessageBubble` has no reply button and `MessageInput` has no reply-mode banner.
+- **Edited messages show no `(edited)` marker** — When a message is edited, no visual indicator is shown to other users that the content differs from the original.
+- **Real-time reactions trigger a full refetch instead of a cache patch** — `useChannelWS` handles `reaction.added` / `reaction.removed` WS events via `invalidateQueries` (full re-fetch) rather than patching the in-memory message cache in place, causing unnecessary network requests on every reaction.
+- **DM list has no online status indicator or unread badge** — Contacts in the direct messages list (`@me` view) show no online/offline status dot and no badge for unread messages.
 
 ## 2. Feature Requests: User Profiles
 
@@ -77,9 +83,9 @@ Clicking on the user's own avatar in the bottom-left "User Panel" (sidebar) shou
 
 ### 3.4. Voice Channel Grid View
 Clicking on an active voice channel in the sidebar should switch the main content area from the text chat view to a "Voice Grid" view.
--   **Grid Layout**: Display all connected participants as individual tiles (cards) containing their avatar and name.
--   **Stream Separation**: If a user is screen sharing, their stream should appear as a **separate tile**, distinct from their user avatar tile.
--   **Focus/Theater Mode**: Clicking on a stream tile should expand it to fill the available space in the voice channel page, minimizing other tiles to a sidebar or filmstrip.
+-   **Grid Layout**: Display all connected participants as individual tiles (cards). Each tile shows the user's webcam feed (if enabled) or their avatar — the camera is always contained within the user's own tile.
+-   **Screen Share Tile**: If a user is screen sharing, their screen capture appears as an **additional, separate tile** alongside (not replacing) their user tile. The user tile continues to show their webcam/avatar.
+-   **Focus/Theater Mode**: Clicking on any tile (user or screen share) should expand it to fill the available space, minimizing other tiles to a sidebar or filmstrip.
 
 ## 4. Feature Requests: Server & Channel Management
 
@@ -174,6 +180,18 @@ At 50 ms per request this produces ~20 messages/second, ~1 200/minute — the ra
 -   Server admins can see all active invite links in server settings, and can **pause** (temporarily disable) or **revoke** (delete) any link.
 -   Expired or fully-used links return a clear error on the invite page.
 
+### 4.8. Channel Topic / Description in Header
+-   Each text channel has an optional `description` field stored in the database, but it is not displayed anywhere in the UI.
+-   The message pane header should show the channel topic beside or below the channel name, matching Discord's topic bar.
+-   Clicking the topic should open the channel settings modal for admins.
+
+### 4.9. Keyboard Shortcuts
+-   Discord-standard keyboard shortcuts are entirely absent. Priority shortcuts to implement:
+    -   **Ctrl+K** — Quick-switcher overlay for jumping to channels, DMs, or servers by name.
+    -   **Alt+↑ / Alt+↓** — Navigate to the previous/next channel in the sidebar.
+    -   **Escape** — Close open modals, context menus, or the emoji picker.
+    -   **Ctrl+/** — Open a keyboard shortcuts cheat-sheet dialog.
+
 ## 5. Feature Requests: Messaging
 
 ### 5.1. Message Reactions
@@ -196,7 +214,28 @@ See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec
 - Deleted originals show a tombstone: *"Original message was deleted"*.
 - Flat list only — no nested threading.
 
-### 5.3. Paginated / Batch Message Loading
+### 5.3. Typing Indicator
+-   While a user is typing in a text channel or DM, other participants should see a **"Username is typing…"** notice at the bottom of the message list, above the input bar.
+-   Send a `typing.start` WS event when the user starts typing (debounced, retransmit every ~5 s while still typing); `typing.stop` when they send or clear the input. The server fans the event out to the channel room.
+-   Multiple simultaneous typers: "Alice and Bob are typing…" / "Several people are typing…" (3+).
+-   Indicator auto-clears after 8 s if no follow-up `typing.start` is received.
+
+### 5.4. @mention Autocomplete
+-   Typing `@` in the message input should open a floating autocomplete list of server members and roles that filters in real-time.
+-   Keyboard navigation: ↑/↓ to move, Enter/Tab to select, Escape to dismiss.
+-   The existing `@mention` parsing and highlight rendering in `Content` is already in place; this only adds the input-side UX.
+
+### 5.5. Message Search
+-   A search bar (Ctrl+F or toolbar icon) allows searching messages within the current channel or across the entire server.
+-   Results appear in a side panel with author, timestamp, and a "Jump" link to the message.
+-   Backend: `GET /channels/{id}/messages?q=<query>` using SQLite `LIKE` or FTS5.
+
+### 5.6. Pinned Messages
+-   Admins (or members with "Manage Messages" permission) can pin any message via the message action bar.
+-   The channel header shows a 📌 button that opens a panel listing all pinned messages in reverse-pin order.
+-   Backend: a `pinned_messages` join table (`channel_id`, `message_id`, `pinned_at`, `pinned_by`). WS events `message.pinned` / `message.unpinned` broadcast to the channel room.
+
+### 5.7. Paginated / Batch Message Loading
 -   **Initial load**: When a user opens a text channel, the most recent **100 messages** are fetched in a single request.
 -   **Pagination chunks**: Scrolling up towards older messages fetches the next **50 messages** at a time (cursor-based, using the oldest visible message ID as the `before` cursor).
 -   **Configurable chunk size**: The page size for subsequent loads (default 50) is a per-server setting, adjustable by admins in server settings (e.g. 25 / 50 / 100). The initial load size (100) can also be made configurable via a server setting.

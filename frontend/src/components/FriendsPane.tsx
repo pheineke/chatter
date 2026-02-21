@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   getFriends, getFriendRequests,
   sendFriendRequest, acceptFriendRequest,
-  declineFriendRequest, removeFriend,
+  declineFriendRequest, cancelFriendRequest, removeFriend,
 } from '../api/friends'
 import { getUserByUsername } from '../api/users'
 import { UserAvatar } from './UserAvatar'
@@ -33,6 +33,10 @@ export function FriendsPane() {
   })
   const declineMut = useMutation({
     mutationFn: declineFriendRequest,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['friendRequests'] }),
+  })
+  const cancelMut = useMutation({
+    mutationFn: cancelFriendRequest,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['friendRequests'] }),
   })
   const removeMut = useMutation({
@@ -68,6 +72,8 @@ export function FriendsPane() {
     : friends
 
   const pending = requests.filter((r) => r.status === 'pending')
+  const incoming = pending.filter((r) => r.recipient.id === currentUser?.id)
+  const outgoing = pending.filter((r) => r.sender.id === currentUser?.id)
 
   return (
     <div className="flex flex-col h-full">
@@ -82,9 +88,9 @@ export function FriendsPane() {
               ${tab === t ? 'bg-discord-input text-discord-text' : 'text-discord-muted hover:bg-discord-input/60 hover:text-discord-text'}`}
           >
             {t}
-            {t === 'pending' && pending.length > 0 && (
+            {t === 'pending' && incoming.length > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                {pending.length}
+                {incoming.length}
               </span>
             )}
           </button>
@@ -113,20 +119,44 @@ export function FriendsPane() {
           </div>
         ) : tab === 'pending' ? (
           <div className="space-y-2">
-            <p className="text-xs uppercase font-semibold text-discord-muted mb-2">Pending — {pending.length}</p>
-            {pending.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group">
-                <UserAvatar user={r.sender} size={40} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm">{r.sender.username}</p>
-                  <p className="text-xs text-discord-muted">Incoming Friend Request</p>
-                </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => acceptMut.mutate(r.id)} className="btn text-sm py-1 px-3" title="Accept"><Icon name="checkmark-circle" size={16} /></button>
-                  <button onClick={() => declineMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-discord-input hover:bg-red-500" title="Decline"><Icon name="close-circle" size={16} /></button>
-                </div>
-              </div>
-            ))}
+            {incoming.length > 0 && (
+              <>
+                <p className="text-xs uppercase font-semibold text-discord-muted mb-2">Incoming — {incoming.length}</p>
+                {incoming.map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group">
+                    <UserAvatar user={r.sender} size={40} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{r.sender.username}</p>
+                      <p className="text-xs text-discord-muted">Incoming Friend Request</p>
+                    </div>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => acceptMut.mutate(r.id)} className="btn text-sm py-1 px-3" title="Accept"><Icon name="checkmark-circle" size={16} /></button>
+                      <button onClick={() => declineMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-discord-input hover:bg-red-500" title="Decline"><Icon name="close-circle" size={16} /></button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+            {outgoing.length > 0 && (
+              <>
+                <p className="text-xs uppercase font-semibold text-discord-muted mt-4 mb-2">Outgoing — {outgoing.length}</p>
+                {outgoing.map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group">
+                    <UserAvatar user={r.recipient} size={40} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{r.recipient.username}</p>
+                      <p className="text-xs text-discord-muted">Outgoing Friend Request</p>
+                    </div>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => cancelMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-discord-input hover:bg-red-500" title="Cancel"><Icon name="close-circle" size={16} /></button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+            {incoming.length === 0 && outgoing.length === 0 && (
+              <p className="text-sm text-discord-muted">No pending friend requests.</p>
+            )}
           </div>
         ) : (
           <div className="space-y-1">

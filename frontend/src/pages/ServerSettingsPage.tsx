@@ -361,28 +361,32 @@ function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
 
 function MemberRolePicker({ serverId, member, allRoles }: { serverId: string; member: Member; allRoles: Role[] }) {
   const qc = useQueryClient()
-  // member doesn't carry role list from API right now — we just show add/remove buttons inline
   if (allRoles.length === 0) return <span className="text-discord-muted text-xs">—</span>
+  const assignedIds = new Set(member.roles.map(r => r.id))
   return (
     <div className="flex flex-wrap gap-1">
       {allRoles.map(role => {
-        // Simple toggle — in future we'd track per-member roles
+        const assigned = assignedIds.has(role.id)
+        const color = role.color ?? '#99aab5'
         return (
           <button
             key={role.id}
-            className="px-2 py-0.5 rounded text-[11px] font-bold border border-white/20 hover:border-white/40 transition-colors"
-            style={{ color: role.color ?? '#99aab5', borderColor: role.color ? `${role.color}50` : undefined }}
-            title={`Assign/remove ${role.name}`}
+            className="px-2 py-0.5 rounded text-[11px] font-bold border transition-colors"
+            style={assigned
+              ? { backgroundColor: `${color}30`, color, borderColor: color }
+              : { color: '#72767d', borderColor: '#72767d50' }
+            }
+            title={assigned ? `Remove role ${role.name}` : `Assign role ${role.name}`}
             onClick={async () => {
-              try {
-                await assignRole(serverId, member.user.id, role.id)
-              } catch {
+              if (assigned) {
                 await removeRole(serverId, member.user.id, role.id)
+              } else {
+                await assignRole(serverId, member.user.id, role.id)
               }
               qc.invalidateQueries({ queryKey: ['members', serverId] })
             }}
           >
-            {role.name}
+            {assigned ? '✓ ' : ''}{role.name}
           </button>
         )
       })}
