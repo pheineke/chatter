@@ -66,10 +66,12 @@ When a user shares their screen or streams an application:
 
 ## 4. Feature Requests: Server & Channel Management
 
-### 4.1. Channel Reordering
--   **Drag-and-Drop**: Users (with appropriate permissions) should be able to drag-and-drop channels to rearrange their order within the sidebar.
--   **Persistence**: The new order must be saved to the backend and reflected for all users in real-time.
--   **Category Support**: Users should also be able to move channels between categories or reorder entire categories.
+### ~~4.1. Channel Reordering~~ ✅ Implemented
+- Admins drag channel rows to reorder within a category or move to another category (position + `category_id` updated together).
+- Admins drag category headers to reorder categories.
+- 8 px activation distance so normal clicks still navigate.
+- Optimistic cache update with server confirmation via `PUT /servers/{id}/channels/reorder` and `/categories/reorder`; `channels.reordered` / `categories.reordered` WS events keep all clients in sync.
+- Non-admins see a read-only ordered list — no drag UI shown.
 
 ### 4.2. Unread Channel Indicators
 -   **Visual Highlight**: Channels with new unread messages should be displayed with a brighter text color (e.g., white instead of muted grey) in the sidebar to attract attention.
