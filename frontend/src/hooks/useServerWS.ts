@@ -92,9 +92,21 @@ export function useServerWS(serverId: string | null) {
           )
           break
         }
-        default:
-          // member / role events – just refetch members
+        case 'server.member_joined':
+        case 'server.member_left':
+        case 'server.member_kicked':
+        case 'role.assigned':
+        case 'role.removed':
           qc.invalidateQueries({ queryKey: ['members', serverId] })
+          break
+        case 'role.created':
+        case 'role.updated':
+        case 'role.deleted':
+          qc.invalidateQueries({ queryKey: ['roles', serverId] })
+          qc.invalidateQueries({ queryKey: ['members', serverId] })
+          break
+        default:
+          break
       }
     },
   })

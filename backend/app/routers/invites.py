@@ -23,6 +23,7 @@ from pydantic import BaseModel, field_validator
 
 from app.dependencies import CurrentUser, DB
 from app.routers.servers import _get_server_or_404, _require_member, _require_admin
+from app.ws_manager import manager
 from models.invite import ServerInvite
 from models.server import Server, ServerMember
 
@@ -144,10 +145,18 @@ async def join_via_invite(code: str, current_user: CurrentUser, db: DB):
             ServerMember.user_id == current_user.id,
         )
     )
+    newly_joined = False
     if not existing.scalar_one_or_none():
         db.add(ServerMember(server_id=invite.server_id, user_id=current_user.id))
         invite.uses += 1
         await db.commit()
+        newly_joined = True
+
+    if newly_joined:
+        await manager.broadcast_server(
+            invite.server_id,
+            {"type": "server.member_joined", "data": {"server_id": str(invite.server_id), "user_id": str(current_user.id)}},
+        )
 
     return {"server_id": str(invite.server_id)}
 

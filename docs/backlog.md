@@ -4,7 +4,7 @@
 
 - **Image attachments require page reload for other clients** — When a user sends an image attachment, other connected clients do not see it in real-time and must reload the page.
 - ~~**Private (DM) chats do not support attachments**~~ ✅ Fixed — DMs were refactored to use the channel system (`type=dm`); they now render with `MessageInput`/`MessageList`, giving them full attachment support automatically.
-- **New server members only appear after page reload** — When a user joins a server, existing members do not see the new member in the member list until they refresh.
+- ~~**New server members only appear after page reload**~~ ✅ Fixed — `join_via_invite` (the primary join path) never broadcasted a `server.member_joined` WS event, so existing members never knew someone joined. Fixed by: (1) `invites.py` now broadcasts `server.member_joined` after a new `ServerMember` row is created; (2) `useServerWS` now explicitly handles `server.member_joined/left/kicked` → invalidate `['members']`, and `role.created/updated/deleted` → invalidate both `['roles']` and `['members']` (previously fell through to a default that only invalidated members, leaving the Roles tab stale).
 - **Server settings lack a save button** — Changes made in server settings are not persisted; a save/confirm button needs to be added.
 - **Voice & Video page shows a grey/blank screen** — Navigating to the voice/video page renders an empty grey page instead of the expected UI.
 - **Server name length is not limited** — There is no maximum length enforced on server names; a reasonable cap should be added.
