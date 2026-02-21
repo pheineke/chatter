@@ -98,6 +98,14 @@ export function useServerWS(serverId: string | null) {
         case 'role.assigned':
         case 'role.removed':
           qc.invalidateQueries({ queryKey: ['members', serverId] })
+          if (msg.type === 'server.member_joined') {
+            // A join increments an invite's uses counter
+            qc.invalidateQueries({ queryKey: ['invites', serverId] })
+          }
+          break
+        case 'invite.created':
+        case 'invite.deleted':
+          qc.invalidateQueries({ queryKey: ['invites', serverId] })
           break
         case 'role.created':
         case 'role.updated':

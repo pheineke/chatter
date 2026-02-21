@@ -103,7 +103,12 @@ async def create_invite(
         .where(ServerInvite.code == invite.code)
     )
     invite = result.scalar_one()
-    return _invite_to_read(invite)
+    read = _invite_to_read(invite)
+    await manager.broadcast_server(
+        server_id,
+        {"type": "invite.created", "data": {"server_id": str(server_id), "code": invite.code}},
+    )
+    return read
 
 
 @router.get("/invites/{code}", response_model=InviteRead)
@@ -190,6 +195,12 @@ async def revoke_invite(code: str, current_user: CurrentUser, db: DB):
         raise HTTPException(status_code=404, detail="Invite not found")
     server = await _get_server_or_404(invite.server_id, db)
     await _require_admin(server, current_user.id, db)
+    server_id = invite.server_id
+    code = invite.code
     await db.delete(invite)
     await db.commit()
+    await manager.broadcast_server(
+        server_id,
+        {"type": "invite.deleted", "data": {"server_id": str(server_id), "code": code}},
+    )
 
