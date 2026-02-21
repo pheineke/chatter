@@ -34,7 +34,11 @@ function ServerIcon({ server, active, onContextMenu }: { server: Server; active:
   )
 }
 
-export function ServerSidebar() {
+interface ServerSidebarProps {
+  hasUnreadDMs?: boolean
+}
+
+export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
   const { serverId } = useParams<{ serverId: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -87,13 +91,18 @@ export function ServerSidebar() {
   return (
     <div className="flex flex-col items-center gap-2 py-3 w-[72px] bg-discord-servers overflow-y-auto scrollbar-none">
       {/* DMs */}
-      <button
-        title="Direct Messages"
-        onClick={() => navigate('/channels/@me')}
-        className={`w-12 h-12 rounded-full flex items-center justify-center bg-discord-sidebar hover:rounded-2xl hover:bg-discord-mention transition-all text-discord-mention hover:text-white text-xl font-bold`}
-      >
-        <Icon name="message-circle" size={24} />
-      </button>
+      <div className="relative">
+        <button
+          title="Direct Messages"
+          onClick={() => navigate('/channels/@me')}
+          className={`w-12 h-12 rounded-full flex items-center justify-center bg-discord-sidebar hover:rounded-2xl hover:bg-discord-mention transition-all text-discord-mention hover:text-white text-xl font-bold`}
+        >
+          <Icon name="message-circle" size={24} />
+        </button>
+        {hasUnreadDMs && (
+          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-discord-online border-2 border-discord-servers" />
+        )}
+      </div>
 
       <div className="w-8 h-px bg-discord-input" />
 

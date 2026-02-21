@@ -11,6 +11,7 @@ import { VoiceChannelBar } from '../components/VoiceChannelBar'
 import { VoiceCallProvider } from '../contexts/VoiceCallContext'
 import { SettingsPage } from './SettingsPage'
 import { ServerSettingsPage } from './ServerSettingsPage'
+import { useUnreadDMs } from '../hooks/useUnreadDMs'
 
 /** The active voice session, if any (channelId + channelName). */
 export interface VoiceSession {
@@ -22,6 +23,7 @@ export interface VoiceSession {
 export default function AppShell() {
   const { user } = useAuth()
   const [voiceSession, setVoiceSession] = useState<VoiceSession | null>(null)
+  const hasUnreadDMs = useUnreadDMs()
 
   function handleLeaveVoice() {
     setVoiceSession(null)
@@ -35,7 +37,7 @@ export default function AppShell() {
         <Route path="*" element={
           <VoiceCallProvider session={voiceSession} userId={user?.id ?? ''}>
             {/* Far-left: server icons */}
-            <ServerSidebar />
+            <ServerSidebar hasUnreadDMs={hasUnreadDMs} />
 
             {/* Second column: channel/DM list */}
             <div className="flex flex-col w-60 shrink-0 bg-discord-sidebar overflow-hidden">

@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useMatch } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { getConversations } from '../api/dms'
@@ -9,8 +9,7 @@ import { StatusIndicator } from './StatusIndicator'
 import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { useWebSocket } from '../hooks/useWebSocket'
-import type { DMConversation, Message } from '../api/types'
+import type { DMConversation } from '../api/types'
 
 const LAST_READ_KEY = 'dmLastRead'
 
@@ -22,9 +21,10 @@ function saveLastRead(data: Record<string, string>) {
   localStorage.setItem(LAST_READ_KEY, JSON.stringify(data))
 }
 
+interface DMSidebarProps {}
+
 export function DMSidebar() {
   const navigate = useNavigate()
-  const qc = useQueryClient()
   const { user, refreshUser } = useAuth()
   const match = useMatch('/channels/@me/:dmUserId')
   const activeDmUserId = match?.params.dmUserId ?? null
@@ -38,28 +38,8 @@ export function DMSidebar() {
     refetchInterval: 60_000,
   })
 
-  // Subscribe to personal WS for real-time unread badge updates
-  useWebSocket('/ws/me', {
-    onMessage(msg) {
-      if (msg.type === 'message.created') {
-        const data = msg.data as Message
-        const exists = conversations.some(c => c.channel_id === data.channel_id)
-        if (!exists) {
-          // Potentially a brand-new DM channel; refresh the list
-          qc.invalidateQueries({ queryKey: ['dmConversations'] })
-          return
-        }
-        // Patch last_message_at so the unread dot updates without a refetch
-        qc.setQueryData<DMConversation[]>(['dmConversations'], old =>
-          old?.map(c =>
-            c.channel_id === data.channel_id
-              ? { ...c, last_message_at: data.created_at }
-              : c,
-          ) ?? [],
-        )
-      }
-    },
-  })
+  // Subscribe to personal WS — handled globally by useUnreadDMs in AppShell.
+  // This component just reacts to cache changes already applied by that hook.
 
   // Mark active channel as read whenever it becomes active or new messages arrive
   useEffect(() => {
