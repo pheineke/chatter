@@ -56,6 +56,13 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     enabled: !!serverId,
   })
 
+  // Derive admin status: owner, or member with an is_admin role
+  const isAdmin =
+    !!server && !!user && (
+      server.owner_id === user.id ||
+      members.find(m => m.user.id === user.id)?.roles.some(r => r.is_admin) === true
+    )
+
   const { data: voicePresence = {} } = useQuery({
     queryKey: ['voicePresence', serverId],
     queryFn: () => getServerVoicePresence(serverId!),
@@ -75,15 +82,11 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        { label: 'Create Channel', icon: 'hash', onClick: () => setShowAddChannel(true) },
-        { label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite },
-      ],
-    })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    const items: ContextMenuItem[] = []
+    if (isAdmin) items.push({ label: 'Create Channel', icon: 'hash', onClick: () => setShowAddChannel(true) })
+    items.push({ label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite })
+    setContextMenu({ x: e.clientX, y: e.clientY, items })
+  }, [isAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleHeaderClick(e: React.MouseEvent) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -119,6 +122,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   }
 
   function openChannelContextMenu(e: React.MouseEvent, ch: Channel) {
+    if (!isAdmin) return
     e.preventDefault()
     e.stopPropagation()
     setContextMenu({
@@ -356,7 +360,7 @@ interface RowProps {
   onJoinVoice: (s: VoiceSession) => void
   onLeaveVoice: () => void
   navigate: ReturnType<typeof useNavigate>
-  onContextMenu: (e: React.MouseEvent) => void
+  onContextMenu?: (e: React.MouseEvent) => void
 }
 
 function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {

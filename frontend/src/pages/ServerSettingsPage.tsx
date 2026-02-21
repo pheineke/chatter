@@ -46,7 +46,8 @@ export function ServerSettingsPage() {
   })
 
   const isOwner = !!currentUser && server?.owner_id === currentUser.id
-  const isAdmin = isOwner // simplified; could also check role
+  const isAdmin = isOwner ||
+    members.some(m => m.user.id === currentUser?.id && m.roles.some(r => r.is_admin))
 
   function close() {
     navigate(`/channels/${serverId}`)
