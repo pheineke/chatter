@@ -23,41 +23,23 @@
 - **Image resolution for avatars and banners is not limited** — Currently, server/profile avatars and banners can be uploaded at any resolution. These should be constrained (e.g., max 1024x1024 for avatars, 1920x1080 for banners) to optimize storage and bandwidth.
 - ~~**Emoji picker is not implemented**~~ ✅ Fixed — Installed `emoji-mart` + `@emoji-mart/data` + `@emoji-mart/react`. New `EmojiPicker.tsx` portal wraps the dark-themed picker with outside-click and Escape dismissal and viewport clamping. The hover toolbar in `MessageBubble` opens the picker anchored below the button and sends the chosen emoji via `addReaction`. `MessageInput` gained a smiley-face button that opens the picker above the input bar and inserts the chosen emoji at the cursor position.
 - **Message replies UI is not implemented** — The backend model and `reply_to_id` field exist and the spec is written (`docs/specs/message_replies_spec.md`), but `MessageBubble` has no reply button and `MessageInput` has no reply-mode banner.
-- **Edited messages show no `(edited)` marker** — When a message is edited, no visual indicator is shown to other users that the content differs from the original.
-- **Real-time reactions trigger a full refetch instead of a cache patch** — `useChannelWS` handles `reaction.added` / `reaction.removed` WS events via `invalidateQueries` (full re-fetch) rather than patching the in-memory message cache in place, causing unnecessary network requests on every reaction.
-- **DM list has no online status indicator or unread badge** — Contacts in the direct messages list (`@me` view) show no online/offline status dot and no badge for unread messages.
+- ~~**Edited messages show no `(edited)` marker**~~ ✅ Fixed — `is_edited` and `edited_at` fields added to the `Message` model (Alembic migration applied). `edit_message` sets both on save. `MessageRead` schema exposes them. `MessageBubble` shows a muted `(edited)` label after the message content with a tooltip showing the exact edit timestamp.
+- ~~**Real-time reactions trigger a full refetch instead of a cache patch**~~ ✅ Fixed — `useChannelWS` now uses `setQueryData` for both `reaction.added` and `reaction.removed`: added reactions are appended with a dedup guard; removed reactions are filtered out by `(user_id, emoji)` pair. No network request is made.
+- ~~**DM list has no online status indicator or unread badge**~~ ✅ Fixed — `DMSidebar` now lists all conversations with `UserAvatar` + `StatusIndicator` per contact. An unread white dot appears next to any conversation with messages newer than the stored `dmLastRead` timestamp. A green dot badge also appears on the DM button in `ServerSidebar` (via `useUnreadDMs`) whenever any DM has unread messages, even while on a server.
 
 ## 2. Feature Requests: User Profiles
 
-### 2.1. Enhanced Profile Data
-Users need additional fields to fully customize their identity:
-- **Profile Banner**: A customizable background color, static image, or animated GIF that appears at the top of their profile card (e.g., the turquoise area in the reference).
-- **Pronouns**: A dedicated text field for pronouns (e.g., "he/him").
-- **Bio / Description**: A text area for a short "About Me" description (e.g., "Moin, I'm Joshie...").
-- **Online Status**: A consistent indicator (e.g., colored circle: Green/Online, Grey/Offline, Red/DND, Yellow/Idle) displayed next to the avatar.
+### ~~2.1. Enhanced Profile Data~~ ✅ Implemented
+- **Profile Banner**: Uploadable via `POST /me/banner`; displayed in profile cards.
+- **Pronouns**: Stored in `User.pronouns`; shown in profile card and settings.
+- **Bio / Description**: `User.description` field; editable in settings, shown on profile card.
+- **Online Status**: `StatusIndicator` component shows coloured dot (green/yellow/red/grey) next to avatars throughout the UI; status persists via `User.status` and broadcasts over WS.
 
-### 2.2. Interactive Profile Card (Popout)
-Clicking a username in the chat or member list should open a "Profile Card" overlay (similar to the screenshot provided).
-
-**Card Layout & Contents:**
-1.  **Header (Banner)**:
-    -   Displays the user's custom banner color or image.
-2.  **Avatar**:
-    -   Positioned overlapping the banner and body.
-    -   Includes the **Online Status** indicator (e.g., a grey circle for offline, green for online).
-3.  **Identity**:
-    -   **Display Name**: (e.g., "deaddy") - The visible name.
-    -   **Handle / UUID**: (e.g., "joshie_23") - The unique identifier or username handle.
-    -   **Pronouns**: Displayed next to the handle or below the name.
-4.  **Mutual Connections**:
-    -   **Mutual Friends**: Count of shared friends.
-    -   **Mutual Servers**: Count of shared servers.
-    -   *Tabs/UI*: Ideally displayed as small icons/tabs or summary text.
-5.  **About Me (Body)**:
-    -   The user's description text (Bio).
-    -   Rich text support (optional, e.g., emojis).
-6.  **Footer**:
-    -   **"Message @Handle" Input**: A quick way to send a Direct Message to this user directly from the card.
+### ~~2.2. Interactive Profile Card (Popout)~~ ✅ Implemented
+- `ProfileCard` component opens on username/avatar click in chat and member list.
+- Shows banner, avatar with status dot, username, pronouns, bio, mutual server count.
+- Private note field with debounced auto-save (`GET`/`PUT /users/{id}/note`).
+- "Message" input at the bottom opens/navigates to the DM with that user.
 
 ## 3. Feature Requests: Voice Chat Improvements
 
@@ -73,20 +55,14 @@ When a user shares their screen or streams an application:
 -   **"LIVE" Badge**: Display a prominent red "LIVE" pill/badge next to the user's name in the voice channel list.
 -   **Visibility**: This badge must be visible to all other participants in the channel to indicate active screen sharing.
 
-### 3.3. Self-Status Menu
-Clicking on the user's own avatar in the bottom-left "User Panel" (sidebar) should open a status selection menu/popover.
--   **Status Options**:
-    -   **Online** (Green)
-    -   **Idle** (Yellow)
-    -   **Do Not Disturb** (Red)
-    -   **Invisible** (Grey)
--   **Custom Status**: Option to set a custom text status (e.g., "In a meeting", "Coding").
+### ~~3.3. Self-Status Menu~~ ✅ Implemented
+- Clicking the user panel avatar in both `ChannelSidebar` and `DMSidebar` opens a `ContextMenu` with Online / Away / Do Not Disturb / Offline options.
+- Selection calls `PATCH /me` and refreshes the auth context; status dot updates immediately.
 
-### 3.4. Voice Channel Grid View
-Clicking on an active voice channel in the sidebar should switch the main content area from the text chat view to a "Voice Grid" view.
--   **Grid Layout**: Display all connected participants as individual tiles (cards). Each tile shows the user's webcam feed (if enabled) or their avatar — the camera is always contained within the user's own tile.
--   **Screen Share Tile**: If a user is screen sharing, their screen capture appears as an **additional, separate tile** alongside (not replacing) their user tile. The user tile continues to show their webcam/avatar.
--   **Focus/Theater Mode**: Clicking on any tile (user or screen share) should expand it to fill the available space, minimizing other tiles to a sidebar or filmstrip.
+### ~~3.4. Voice Channel Grid View~~ ✅ Implemented
+- `VoiceGridPane` renders all participants as tiles (webcam feed or avatar, speaking ring, mute indicator).
+- Screen-share appears as a separate tile alongside the user tile.
+- Clicking any tile enters theater/focus mode; other tiles shrink to a filmstrip sidebar.
 
 ## 4. Feature Requests: Server & Channel Management
 
@@ -180,10 +156,9 @@ At 50 ms per request this produces ~20 messages/second, ~1 200/minute — the ra
 -   Server admins can see all active invite links in server settings, and can **pause** (temporarily disable) or **revoke** (delete) any link.
 -   Expired or fully-used links return a clear error on the invite page.
 
-### 4.8. Channel Topic / Description in Header
--   Each text channel has an optional `description` field stored in the database, but it is not displayed anywhere in the UI.
--   The message pane header should show the channel topic beside or below the channel name, matching Discord's topic bar.
--   Clicking the topic should open the channel settings modal for admins.
+### ~~4.8. Channel Topic / Description in Header~~ ✅ Implemented
+- `MessagePane` header shows `# name | topic` (truncated, full text in tooltip) when `channel.description` is set.
+- Edit Channel modal in `ChannelSidebar` has a "Channel Topic" textarea (pre-filled, saved via `updateChannel`).
 
 ### 4.9. Keyboard Shortcuts
 -   Discord-standard keyboard shortcuts are entirely absent. Priority shortcuts to implement:
@@ -194,15 +169,11 @@ At 50 ms per request this produces ~20 messages/second, ~1 200/minute — the ra
 
 ## 5. Feature Requests: Messaging
 
-### 5.1. Message Reactions
-See full spec: [`docs/specs/message_reactions_spec.md`](specs/message_reactions_spec.md)
-
-- **Hover action bar** (😊＋ icon) or right-click context menu opens the emoji picker.
-- **Full emoji picker** — category nav bar, search, recently used (last 36), skin tone selector, 36×36 px grid with name tooltip.
-- **Reaction pills** below message body — emoji + count, highlighted if current user reacted, ＋ add button.
-- **Hover tooltip** — shows "Liked by Josh, Anna, and 3 more" after 400 ms delay.
-- **Right-click a pill** — opens a persistent Reactors Popover with full scrollable list of avatars + names.
-- WebSocket events `reaction.added` / `reaction.removed` for real-time pill updates.
+### ~~5.1. Message Reactions~~ ✅ Implemented
+- Hover action bar in `MessageBubble` opens `EmojiPicker` (emoji-mart, dark theme, viewport-clamped portal) to add a reaction.
+- Reaction pills render below message body with emoji + count; current user's reactions are highlighted.
+- `+` button on pills opens picker to add more. Clicking an existing pill toggles it.
+- WS events `reaction.added` / `reaction.removed` patch the TanStack Query cache in place (no refetch).
 
 ### 5.2. Reply to Messages
 See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec.md)
