@@ -32,10 +32,33 @@ export function useChannelWS(channelId: string | null) {
           qc.setQueryData<Message[]>(key, (old = []) => old.filter((m) => m.id !== message_id))
           break
         }
-        case 'reaction.added':
+        case 'reaction.added': {
+          const { message_id, user_id, emoji } = msg.data as { message_id: string; user_id: string; emoji: string }
+          qc.setQueryData<Message[]>(key, (old = []) =>
+            old.map((m) => {
+              if (m.id !== message_id) return m
+              // Avoid duplicates (e.g. own optimistic mutation already added it)
+              const already = m.reactions.some((r) => r.user_id === user_id && r.emoji === emoji)
+              if (already) return m
+              return {
+                ...m,
+                reactions: [...m.reactions, { id: `${user_id}-${emoji}`, user_id, emoji }],
+              }
+            }),
+          )
+          break
+        }
         case 'reaction.removed': {
-          // Trigger a refetch for simplicity – reactions are high-frequency but small
-          qc.invalidateQueries({ queryKey: key })
+          const { message_id, user_id, emoji } = msg.data as { message_id: string; user_id: string; emoji: string }
+          qc.setQueryData<Message[]>(key, (old = []) =>
+            old.map((m) => {
+              if (m.id !== message_id) return m
+              return {
+                ...m,
+                reactions: m.reactions.filter((r) => !(r.user_id === user_id && r.emoji === emoji)),
+              }
+            }),
+          )
           break
         }
       }
