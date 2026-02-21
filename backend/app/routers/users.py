@@ -8,10 +8,9 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.dependencies import CurrentUser, DB
+from app.presence import broadcast_presence
 from app.schemas.user import UserRead, UserUpdate
-from app.ws_manager import manager
-from models.user import User, UserStatus
-from models.server import ServerMember
+from models.user import User
 from models.note import UserNote
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -39,18 +38,9 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB):
     await db.commit()
     await db.refresh(current_user)
 
-    # Broadcast status change to all servers the user is a member of
+    # Broadcast status change to servers and friends
     if status_changed:
-        result = await db.execute(
-            select(ServerMember.server_id).where(ServerMember.user_id == current_user.id)
-        )
-        server_ids = result.scalars().all()
-        event = {
-            "type": "user.status_changed",
-            "data": {"user_id": str(current_user.id), "status": current_user.status.value},
-        }
-        for sid in server_ids:
-            await manager.broadcast_server(sid, event)
+        await broadcast_presence(current_user.id, current_user.status.value, db)
 
     return current_user
 

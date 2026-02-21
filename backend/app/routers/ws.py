@@ -17,6 +17,8 @@ Clients connect to one of:
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, status
@@ -25,8 +27,13 @@ from sqlalchemy import select
 
 from app.auth import decode_access_token
 from app.database import get_db
+from app.presence import broadcast_presence
 from app.ws_manager import manager
 from models.server import ServerMember
+from models.user import User, UserStatus
+
+# How long to wait for a heartbeat before closing the connection (seconds).
+_HEARTBEAT_TIMEOUT = 90
 
 router = APIRouter(tags=["websocket"])
 
@@ -139,6 +146,7 @@ async def server_ws(
 async def personal_ws(
     ws: WebSocket,
     token: str = Query(..., description="JWT access token"),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Subscribe to personal events:
@@ -148,6 +156,11 @@ async def personal_ws(
       - friend_request.accepted
       - friend_request.declined
       - user.status_changed
+
+    Clients must send {"type": "ping"} at least every 60 s; the server
+    replies with {"type": "pong"}.  When the connection drops or the
+    heartbeat times out the user's status is set to offline and the
+    change is broadcast to servers and friends.
     """
     user_id = await _authenticate_ws(ws, token)
     if user_id is None:
@@ -155,10 +168,38 @@ async def personal_ws(
 
     room = manager.user_room(user_id)
     await manager.connect(room, ws)
+
+    # --- set online if currently offline --------------------------------
+    user = await db.get(User, user_id)
+    if user and user.status == UserStatus.offline:
+        user.status = UserStatus.online
+        db.add(user)
+        await db.commit()
+        await broadcast_presence(user_id, "online", db)
+
     try:
         while True:
-            await ws.receive_text()
+            try:
+                text = await asyncio.wait_for(ws.receive_text(), timeout=_HEARTBEAT_TIMEOUT)
+            except asyncio.TimeoutError:
+                # Client stopped sending pings — treat as disconnect
+                break
+            try:
+                data = json.loads(text)
+                if isinstance(data, dict) and data.get("type") == "ping":
+                    await ws.send_text('{"type":"pong"}')
+            except (json.JSONDecodeError, Exception):
+                pass
     except WebSocketDisconnect:
         pass
     finally:
         await manager.disconnect(room, ws)
+
+        # Only set offline if this was the user's last open connection
+        if not manager._rooms.get(room):
+            await db.refresh(user)
+            if user.status != UserStatus.offline:
+                user.status = UserStatus.offline
+                db.add(user)
+                await db.commit()
+                await broadcast_presence(user_id, "offline", db)

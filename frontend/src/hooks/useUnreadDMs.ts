@@ -45,7 +45,7 @@ export function useUnreadDMs(): boolean {
     setLastRead(loadLastRead())
   }, [activeDmUserId])
 
-  useWebSocket('/ws/me', {
+  const { send } = useWebSocket('/ws/me', {
     onMessage(msg) {
       if (msg.type !== 'message.created') return
       const data = msg.data as Message
@@ -65,6 +65,12 @@ export function useUnreadDMs(): boolean {
       })
     },
   })
+
+  // Heartbeat: server expects a ping at least every 60 s; we send every 30 s.
+  useEffect(() => {
+    const id = setInterval(() => send({ type: 'ping' }), 30_000)
+    return () => clearInterval(id)
+  }, [send])
 
   return conversations.some(conv => {
     const isActive = conv.other_user.id === activeDmUserId
