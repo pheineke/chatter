@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMatch } from 'react-router-dom'
 import { useWebSocket } from './useWebSocket'
 import { getConversations } from '../api/dms'
@@ -22,6 +22,14 @@ export function useUnreadDMs(): boolean {
   const match = useMatch('/channels/@me/:dmUserId')
   const activeDmUserId = match?.params.dmUserId ?? null
   const [lastRead, setLastRead] = useState<Record<string, string>>(loadLastRead)
+
+  // useQuery makes this component re-render whenever the cache changes
+  const { data: conversations = [] } = useQuery<DMConversation[]>({
+    queryKey: ['dmConversations'],
+    queryFn: getConversations,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
 
   // Re-sync lastRead from localStorage whenever it changes (DMSidebar writes it)
   useEffect(() => {
@@ -46,7 +54,6 @@ export function useUnreadDMs(): boolean {
         if (!old) return old
         const exists = old.some(c => c.channel_id === data.channel_id)
         if (!exists) {
-          // New conversation — refetch the list
           qc.invalidateQueries({ queryKey: ['dmConversations'] })
           return old
         }
@@ -58,16 +65,6 @@ export function useUnreadDMs(): boolean {
       })
     },
   })
-
-  // Ensure conversations are loaded even if DMSidebar hasn't mounted yet
-  const conversations = qc.getQueryState<DMConversation[]>(['dmConversations'])?.data ?? []
-
-  // Pre-fetch if not loaded
-  useEffect(() => {
-    if (!qc.getQueryState(['dmConversations'])?.data) {
-      qc.prefetchQuery({ queryKey: ['dmConversations'], queryFn: getConversations })
-    }
-  }, [qc])
 
   return conversations.some(conv => {
     const isActive = conv.other_user.id === activeDmUserId
