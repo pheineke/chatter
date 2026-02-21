@@ -112,10 +112,10 @@ function ParticipantCard({
 // ─── Video tile card ─────────────────────────────────────────────────────────
 
 function VideoCard({
-  tile, compact = false, focused = false, active = false, onActivate, onClick,
+  tile, compact = false, focused = false, active = false, onActivate, onDeactivate, onClick,
 }: {
   tile: VideoTile; compact?: boolean; focused?: boolean
-  active?: boolean; onActivate?: () => void; onClick?: () => void
+  active?: boolean; onActivate?: () => void; onDeactivate?: () => void; onClick?: () => void
 }) {
   // Inactive placeholder — shown for remote tiles until the user clicks to watch.
   if (!active) {
@@ -159,9 +159,10 @@ function VideoCard({
       <VideoEl stream={tile.stream} />
       {/* Play screen-share system audio alongside the video when present */}
       {tile.audioStream && <AudioEl stream={tile.audioStream} />}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
+      {/* Theater Mode hint — center overlay */}
       {!focused && !compact && (
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
           <span className="text-white text-xs font-semibold bg-black/60 px-3 py-1 rounded-full flex items-center gap-1.5">
             <Icon name="maximize-2" size={13} /> Theater Mode
           </span>
@@ -170,7 +171,16 @@ function VideoCard({
       <div className="absolute bottom-2 left-2 text-[11px] font-semibold text-white drop-shadow bg-black/50 px-2 py-0.5 rounded-full">
         {tile.label}
       </div>
-      <div className="absolute top-2 right-2">
+      <div className="absolute top-2 right-2 flex items-center gap-1.5">
+        {onDeactivate && (
+          <button
+            title="Stop watching"
+            className="opacity-0 group-hover:opacity-100 transition text-[10px] font-bold text-white bg-red-600/80 hover:bg-red-600 px-1.5 py-0.5 rounded flex items-center gap-1"
+            onClick={e => { e.stopPropagation(); onDeactivate() }}
+          >
+            <Icon name="x" size={10} />{!compact && 'Exit'}
+          </button>
+        )}
         <span className="text-[10px] uppercase font-bold text-white bg-discord-mention/80 px-1.5 py-0.5 rounded">
           {tile.tileType === 'screen' ? 'Screen' : 'Cam'}
         </span>
@@ -206,7 +216,11 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   const [activeTiles, setActiveTiles] = useState<Set<string>>(
     () => new Set(['screen-local', 'webcam-local'])
   )
-  const activateTile = (id: string) => setActiveTiles(prev => new Set([...prev, id]))
+  const activateTile   = (id: string) => setActiveTiles(prev => new Set([...prev, id]))
+  const deactivateTile = (id: string) => {
+    if (focused === id) setFocused(null)
+    setActiveTiles(prev => { const n = new Set(prev); n.delete(id); return n })
+  }
 
   // Exit fullscreen when theater mode ends
   function clearFocused() {
@@ -360,7 +374,11 @@ export function VoiceGridPane({ session, onLeave }: Props) {
           <div className="flex flex-col h-full gap-3">
             {/* Focused video */}
             <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-black border border-white/10">
-              <VideoCard tile={theaterTile} focused active onClick={clearFocused} />
+              <VideoCard
+                tile={theaterTile} focused active
+                onDeactivate={theaterTile.isLocal ? undefined : () => deactivateTile(theaterTile.id)}
+                onClick={clearFocused}
+              />
               {/* Fullscreen button — bottom right */}
               <button
                 onClick={() => setFullscreen(true)}
@@ -381,6 +399,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                       compact
                       active={t.isLocal || activeTiles.has(t.id)}
                       onActivate={() => activateTile(t.id)}
+                      onDeactivate={t.isLocal ? undefined : () => deactivateTile(t.id)}
                       onClick={() => setFocused(t.id)}
                     />
                   ) : (
@@ -405,6 +424,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                   tile={t}
                   active={t.isLocal || activeTiles.has(t.id)}
                   onActivate={() => activateTile(t.id)}
+                  onDeactivate={t.isLocal ? undefined : () => deactivateTile(t.id)}
                   onClick={() => setFocused(t.id)}
                 />
               ) : (
