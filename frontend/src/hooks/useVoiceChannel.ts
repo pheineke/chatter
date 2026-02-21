@@ -35,6 +35,14 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   const localStream = useRef<MediaStream | null>(null)
   // ICE candidates received before setRemoteDescription is applied are queued here
   const iceCandidateQueue = useRef<Map<string, RTCIceCandidateInit[]>>(new Map())
+  // peerId → RTCRtpSender for the screen / webcam track so we can removeTrack later
+  const screenSenders = useRef<Map<string, RTCRtpSender>>(new Map())
+  const webcamSenders = useRef<Map<string, RTCRtpSender>>(new Map())
+  // Stable refs to local screen/webcam streams so stop-callbacks can reach them
+  const screenStreamRef = useRef<MediaStream | null>(null)
+  const webcamStreamRef = useRef<MediaStream | null>(null)
+  // Perfect Negotiation: tracks whether we are in the middle of createOffer per peer
+  const makingOffer = useRef<Map<string, boolean>>(new Map())
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({})
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null)
   // Only open the voice WebSocket after the local audio stream has been acquired
@@ -152,6 +160,21 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       if (pc.connectionState === 'failed') pc.restartIce()
     }
 
+    // Perfect Negotiation: both sides can send renegotiation offers.
+    // A makingOffer flag lets handleOffer detect and resolve collisions.
+    pc.onnegotiationneeded = async () => {
+      if (pc.signalingState !== 'stable') return
+      try {
+        makingOffer.current.set(peerId, true)
+        const offer = await pc.createOffer()
+        if (pc.signalingState !== 'stable') return  // state changed while awaiting
+        await pc.setLocalDescription(offer)
+        send({ type: 'offer', to: peerId, sdp: offer.sdp })
+      } catch { /* ignore errors from racing state changes */ } finally {
+        makingOffer.current.set(peerId, false)
+      }
+    }
+
     pc.ontrack = ({ track, streams }) => {
       // e.streams[0] can be undefined if the sender didn't bundle the track
       // into a named stream — fall back to wrapping it ourselves.
@@ -188,30 +211,49 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     return pc
   }, [send])
 
-  const initiateCall = useCallback(async (peerId: string) => {
+  const initiateCall = useCallback((peerId: string) => {
     const pc = createPeer(peerId)
-    // offerToReceiveAudio ensures the SDP has an active audio m-section even
-    // if the local mic is currently muted (track enabled=false still adds the
-    // track; the remote side still sees the sendrecv direction).
-    const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
-    await pc.setLocalDescription(offer)
-    send({ type: 'offer', to: peerId, sdp: offer.sdp })
-  }, [createPeer, send])
+    // If we're already sharing screen/webcam, add those tracks immediately so
+    // the initial offer includes them instead of requiring a second renegotiation.
+    if (screenStreamRef.current) {
+      const [t] = screenStreamRef.current.getVideoTracks()
+      if (t) screenSenders.current.set(peerId, pc.addTrack(t, screenStreamRef.current))
+    }
+    if (webcamStreamRef.current) {
+      const [t] = webcamStreamRef.current.getVideoTracks()
+      if (t) webcamSenders.current.set(peerId, pc.addTrack(t, webcamStreamRef.current))
+    }
+    // onnegotiationneeded fires automatically once tracks are added and sends the
+    // initial offer. No explicit createOffer needed here.
+  }, [createPeer])
 
   const handleOffer = useCallback(async (peerId: string, sdp: string) => {
-    // Tear down any previous connection for this peer (e.g. after a reconnect).
-    if (peers.current.has(peerId)) {
-      peers.current.get(peerId)!.close()
-      peers.current.delete(peerId)
+    const existing = peers.current.get(peerId)
+    // Perfect Negotiation: the polite side is the one with the higher userId.
+    // When there's a collision (both sides tried to offer simultaneously), the
+    // polite side rolls back its own pending offer and accepts the remote offer.
+    // The impolite side simply ignores the incoming offer and keeps its own.
+    const polite = userId > peerId
+    const collision = (makingOffer.current.get(peerId) === true) ||
+      (existing != null && existing.signalingState !== 'stable')
+
+    if (collision) {
+      if (!polite) return   // impolite: ignore the incoming offer, ours wins
+      // polite: roll back our pending offer so we can accept theirs
+      if (existing) {
+        await existing.setLocalDescription({ type: 'rollback' })
+        makingOffer.current.set(peerId, false)
+      }
     }
-    const pc = createPeer(peerId)
+
+    // No collision (or polite rollback complete): accept the offer normally.
+    const pc = existing ?? createPeer(peerId)
     await pc.setRemoteDescription({ type: 'offer', sdp })
-    // Flush candidates that arrived before setRemoteDescription.
     await flushIceCandidates(peerId)
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     send({ type: 'answer', to: peerId, sdp: answer.sdp })
-  }, [createPeer, flushIceCandidates, send])
+  }, [createPeer, flushIceCandidates, send, userId])
 
   const handleAnswer = useCallback(async (peerId: string, sdp: string) => {
     const pc = peers.current.get(peerId)
@@ -239,6 +281,9 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     peers.current.get(peerId)?.close()
     peers.current.delete(peerId)
     iceCandidateQueue.current.delete(peerId)
+    makingOffer.current.delete(peerId)
+    screenSenders.current.delete(peerId)
+    webcamSenders.current.delete(peerId)
     document.getElementById(`audio-${peerId}`)?.remove()
     setRemoteStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
   }, [])
@@ -267,6 +312,13 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     return () => {
       localStream.current?.getTracks().forEach((t) => t.stop())
       localStream.current = null
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop())
+      screenStreamRef.current = null
+      webcamStreamRef.current?.getTracks().forEach((t) => t.stop())
+      webcamStreamRef.current = null
+      screenSenders.current.clear()
+      webcamSenders.current.clear()
+      makingOffer.current.clear()
       peers.current.forEach((pc) => pc.close())
       peers.current.clear()
       iceCandidateQueue.current.clear()
@@ -300,55 +352,81 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     send({ type: 'speaking', is_speaking: isSpeaking })
   }, [send])
 
-  const toggleScreenShare = useCallback(async () => {
-    const current = state.isSharingScreen
-    if (!current) {
-      try {
-        const screen = await navigator.mediaDevices.getDisplayMedia({ video: true })
-        screen.getTracks().forEach((t) => {
-          localStream.current?.addTrack(t)
-          peers.current.forEach((pc) => pc.addTrack(t, localStream.current!))
-        })
-        setLocalVideoStream(screen)
-        // Auto-stop when user ends sharing via browser UI
-        screen.getVideoTracks()[0]?.addEventListener('ended', () => {
-          setState(s => ({ ...s, isSharingScreen: false }))
-          setLocalVideoStream(null)
-          send({ type: 'screen_share', enabled: false })
-        })
-      } catch {
-        return
-      }
-    } else {
-      setLocalVideoStream(null)
-    }
-    setState((s) => {
-      send({ type: 'screen_share', enabled: !s.isSharingScreen })
-      return { ...s, isSharingScreen: !s.isSharingScreen }
+  const stopScreenShare = useCallback(() => {
+    screenStreamRef.current?.getTracks().forEach(t => t.stop())
+    screenStreamRef.current = null
+    setLocalVideoStream(null)
+    // Remove the screen sender from every peer — onnegotiationneeded fires automatically.
+    peers.current.forEach((pc, peerId) => {
+      const sender = screenSenders.current.get(peerId)
+      if (sender) { try { pc.removeTrack(sender) } catch { /* ignore */ } }
+      screenSenders.current.delete(peerId)
     })
-  }, [state.isSharingScreen, send])
+    setState(s => ({ ...s, isSharingScreen: false }))
+    send({ type: 'screen_share', enabled: false })
+  }, [send])
+
+  const toggleScreenShare = useCallback(async () => {
+    if (state.isSharingScreen) {
+      stopScreenShare()
+      return
+    }
+    let screenStream: MediaStream
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+    } catch {
+      return  // user cancelled or permission denied
+    }
+    const [videoTrack] = screenStream.getVideoTracks()
+    screenStreamRef.current = screenStream
+    setLocalVideoStream(screenStream)
+    setState(s => ({ ...s, isSharingScreen: true }))
+    send({ type: 'screen_share', enabled: true })
+    // Add the video track to every existing peer connection.
+    // onnegotiationneeded will fire and trigger a renegotiation offer automatically.
+    peers.current.forEach((pc, peerId) => {
+      const sender = pc.addTrack(videoTrack, screenStream)
+      screenSenders.current.set(peerId, sender)
+    })
+    // Handle the browser's own "Stop sharing" button.
+    videoTrack.addEventListener('ended', () => stopScreenShare(), { once: true })
+  }, [state.isSharingScreen, stopScreenShare, send])
+
+  const stopWebcam = useCallback(() => {
+    webcamStreamRef.current?.getTracks().forEach(t => t.stop())
+    webcamStreamRef.current = null
+    setLocalVideoStream(null)
+    peers.current.forEach((pc, peerId) => {
+      const sender = webcamSenders.current.get(peerId)
+      if (sender) { try { pc.removeTrack(sender) } catch { /* ignore */ } }
+      webcamSenders.current.delete(peerId)
+    })
+    setState(s => ({ ...s, isSharingWebcam: false }))
+    send({ type: 'webcam', enabled: false })
+  }, [send])
 
   const toggleWebcam = useCallback(async () => {
-    const current = state.isSharingWebcam
-    if (!current) {
-      try {
-        const cam = await navigator.mediaDevices.getUserMedia({ video: true })
-        cam.getTracks().forEach((t) => {
-          localStream.current?.addTrack(t)
-          peers.current.forEach((pc) => pc.addTrack(t, localStream.current!))
-        })
-        setLocalVideoStream(cam)
-      } catch {
-        return
-      }
-    } else {
-      setLocalVideoStream(null)
+    if (state.isSharingWebcam) {
+      stopWebcam()
+      return
     }
-    setState((s) => {
-      send({ type: 'webcam', enabled: !s.isSharingWebcam })
-      return { ...s, isSharingWebcam: !s.isSharingWebcam }
+    let camStream: MediaStream
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: true })
+    } catch {
+      return
+    }
+    const [videoTrack] = camStream.getVideoTracks()
+    webcamStreamRef.current = camStream
+    setLocalVideoStream(camStream)
+    setState(s => ({ ...s, isSharingWebcam: true }))
+    send({ type: 'webcam', enabled: true })
+    peers.current.forEach((pc, peerId) => {
+      const sender = pc.addTrack(videoTrack, camStream)
+      webcamSenders.current.set(peerId, sender)
     })
-  }, [state.isSharingWebcam, send])
+    videoTrack.addEventListener('ended', () => stopWebcam(), { once: true })
+  }, [state.isSharingWebcam, stopWebcam, send])
 
   return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, localVideoStream, localStream }
 }

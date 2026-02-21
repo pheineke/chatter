@@ -12,8 +12,8 @@
 - **Copy button in invite modal does not work** — Clicking the copy button in the invite link modal has no effect.
 - **New users receive all roles (including admin) on server join** — Every new member is incorrectly assigned all existing roles. New members should receive no roles by default unless a role is explicitly configured to be assigned on join.
 - **Users cannot see other participants' cameras in voice channels** — Shared camera streams from other users are not rendered.
-- **Users cannot hear each other in voice channels** — Audio transmission between participants is not working.
-- **Screen sharing does not work** — Initiating screen share has no effect for other participants.
+- ~~**Users cannot hear each other in voice channels**~~ ✅ Fixed — WebRTC peer connections now correctly exchange audio tracks; AudioContext autoplay policy and ICE candidate queueing resolved.
+- ~~**Screen sharing does not work**~~ ✅ Fixed — Rewrote `toggleScreenShare`/`toggleWebcam` with proper `RTCRtpSender` tracking and `onnegotiationneeded`-driven renegotiation; `handleOffer` now handles renegotiation without tearing down the existing peer connection.
 - **Voice-connected footer bar goes off-screen** — The footer bar showing active voice channel users overflows off the bottom of the viewport.
 - **Right-clicking a server icon does not show context menu** — Right-clicking the server icon in the sidebar should open a context menu with options for "Invite to Server" and "Server Settings".
 - **Adding a note to a user in the profile card does not work** — The note field in the profile card popout does not save or persist user notes.

@@ -30,7 +30,8 @@ export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }
     if (!token) return
 
     const url = `${WS_BASE}${path}?token=${token}`
-    const ws = new WebSocket(url.startsWith('ws') ? url : `ws://${location.host}${url}`)
+    const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws'
+    const ws = new WebSocket(url.startsWith('ws') ? url : `${wsScheme}://${location.host}${url}`)
     wsRef.current = ws
 
     ws.onmessage = (e) => {
