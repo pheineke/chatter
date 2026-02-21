@@ -35,15 +35,26 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   const localStream = useRef<MediaStream | null>(null)
   // ICE candidates received before setRemoteDescription is applied are queued here
   const iceCandidateQueue = useRef<Map<string, RTCIceCandidateInit[]>>(new Map())
-  // peerId → RTCRtpSender for the screen / webcam track so we can removeTrack later
-  const screenSenders = useRef<Map<string, RTCRtpSender>>(new Map())
+  // peerId → RTCRtpSender[] for screen share (can be video+audio) / webcam so we can removeTrack later
+  const screenSenders = useRef<Map<string, RTCRtpSender[]>>(new Map())
   const webcamSenders = useRef<Map<string, RTCRtpSender>>(new Map())
   // Stable refs to local screen/webcam streams so stop-callbacks can reach them
   const screenStreamRef = useRef<MediaStream | null>(null)
   const webcamStreamRef = useRef<MediaStream | null>(null)
   // Perfect Negotiation: tracks whether we are in the middle of createOffer per peer
   const makingOffer = useRef<Map<string, boolean>>(new Map())
+  // Handles the race between audio and video ontrack events from the same stream.
+  // When an audio track arrives before the video track for the same stream ID we
+  // temporarily route it as mic audio. When the video track arrives we check this
+  // map and upgrade the audio to the screen-share audio path.
+  const pendingStreamAudio = useRef<Map<string, {
+    el: HTMLAudioElement
+    peerId: string
+    stream: MediaStream
+    track: MediaStreamTrack
+  }>>(new Map())
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({})
+  const [remoteScreenAudioStreams, setRemoteScreenAudioStreams] = useState<Record<string, MediaStream>>({})
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null)
   // Only open the voice WebSocket after the local audio stream has been acquired
   // (or the attempt has definitively failed). This ensures localStream.current is
@@ -176,35 +187,78 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     }
 
     pc.ontrack = ({ track, streams }) => {
-      // e.streams[0] can be undefined if the sender didn't bundle the track
-      // into a named stream — fall back to wrapping it ourselves.
+      // streams[0] can be undefined if the sender didn't bundle the track into a
+      // named stream — fall back to a single-track wrapper as a safety net.
       const remoteStream = streams[0] ?? new MediaStream([track])
+      const streamId = remoteStream.id
 
       if (track.kind === 'audio') {
-        const elId = `audio-${peerId}`
-        let audio = document.getElementById(elId) as HTMLAudioElement | null
-        if (!audio) {
-          audio = Object.assign(document.createElement('audio'), {
-            id: elId,
-            autoplay: true,
-          })
-          document.body.appendChild(audio)
+        // We can't reliably tell at this moment whether the audio is from the mic
+        // (audio-only stream) or from a screen share (audio + video in same stream)
+        // because the peer's ontrack fires once per track — the video track for the
+        // same stream may not have arrived yet.
+        //
+        // Strategy:
+        //  • If the stream already has a video track → screen audio immediately.
+        //  • Otherwise → create a hidden mic-audio element, but register it in
+        //    pendingStreamAudio so the video ontrack handler can upgrade it.
+
+        const routeAsScreenAudio = (audioTrack: MediaStreamTrack, audioStream: MediaStream) => {
+          setRemoteScreenAudioStreams(prev => ({ ...prev, [peerId]: audioStream }))
+          audioTrack.addEventListener('ended', () => {
+            setRemoteScreenAudioStreams(prev => { const n = { ...prev }; delete n[peerId]; return n })
+          }, { once: true })
         }
-        audio.srcObject = remoteStream
-        // Explicit play() is required — autoplay alone is blocked by browser policy.
-        const tryPlay = () =>
-          audio!.play().catch(() => document.addEventListener('click', tryPlay, { once: true }))
-        tryPlay()
+
+        if (remoteStream.getVideoTracks().length > 0) {
+          // Video already present — definitely screen-share audio.
+          routeAsScreenAudio(track, remoteStream)
+        } else {
+          // Route as mic audio for now; upgrade if video arrives later.
+          const elId = `audio-${streamId}`
+          let audio = document.getElementById(elId) as HTMLAudioElement | null
+          if (!audio) {
+            audio = document.createElement('audio')
+            audio.id = elId
+            audio.autoplay = true
+            audio.dataset.peer = peerId
+            document.body.appendChild(audio)
+          }
+          audio.srcObject = remoteStream
+          const tryPlay = () =>
+            audio!.play().catch(() => document.addEventListener('click', tryPlay, { once: true }))
+          tryPlay()
+
+          // Register so the video ontrack can upgrade this to screen audio.
+          pendingStreamAudio.current.set(streamId, { el: audio, peerId, stream: remoteStream, track })
+          track.addEventListener('ended', () => {
+            pendingStreamAudio.current.delete(streamId)
+            audio?.remove()
+          }, { once: true })
+        }
       }
 
-      setRemoteStreams(prev => {
-        // Keep audio stream reference stable: only overwrite if we don't have
-        // one yet, or if this is a video track update.
-        if (track.kind === 'video' || !prev[peerId]) {
-          return { ...prev, [peerId]: remoteStream }
+      if (track.kind === 'video') {
+        setRemoteStreams(prev => ({ ...prev, [peerId]: remoteStream }))
+        track.addEventListener('ended', () => {
+          setRemoteStreams(prev => { const n = { ...prev }; delete n[peerId]; return n })
+        }, { once: true })
+
+        // Check if an audio track for this same stream arrived earlier and was
+        // tentatively routed as mic audio. If so, upgrade it to screen audio.
+        const pending = pendingStreamAudio.current.get(streamId)
+        if (pending && pending.peerId === peerId) {
+          pendingStreamAudio.current.delete(streamId)
+          // Remove the misrouted mic-audio element.
+          pending.el.pause()
+          pending.el.remove()
+          // Now route correctly as screen audio.
+          setRemoteScreenAudioStreams(prev => ({ ...prev, [peerId]: pending.stream }))
+          pending.track.addEventListener('ended', () => {
+            setRemoteScreenAudioStreams(prev => { const n = { ...prev }; delete n[peerId]; return n })
+          }, { once: true })
         }
-        return prev
-      })
+      }
     }
 
     peers.current.set(peerId, pc)
@@ -216,8 +270,8 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     // If we're already sharing screen/webcam, add those tracks immediately so
     // the initial offer includes them instead of requiring a second renegotiation.
     if (screenStreamRef.current) {
-      const [t] = screenStreamRef.current.getVideoTracks()
-      if (t) screenSenders.current.set(peerId, pc.addTrack(t, screenStreamRef.current))
+      const senders = screenStreamRef.current.getTracks().map(t => pc.addTrack(t, screenStreamRef.current!))
+      screenSenders.current.set(peerId, senders)
     }
     if (webcamStreamRef.current) {
       const [t] = webcamStreamRef.current.getVideoTracks()
@@ -247,9 +301,26 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     }
 
     // No collision (or polite rollback complete): accept the offer normally.
+    const isNewPeer = existing == null || collision
     const pc = existing ?? createPeer(peerId)
     await pc.setRemoteDescription({ type: 'offer', sdp })
     await flushIceCandidates(peerId)
+
+    // If this is a brand-new peer (not a renegotiation) and we are currently
+    // sharing our screen or webcam, add those tracks now so they are included
+    // in the answer SDP.  Without this the polite side (which never calls
+    // initiateCall) would omit screen/webcam tracks entirely for late joiners.
+    if (isNewPeer) {
+      if (screenStreamRef.current) {
+        const senders = screenStreamRef.current.getTracks().map(t => pc.addTrack(t, screenStreamRef.current!))
+        screenSenders.current.set(peerId, senders)
+      }
+      if (webcamStreamRef.current) {
+        const [t] = webcamStreamRef.current.getVideoTracks()
+        if (t) webcamSenders.current.set(peerId, pc.addTrack(t, webcamStreamRef.current))
+      }
+    }
+
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     send({ type: 'answer', to: peerId, sdp: answer.sdp })
@@ -284,8 +355,18 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     makingOffer.current.delete(peerId)
     screenSenders.current.delete(peerId)
     webcamSenders.current.delete(peerId)
-    document.getElementById(`audio-${peerId}`)?.remove()
+    // Remove all audio elements for this peer (mic audio)
+    document.querySelectorAll<HTMLAudioElement>(`audio[data-peer="${peerId}"]`)
+      .forEach(el => el.remove())
     setRemoteStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
+    setRemoteScreenAudioStreams(prev => { const next = { ...prev }; delete next[peerId]; return next })
+    // Clean up any pending audio that hadn't been resolved for this peer
+    pendingStreamAudio.current.forEach((entry, streamId) => {
+      if (entry.peerId === peerId) {
+        entry.el.pause(); entry.el.remove()
+        pendingStreamAudio.current.delete(streamId)
+      }
+    })
   }, [])
 
   // --- Local media ----------------------------------------------------------
@@ -319,6 +400,8 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       screenSenders.current.clear()
       webcamSenders.current.clear()
       makingOffer.current.clear()
+      pendingStreamAudio.current.forEach(({ el }) => { el.pause(); el.remove() })
+      pendingStreamAudio.current.clear()
       peers.current.forEach((pc) => pc.close())
       peers.current.clear()
       iceCandidateQueue.current.clear()
@@ -356,10 +439,10 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     screenStreamRef.current?.getTracks().forEach(t => t.stop())
     screenStreamRef.current = null
     setLocalVideoStream(null)
-    // Remove the screen sender from every peer — onnegotiationneeded fires automatically.
+    // Remove all screen senders (video + optional audio) — onnegotiationneeded fires automatically.
     peers.current.forEach((pc, peerId) => {
-      const sender = screenSenders.current.get(peerId)
-      if (sender) { try { pc.removeTrack(sender) } catch { /* ignore */ } }
+      const senders = screenSenders.current.get(peerId) ?? []
+      senders.forEach(s => { try { pc.removeTrack(s) } catch { /* ignore */ } })
       screenSenders.current.delete(peerId)
     })
     setState(s => ({ ...s, isSharingScreen: false }))
@@ -373,7 +456,10 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     }
     let screenStream: MediaStream
     try {
-      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      // audio: true makes the browser show a "Share audio" / "Share tab audio" checkbox
+      // in its native picker. If the user unchecks it the stream just has no audio tracks,
+      // and the track-iteration below handles that gracefully (nothing extra is sent).
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
     } catch {
       return  // user cancelled or permission denied
     }
@@ -382,11 +468,11 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     setLocalVideoStream(screenStream)
     setState(s => ({ ...s, isSharingScreen: true }))
     send({ type: 'screen_share', enabled: true })
-    // Add the video track to every existing peer connection.
-    // onnegotiationneeded will fire and trigger a renegotiation offer automatically.
+    // Add ALL tracks (video + any captured audio) to every existing peer connection.
+    // onnegotiationneeded fires per peer and sends renegotiation offers automatically.
     peers.current.forEach((pc, peerId) => {
-      const sender = pc.addTrack(videoTrack, screenStream)
-      screenSenders.current.set(peerId, sender)
+      const senders = screenStream.getTracks().map(t => pc.addTrack(t, screenStream))
+      screenSenders.current.set(peerId, senders)
     })
     // Handle the browser's own "Stop sharing" button.
     videoTrack.addEventListener('ended', () => stopScreenShare(), { once: true })
@@ -428,5 +514,5 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     videoTrack.addEventListener('ended', () => stopWebcam(), { once: true })
   }, [state.isSharingWebcam, stopWebcam, send])
 
-  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, localVideoStream, localStream }
+  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream }
 }

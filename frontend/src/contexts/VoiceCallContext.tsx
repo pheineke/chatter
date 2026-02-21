@@ -13,6 +13,8 @@ interface VoiceCallContextValue {
   toggleScreenShare: () => Promise<void>
   toggleWebcam: () => Promise<void>
   remoteStreams: Record<string, MediaStream>
+  /** Screen-share audio streams keyed by peer userId — rendered as separate audio source tiles. */
+  remoteScreenAudioStreams: Record<string, MediaStream>
   localVideoStream: MediaStream | null
   /** Ref to the local microphone stream — used for speaking detection. */
   localStream: MutableRefObject<MediaStream | null>
@@ -35,11 +37,11 @@ interface ProviderProps {
 }
 
 export function VoiceCallProvider({ session, userId, children }: ProviderProps) {
-  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, localVideoStream, localStream } =
+  const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream } =
     useVoiceChannel({ channelId: session?.channelId ?? null, userId })
 
   return (
-    <VoiceCallContext.Provider value={{ state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, localVideoStream, localStream }}>
+    <VoiceCallContext.Provider value={{ state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream }}>
       {children}
     </VoiceCallContext.Provider>
   )

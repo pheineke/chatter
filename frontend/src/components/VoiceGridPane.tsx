@@ -32,7 +32,15 @@ interface VideoTile {
   tileType: 'screen' | 'webcam'
 }
 
-type Tile = ParticipantTile | VideoTile
+interface AudioTile {
+  kind: 'audio'
+  id: string
+  /** e.g. "Alice's Screen Audio" */
+  label: string
+  stream: MediaStream
+}
+
+type Tile = ParticipantTile | VideoTile | AudioTile
 
 // ─── Video element ──────────────────────────────────────────────────────────
 
@@ -41,6 +49,8 @@ function VideoEl({ stream, muted = false }: { stream: MediaStream; muted?: boole
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream
   }, [stream])
+  // Video is always muted — audio is routed through separate <audio> elements
+  // (mic via hidden elements, screen-share via the visible AudioCard).
   return <video ref={ref} autoPlay muted={muted} playsInline className="w-full h-full object-contain" />
 }
 
@@ -106,7 +116,7 @@ function VideoCard({
         ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}
       onClick={onClick}
     >
-      <VideoEl stream={tile.stream} muted={tile.label.startsWith('Your')} />
+      <VideoEl stream={tile.stream} muted />
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
       {!focused && !compact && (
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -123,6 +133,40 @@ function VideoCard({
           {tile.tileType === 'screen' ? 'Screen' : 'Cam'}
         </span>
       </div>
+    </div>
+  )
+}
+
+// ─── Audio source tile card ──────────────────────────────────────────────────
+
+function AudioCard({ tile, compact = false }: { tile: AudioTile; compact?: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  useEffect(() => {
+    const el = audioRef.current
+    if (!el) return
+    el.srcObject = tile.stream
+    const tryPlay = () => el.play().catch(() => document.addEventListener('click', tryPlay, { once: true }))
+    tryPlay()
+  }, [tile.stream])
+
+  return (
+    <div className={`relative flex flex-col items-center justify-center rounded-xl bg-discord-sidebar border border-white/5
+      ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}>
+      {/* Hidden audio element — AudioCard owns playback for this stream */}
+      <audio ref={audioRef} autoPlay />
+      <div className="rounded-full bg-indigo-500/20 p-3">
+        <Icon name="volume-2" size={compact ? 20 : 32} className="text-indigo-400" />
+      </div>
+      {!compact && (
+        <span className="mt-2 text-sm font-semibold text-discord-text truncate max-w-full px-2 text-center">
+          {tile.label}
+        </span>
+      )}
+      {compact && (
+        <span className="mt-1 text-[10px] text-discord-muted truncate max-w-[88px] px-1 text-center leading-none">
+          {tile.label}
+        </span>
+      )}
     </div>
   )
 }
@@ -145,7 +189,7 @@ interface Props {
 
 export function VoiceGridPane({ session, onLeave }: Props) {
   const { user: selfUser } = useAuth()
-  const { state, remoteStreams, localVideoStream, localStream, sendSpeaking } = useVoiceCall()
+  const { state, remoteStreams, remoteScreenAudioStreams, localVideoStream, localStream, sendSpeaking } = useVoiceCall()
   const isSelfSpeaking = useSpeaking(localStream, sendSpeaking)
   const [focused, setFocused] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
@@ -222,6 +266,16 @@ export function VoiceGridPane({ session, onLeave }: Props) {
         label: `${user.username}'s Screen`,
         stream: remoteStreams[p.user_id],
         tileType: 'screen',
+      })
+    }
+    // Screen-share audio tile — separate from the video tile so listeners can
+    // identify it as a distinct audio source (not the user's microphone).
+    if (p.is_sharing_screen && remoteScreenAudioStreams[p.user_id]) {
+      tiles.push({
+        kind: 'audio',
+        id: `screen-audio-${p.user_id}`,
+        label: `${user.username}'s Screen Audio`,
+        stream: remoteScreenAudioStreams[p.user_id],
       })
     }
     // Remote webcam tile (separate from screen share)
@@ -309,6 +363,8 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                       compact
                       onClick={() => setFocused(t.id)}
                     />
+                  ) : t.kind === 'audio' ? (
+                    <AudioCard key={t.id} tile={t} compact />
                   ) : (
                     <ParticipantCard
                       key={t.id}
@@ -331,6 +387,8 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                   tile={t}
                   onClick={() => setFocused(t.id)}
                 />
+              ) : t.kind === 'audio' ? (
+                <AudioCard key={t.id} tile={t} />
               ) : (
                 <ParticipantCard
                   key={t.id}
@@ -363,7 +421,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
 
           {/* Video */}
           <div className="flex-1 min-h-0 flex items-center justify-center">
-            <VideoEl stream={theaterTile.stream} muted={theaterTile.label.startsWith('Your')} />
+            <VideoEl stream={theaterTile.stream} muted />
           </div>
 
           {/* Bottom bar */}
