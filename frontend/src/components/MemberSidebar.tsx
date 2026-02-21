@@ -78,6 +78,7 @@ export function MemberSidebar({ serverId }: Props) {
     grouped.push({ role: null, members: ungroupedOnline })
   }
 
+  const offlineSorted = [...offline].sort((a, b) => a.user.username.localeCompare(b.user.username))
 
   return (
     <div className="w-60 shrink-0 bg-discord-sidebar flex flex-col h-full overflow-y-auto border-l border-black/20">
