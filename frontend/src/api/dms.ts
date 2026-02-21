@@ -14,3 +14,10 @@ export async function sendDM(userId: string, content: string): Promise<DM> {
 export async function deleteDM(dmId: string): Promise<void> {
   await client.delete(`/dms/${dmId}`)
 }
+
+export async function uploadDMAttachment(dmId: string, file: File): Promise<DM> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await client.post<DM>(`/dms/${dmId}/attachments`, form)
+  return data
+}

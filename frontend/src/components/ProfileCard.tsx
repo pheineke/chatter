@@ -5,9 +5,32 @@ import { Icon } from './Icon'
 import { useQuery } from '@tanstack/react-query'
 import { getUser } from '../api/users'
 import { getDMs, sendDM } from '../api/dms'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
+
+function UserTag({ userId }: { userId: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(userId).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [userId])
+  const short = userId.split('-')[0]
+  return (
+    <button
+      onClick={copy}
+      title="Click to copy user ID"
+      className="flex items-center gap-1 text-xs text-discord-muted hover:text-discord-text transition mt-0.5 group"
+    >
+      <span className="font-mono">{short}…</span>
+      <span className="opacity-0 group-hover:opacity-100 transition text-[10px]">
+        {copied ? '✓ Copied!' : 'Copy ID'}
+      </span>
+    </button>
+  )
+}
 
 interface Props {
   userId: string
@@ -79,6 +102,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
           
           <div className="mt-12">
              <div className="text-xl font-bold leading-tight">{user.username}</div>
+             <UserTag userId={user.id} />
              <div className="text-sm text-discord-muted">{user.pronouns}</div>
              
              <div className="mt-4 border-t border-discord-input pt-2">

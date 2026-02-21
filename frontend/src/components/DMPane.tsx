@@ -10,6 +10,7 @@ import { StatusIndicator } from './StatusIndicator'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { DM } from '../api/types'
 import { format } from 'date-fns'
+import { uploadDMAttachment } from '../api/dms'
 
 function ImagePreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
   useEffect(() => {
@@ -40,6 +41,7 @@ export function DMPane() {
   const { user } = useAuth()
   const isSelf = !!user && user.id === dmUserId
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [text, setText] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const closePreview = useCallback(() => setPreviewUrl(null), [])
@@ -60,6 +62,20 @@ export function DMPane() {
     mutationFn: () => sendDM(dmUserId!, text),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['dms', dmUserId] }); setText('') },
   })
+
+  const uploadMut = useMutation({
+    mutationFn: async (file: File) => {
+      const dm = await sendDM(dmUserId!, file.name)
+      return uploadDMAttachment(dm.id, file)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dms', dmUserId] }),
+  })
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) uploadMut.mutate(file)
+    e.target.value = ''
+  }
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [dms.length])
 
@@ -118,6 +134,19 @@ export function DMPane() {
       {!isSelf && (
         <div className="px-4 pb-4">
           <div className="flex items-end gap-2 bg-discord-input rounded-lg px-3 py-2">
+            <button
+              type="button"
+              className="text-discord-muted hover:text-discord-text transition shrink-0 mb-0.5"
+              title="Upload file"
+              onClick={() => fileRef.current?.click()}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="16" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+            </button>
+            <input ref={fileRef} type="file" accept="image/*,audio/*" className="hidden" onChange={handleFile} />
             <textarea
               className="flex-1 bg-transparent resize-none outline-none text-sm text-discord-text placeholder:text-discord-muted max-h-36"
               rows={1}

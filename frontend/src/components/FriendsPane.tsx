@@ -2,11 +2,13 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from './Icon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import {
   getFriends, getFriendRequests,
   sendFriendRequest, acceptFriendRequest,
   declineFriendRequest, removeFriend,
 } from '../api/friends'
+import { getUserByUsername } from '../api/users'
 import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
 import { getDMs } from '../api/dms'
@@ -16,6 +18,7 @@ type Tab = 'online' | 'all' | 'pending' | 'add'
 export function FriendsPane() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { user: currentUser } = useAuth()
   const [tab, setTab] = useState<Tab>('online')
   const [addUsername, setAddUsername] = useState('')
   const [addError, setAddError] = useState('')
@@ -36,10 +39,28 @@ export function FriendsPane() {
     mutationFn: removeFriend,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['friends'] }),
   })
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
   const sendMut = useMutation({
-    mutationFn: () => sendFriendRequest(addUsername),
-    onSuccess: () => { setAddSuccess(`Friend request sent to ${addUsername}!`); setAddUsername(''); setAddError('') },
-    onError: () => { setAddError('User not found or request already sent.'); setAddSuccess('') },
+    mutationFn: async () => {
+      const input = addUsername.trim()
+      const recipientId = UUID_RE.test(input)
+        ? input
+        : (await getUserByUsername(input)).id
+      if (currentUser && recipientId === currentUser.id) {
+        throw Object.assign(new Error(), { isSelf: true })
+      }
+      return sendFriendRequest(recipientId)
+    },
+    onSuccess: () => { setAddSuccess(`Friend request sent!`); setAddUsername(''); setAddError('') },
+    onError: (err: any) => {
+      if (err?.isSelf) { setAddError("You can't add yourself."); setAddSuccess(''); return }
+      const detail = err?.response?.data?.detail
+      if (detail === 'User not found') setAddError('No user with that username or ID.')
+      else if (detail === 'Cannot send a friend request to yourself') setAddError("You can't add yourself.")
+      else setAddError('Request already sent or you are already friends.')
+      setAddSuccess('')
+    },
   })
 
   const displayed = tab === 'online'
@@ -74,11 +95,11 @@ export function FriendsPane() {
         {tab === 'add' ? (
           <div className="max-w-md">
             <h3 className="font-semibold mb-1">Add Friend</h3>
-            <p className="text-sm text-discord-muted mb-3">You can add friends with their username.</p>
+            <p className="text-sm text-discord-muted mb-3">You can add friends with their username or user ID.</p>
             <div className="flex gap-2">
               <input
                 className="input flex-1"
-                placeholder="Enter a username"
+                placeholder="Enter a username or user ID"
                 value={addUsername}
                 onChange={(e) => setAddUsername(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && addUsername.trim()) sendMut.mutate() }}

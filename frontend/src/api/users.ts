@@ -42,3 +42,8 @@ export async function getUser(id: string): Promise<User> {
   const { data } = await client.get<User>(`/users/${id}`)
   return data
 }
+
+export async function getUserByUsername(username: string): Promise<User> {
+  const { data } = await client.get<User>('/users/search', { params: { username } })
+  return data
+}

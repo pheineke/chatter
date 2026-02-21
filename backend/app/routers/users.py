@@ -101,6 +101,21 @@ async def upload_banner(
     return current_user
 
 
+@router.get("/search", response_model=UserRead)
+async def search_user_by_username(
+    username: str,
+    db: DB,
+    current_user: CurrentUser,
+):
+    """Look up a user by exact username (case-insensitive)."""
+    from sqlalchemy import func
+    result = await db.execute(select(User).where(func.lower(User.username) == username.lower().strip()))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
 @router.get("/{user_id}", response_model=UserRead)
 async def get_user(user_id: uuid.UUID, db: DB, current_user: CurrentUser):
     result = await db.execute(select(User).where(User.id == user_id))
