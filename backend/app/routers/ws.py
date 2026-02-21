@@ -21,12 +21,11 @@ import asyncio
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 
 from app.auth import decode_access_token
-from app.database import get_db
+from app.database import AsyncSessionLocal
 from app.presence import broadcast_presence
 from app.ws_manager import manager
 from models.server import ServerMember
@@ -97,7 +96,6 @@ async def server_ws(
     server_id: uuid.UUID,
     ws: WebSocket,
     token: str = Query(..., description="JWT access token"),
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Subscribe to server-level events:
@@ -116,14 +114,18 @@ async def server_ws(
     if user_id is None:
         return
 
-    # Verify caller is a member of the server
-    row = await db.execute(
-        select(ServerMember).where(
-            ServerMember.server_id == server_id,
-            ServerMember.user_id == user_id,
+    # Verify caller is a member – use a short-lived session so the DB
+    # connection is released before the long-running receive loop.
+    async with AsyncSessionLocal() as db:
+        row = await db.execute(
+            select(ServerMember).where(
+                ServerMember.server_id == server_id,
+                ServerMember.user_id == user_id,
+            )
         )
-    )
-    if row.scalar_one_or_none() is None:
+        is_member = row.scalar_one_or_none() is not None
+
+    if not is_member:
         await ws.close(code=4003, reason="Not a member of this server")
         return
 
@@ -146,7 +148,6 @@ async def server_ws(
 async def personal_ws(
     ws: WebSocket,
     token: str = Query(..., description="JWT access token"),
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Subscribe to personal events:
@@ -161,6 +162,9 @@ async def personal_ws(
     replies with {"type": "pong"}.  When the connection drops or the
     heartbeat times out the user's status is set to offline and the
     change is broadcast to servers and friends.
+
+    DB connections are opened only for the brief setup and teardown steps
+    so the pool is not exhausted by long-lived WebSocket connections.
     """
     user_id = await _authenticate_ws(ws, token)
     if user_id is None:
@@ -169,13 +173,15 @@ async def personal_ws(
     room = manager.user_room(user_id)
     await manager.connect(room, ws)
 
-    # --- set online if currently offline --------------------------------
-    user = await db.get(User, user_id)
-    if user and user.status == UserStatus.offline:
-        user.status = UserStatus.online
-        db.add(user)
-        await db.commit()
-        await broadcast_presence(user_id, "online", db)
+    # --- set online (short-lived session, released before the loop) -----
+    async with AsyncSessionLocal() as db:
+        user = await db.get(User, user_id)
+        if user and user.status == UserStatus.offline:
+            user.status = UserStatus.online
+            db.add(user)
+            await db.commit()
+            await broadcast_presence(user_id, "online", db)
+    # db connection returned to pool here ^
 
     try:
         while True:
@@ -195,11 +201,12 @@ async def personal_ws(
     finally:
         await manager.disconnect(room, ws)
 
-        # Only set offline if this was the user's last open connection
+        # --- set offline (short-lived session) --------------------------
         if not manager._rooms.get(room):
-            await db.refresh(user)
-            if user.status != UserStatus.offline:
-                user.status = UserStatus.offline
-                db.add(user)
-                await db.commit()
-                await broadcast_presence(user_id, "offline", db)
+            async with AsyncSessionLocal() as db:
+                user = await db.get(User, user_id)
+                if user and user.status != UserStatus.offline:
+                    user.status = UserStatus.offline
+                    db.add(user)
+                    await db.commit()
+                    await broadcast_presence(user_id, "offline", db)
