@@ -5,6 +5,7 @@ import { editMessage, deleteMessage, addReaction, removeReaction } from '../api/
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
 import { ProfileCard } from './ProfileCard'
+import { EmojiPicker } from './EmojiPicker'
 import type { Message } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -50,6 +51,7 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const closePreview = useCallback(() => setPreviewUrl(null), [])
   const [cardPos, setCardPos] = useState<{ x: number; y: number } | null>(null)
+  const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
 
   const handleUserClick = useCallback((e: React.MouseEvent) => {
      e.stopPropagation()
@@ -187,7 +189,15 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
       {/* Action toolbar on hover */}
       {hovered && (
         <div className="absolute right-4 top-0 -translate-y-1/2 flex items-center gap-1 bg-discord-sidebar border border-discord-input rounded px-1 py-0.5 shadow-lg">
-          <ActionBtn title="React" onClick={() => reactMut.mutate('👍')}><Icon name="smiling-face" size={16} /></ActionBtn>
+          <ActionBtn
+            title="Add Reaction"
+            onClick={(e) => {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+              setEmojiPickerPos({ x: rect.left, y: rect.bottom + 4 })
+            }}
+          >
+            <Icon name="smiling-face" size={16} />
+          </ActionBtn>
           {isOwn && <ActionBtn title="Edit" onClick={() => { setEditing(true); setEditText(msg.content) }}><Icon name="edit-2" size={16} /></ActionBtn>}
           {isOwn && <ActionBtn title="Delete" onClick={() => deleteMut.mutate()} className="hover:text-red-400"><Icon name="trash-2" size={16} /></ActionBtn>}
         </div>
@@ -201,11 +211,18 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
         position={cardPos}
       />
     )}
+    {emojiPickerPos && (
+      <EmojiPicker
+        position={emojiPickerPos}
+        onPick={(emoji) => reactMut.mutate(emoji)}
+        onClose={() => setEmojiPickerPos(null)}
+      />
+    )}
   </>
   )
 }
 
-function ActionBtn({ title, onClick, className = '', children }: { title: string; onClick: () => void; className?: string; children: React.ReactNode }) {
+function ActionBtn({ title, onClick, className = '', children }: { title: string; onClick: (e: React.MouseEvent) => void; className?: string; children: React.ReactNode }) {
   return (
     <button
       title={title}
