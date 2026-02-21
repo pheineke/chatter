@@ -52,6 +52,8 @@ class MessageRead(MessageBase):
     channel_id: uuid.UUID
     author: UserRead
     is_deleted: bool
+    is_edited: bool
+    edited_at: datetime | None
     created_at: datetime
     attachments: list[AttachmentRead] = []
     reactions: list[ReactionRead] = []

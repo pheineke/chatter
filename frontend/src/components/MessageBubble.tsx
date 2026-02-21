@@ -135,6 +135,9 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
         ) : (
           <p className="text-sm text-discord-text break-words whitespace-pre-wrap leading-relaxed">
             <Content text={msg.content} />
+            {msg.is_edited && (
+              <span className="text-[11px] text-discord-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
+            )}
           </p>
         )}
 

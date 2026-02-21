@@ -97,6 +97,8 @@ export interface Message {
   author: User
   reply_to_id: string | null
   is_deleted: boolean
+  is_edited: boolean
+  edited_at: string | null
   created_at: string
   attachments: Attachment[]
   reactions: Reaction[]

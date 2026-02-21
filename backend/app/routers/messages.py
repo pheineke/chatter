@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import List
 
 import aiofiles
@@ -194,6 +195,8 @@ async def edit_message(
     if msg.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Cannot edit another user's message")
     msg.content = body.content
+    msg.is_edited = True
+    msg.edited_at = datetime.now(timezone.utc)
     # Re-parse mentions: delete old ones then insert new ones
     await db.execute(delete(Mention).where(Mention.message_id == message_id))
     channel = await _get_channel_or_404(channel_id, db)

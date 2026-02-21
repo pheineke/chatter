@@ -22,6 +22,8 @@ class Message(Base):
         ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
     )
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_edited: Mapped[bool] = mapped_column(Boolean, default=False)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
