@@ -11,7 +11,7 @@
 - **Friend requests do not work** — Sending a friend request fails, likely because the form requires a user ID but users have no way to find their own ID. The user ID should be visible on the profile card.
 - **Copy button in invite modal does not work** — Clicking the copy button in the invite link modal has no effect.
 - **New users receive all roles (including admin) on server join** — Every new member is incorrectly assigned all existing roles. New members should receive no roles by default unless a role is explicitly configured to be assigned on join.
-- **Users cannot see other participants' cameras in voice channels** — Shared camera streams from other users are not rendered.
+- ~~**Users cannot see other participants' cameras in voice channels**~~ ✅ Fixed — Camera streams use the same WebRTC renegotiation pipeline as screen sharing; `remoteStreams` is updated via `ontrack` and rendered as a webcam tile in `VoiceGridPane`.
 - ~~**Users cannot hear each other in voice channels**~~ ✅ Fixed — WebRTC peer connections now correctly exchange audio tracks; AudioContext autoplay policy and ICE candidate queueing resolved.
 - ~~**Screen sharing does not work**~~ ✅ Fixed — Rewrote `toggleScreenShare`/`toggleWebcam` with proper `RTCRtpSender` tracking and `onnegotiationneeded`-driven renegotiation; `handleOffer` now handles renegotiation without tearing down the existing peer connection.
 - **Voice-connected footer bar goes off-screen** — The footer bar showing active voice channel users overflows off the bottom of the viewport.
