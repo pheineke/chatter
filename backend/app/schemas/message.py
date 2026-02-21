@@ -85,3 +85,9 @@ class DMRead(DMBase):
     is_deleted: bool
     created_at: datetime
     attachments: list[DMAttachmentRead] = []
+
+
+class DMConversationRead(BaseModel):
+    channel_id: uuid.UUID
+    other_user: UserRead
+    last_message_at: datetime | None = None

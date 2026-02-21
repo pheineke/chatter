@@ -6,6 +6,7 @@ import { ChannelSidebar } from '../components/ChannelSidebar'
 import { MessagePane } from '../components/MessagePane'
 import { FriendsPane } from '../components/FriendsPane'
 import { DMPane } from '../components/DMPane'
+import { DMSidebar } from '../components/DMSidebar'
 import { VoiceChannelBar } from '../components/VoiceChannelBar'
 import { VoiceCallProvider } from '../contexts/VoiceCallContext'
 import { SettingsPage } from './SettingsPage'
@@ -88,7 +89,7 @@ export default function AppShell() {
 }
 
 /** Minimal DM sidebar shown when on the @me route. Real list is inside FriendsPane/DMPane. */
-function DMSidebar() {
+function _DMSidebarUnused() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 text-xs font-semibold uppercase text-discord-muted tracking-wider">

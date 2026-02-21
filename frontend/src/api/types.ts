@@ -107,6 +107,12 @@ export interface Message {
 
 // ---- DMs -------------------------------------------------------------------
 
+export interface DMConversation {
+  channel_id: string
+  other_user: User
+  last_message_at: string | null
+}
+
 export interface DM {
   id: string
   sender: User
