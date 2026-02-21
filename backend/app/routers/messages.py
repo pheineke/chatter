@@ -265,7 +265,12 @@ async def upload_attachment(
     await db.commit()
     db.expire_all()
 
-    return await _get_message_or_404(message_id, db)
+    updated = await _get_message_or_404(message_id, db)
+    await manager.broadcast_channel(
+        channel_id,
+        {"type": "message.updated", "data": MessageRead.model_validate(updated).model_dump(mode="json")},
+    )
+    return updated
 
 
 # ---- Reactions --------------------------------------------------------------
