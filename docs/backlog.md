@@ -3,15 +3,16 @@
 ## 1. Known Issues / Bugs
 
 - **Image attachments require page reload for other clients** — When a user sends an image attachment, other connected clients do not see it in real-time and must reload the page.
-- **Private (DM) chats do not support attachments** — File/image attachment sending is missing from DM conversations.
+- ~~**Private (DM) chats do not support attachments**~~ ✅ Fixed — DMs were refactored to use the channel system (`type=dm`); they now render with `MessageInput`/`MessageList`, giving them full attachment support automatically.
 - **New server members only appear after page reload** — When a user joins a server, existing members do not see the new member in the member list until they refresh.
 - **Server settings lack a save button** — Changes made in server settings are not persisted; a save/confirm button needs to be added.
 - **Voice & Video page shows a grey/blank screen** — Navigating to the voice/video page renders an empty grey page instead of the expected UI.
 - **Server name length is not limited** — There is no maximum length enforced on server names; a reasonable cap should be added.
-- **Friend requests do not work** — Sending/accepting a friend request fails. Sending fails because the form requires a user ID but users have no way to find their own ID (user ID should be visible on the profile card). Accepting friend requests also appears to have no effect or fails.
+- ~~**Accepting friend requests fails**~~ ✅ Fixed — Re-query with `selectinload` after commit resolves the async relationship loading bug that caused 403s. Pending requests are now split into Incoming (accept/decline) and Outgoing (cancel); a `DELETE /friends/requests/{id}` cancel endpoint was added.
+- **Sending a friend request requires a user ID that is not discoverable** — The add-friend form requires the target’s UUID, but there is no way for users to find another person’s ID. The user’s own ID (and others’) should be surfaced on the profile card, or the form should accept a username search instead.
 - ~~**Copy button in invite modal does not work**~~ ✅ Fixed — Copying now uses `navigator.clipboard.writeText` and provides visual feedback.
 - **New users receive all roles (including admin) on server join** — Every new member is incorrectly assigned all existing roles. New members should receive no roles by default unless a role is explicitly configured to be assigned on join.
-- ~~**Users cannot see other participants' cameras in voice channels**~~ ✅ Fixed — Camera streams use the same WebRTC renegotiation pipeline as screen sharing; `remoteStreams` is updated via `ontrack` and rendered as a webcam tile in `VoiceGridPane`.
+- ~~**Users cannot see other participants’ cameras in voice channels**~~ ✅ Fixed — Split `localVideoStream`/`remoteStreams` into separate screen and webcam slots (`localScreenStream`, `localWebcamStream`, `remoteScreenStreams`, `remoteWebcamStreams`). Outgoing tracks tagged with `contentHint` (‘detail’ for screen, ‘motion’ for webcam) so the receiver routes them to the correct slot. Webcam is now always shown in the participant tile independent of screen-sharing state.
 - ~~**Users cannot hear each other in voice channels**~~ ✅ Fixed — WebRTC peer connections now correctly exchange audio tracks; AudioContext autoplay policy and ICE candidate queueing resolved.
 - ~~**Screen sharing does not work**~~ ✅ Fixed — Rewrote `toggleScreenShare`/`toggleWebcam` with proper `RTCRtpSender` tracking and `onnegotiationneeded`-driven renegotiation; `handleOffer` now handles renegotiation without tearing down the existing peer connection.
 - ~~**Voice-connected footer bar goes off-screen**~~ ✅ Fixed — Removed the user listing from the footer bar, resolving the overflow issue.
@@ -98,13 +99,12 @@ Clicking on an active voice channel in the sidebar should switch the main conten
 -   **Visual Highlight**: Channels with new unread messages should be displayed with a brighter text color (e.g., white instead of muted grey) in the sidebar to attract attention.
 -   **Read State**: The channel should revert to the default muted color once the user views the channel or scrolls to the bottom of the chat.
 
-### 4.3. Channel Member List (Right Sidebar)
--   **Structure**: A collapsible sidebar panel on the right side of the text channel interface.
--   **User Listing**: Displays all members belonging to the current server.
--   **Status Grouping**:
-    -   **Online**: Users who are currently connected/online are displayed at the top of the list.
-    -   **Offline**: Users who are offline are displayed at the bottom, typically with lower opacity or a greyed-out appearance.
--   **Role Grouping**: (Optional) Users should be grouped by their highest role (e.g., Admin, Moderator, Member) within the Online/Offline sections.
+### ~~4.3. Channel Member List (Right Sidebar)~~ ✅ Implemented
+-   Members sidebar shows all server members grouped by their highest hoisted (coloured) role, with a coloured dot and role-name section header.
+-   Online members appear under role groups; offline members in a single “Offline” section at the bottom, all sorted alphabetically.
+-   Status updates are real-time via `user.status_changed` WS events; role changes invalidate the member cache via `role.assigned`/`role.removed` WS events. The 30 s poll was removed.
+-   `GET /servers/{id}/members` now eagerly loads roles for all members in one query and returns them sorted by position.
+-   `ServerSettingsPage` → Members tab `MemberRolePicker` now shows each role as assigned (highlighted with role colour) or unassigned, with explicit assign/remove actions.
 
 ### 4.4. Spam / Rate-Limit Protection
 Two-level protection to prevent message flooding:
