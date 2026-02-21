@@ -10,6 +10,7 @@ from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.presence import broadcast_presence
 from app.schemas.user import UserRead, UserUpdate
+from app.ws_manager import manager
 from models.user import User
 from models.note import UserNote
 
@@ -30,6 +31,7 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB):
         current_user.description = body.description
     if body.status is not None:
         current_user.status = body.status
+        manager.set_preferred_status(str(current_user.id), body.status.value)
     if body.pronouns is not None:
         current_user.pronouns = body.pronouns
     if body.banner is not None:

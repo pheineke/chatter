@@ -25,6 +25,22 @@ class ConnectionManager:
         # room_key -> set of WebSocket connections
         self._rooms: dict[str, set[WebSocket]] = defaultdict(set)
         self._lock = asyncio.Lock()
+        # user_id (str) -> last non-offline status chosen by the user
+        # Used to restore the correct status when they reconnect.
+        self._preferred_status: dict[str, str] = {}
+
+    # ------------------------------------------------------------------
+    # Preferred-status helpers
+    # ------------------------------------------------------------------
+
+    def set_preferred_status(self, user_id: str, status: str) -> None:
+        """Record the user's chosen status (anything except 'offline')."""
+        if status != "offline":
+            self._preferred_status[user_id] = status
+
+    def get_preferred_status(self, user_id: str) -> str:
+        """Return the user's preferred online status, defaulting to 'online'."""
+        return self._preferred_status.get(user_id, "online")
 
     # ------------------------------------------------------------------
     # Connection lifecycle

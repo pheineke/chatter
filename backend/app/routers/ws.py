@@ -173,14 +173,15 @@ async def personal_ws(
     room = manager.user_room(user_id)
     await manager.connect(room, ws)
 
-    # --- set online (short-lived session, released before the loop) -----
+    # --- restore preferred status on connect (short-lived session) -----
+    restore = manager.get_preferred_status(str(user_id))
     async with AsyncSessionLocal() as db:
         user = await db.get(User, user_id)
         if user and user.status == UserStatus.offline:
-            user.status = UserStatus.online
+            user.status = UserStatus(restore)
             db.add(user)
             await db.commit()
-            await broadcast_presence(user_id, "online", db)
+            await broadcast_presence(user_id, restore, db)
     # db connection returned to pool here ^
 
     try:
