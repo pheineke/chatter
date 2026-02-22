@@ -9,6 +9,7 @@ import { EmojiPicker } from './EmojiPicker'
 import { ContextMenu } from './ContextMenu'
 import type { Message } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
+import { Linkified } from '../utils/linkify'
 
 interface Props {
   message: Message
@@ -30,21 +31,9 @@ function formatTime(iso: string) {
   return format(d, 'dd/MM/yyyy HH:mm')
 }
 
-/** Render plain text content, turning @mention spans blue. */
+/** Render plain text content, turning @mentions blue and URLs into links. */
 function Content({ text }: { text: string }) {
-  // Highlight @Username mentions
-  const parts = text.split(/(@\w+)/g)
-  return (
-    <>
-      {parts.map((p, i) =>
-        /^@\w+$/.test(p) ? (
-          <span key={i} className="mention">{p}</span>
-        ) : (
-          <span key={i}>{p}</span>
-        ),
-      )}
-    </>
-  )
+  return <Linkified text={text} />
 }
 
 export function MessageBubble({ message: msg, channelId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {

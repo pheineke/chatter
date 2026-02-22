@@ -10,6 +10,7 @@ import { sendMessage } from '../api/messages'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
+import { Linkified } from '../utils/linkify'
 
 function UserTag({ userId }: { userId: string }) {
   const [copied, setCopied] = useState(false)
@@ -142,8 +143,10 @@ export function ProfileCard({ userId, onClose, position }: Props) {
              
              <div className="mt-4 border-t border-discord-input pt-2">
                  <div className="text-xs font-bold text-discord-muted uppercase mb-1">About Me</div>
-                 <div className="text-sm text-discord-text/90 whitespace-pre-wrap text-sm leading-relaxed">
-                    {user.description || <span className="italic text-discord-muted">No bio yet.</span>}
+                 <div className="text-sm text-discord-text/90 whitespace-pre-wrap leading-relaxed">
+                    {user.description
+                      ? <Linkified text={user.description} noMentions />
+                      : <span className="italic text-discord-muted">No bio yet.</span>}
                  </div>
              </div>
 

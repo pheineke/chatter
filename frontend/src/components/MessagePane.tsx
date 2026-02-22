@@ -13,6 +13,7 @@ import type { VoiceSession } from '../pages/AppShell'
 import type { Message } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useChannelWS } from '../hooks/useChannelWS'
+import { Linkified } from '../utils/linkify'
 import { useAuth } from '../contexts/AuthContext'
 
 interface Props {
@@ -128,7 +129,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
               className="text-sm text-discord-muted truncate"
               title={channel.description}
             >
-              {channel.description}
+              <Linkified text={channel.description} noMentions />
             </span>
           </>
         )}
