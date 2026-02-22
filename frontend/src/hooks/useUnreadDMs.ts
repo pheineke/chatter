@@ -92,6 +92,12 @@ export function useUnreadDMs(): boolean {
       if (msg.type !== 'message.created') return
       const data = msg.data as Message
 
+      // Play notification sound if the user isn't currently viewing this DM conversation
+      const activeDmChannelId = conversations.find(c => c.other_user.id === activeDmUserId)?.channel_id
+      if (data.author.id !== user?.id && data.channel_id !== activeDmChannelId) {
+        playSound('notificationSound')
+      }
+
       qc.setQueryData<DMConversation[]>(['dmConversations'], old => {
         if (!old) return old
         const exists = old.some(c => c.channel_id === data.channel_id)
