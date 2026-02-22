@@ -53,10 +53,9 @@ async def upload_avatar(
     db: DB,
     file: UploadFile = File(...),
 ):
-    # Validate magic bytes and enforce maximum dimensions
-    content = await verify_image_magic_with_dims(file, AVATAR_MAX, label="Avatar")
+    # Validate magic bytes and enforce maximum dimensions; ext is MIME-derived
+    content, ext = await verify_image_magic_with_dims(file, AVATAR_MAX, label="Avatar")
 
-    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"avatars/{current_user.id}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
@@ -77,10 +76,9 @@ async def upload_banner(
     db: DB,
     file: UploadFile = File(...),
 ):
-    # Validate magic bytes and enforce maximum dimensions
-    content = await verify_image_magic_with_dims(file, BANNER_MAX, label="Banner")
+    # Validate magic bytes and enforce maximum dimensions; ext is MIME-derived
+    content, ext = await verify_image_magic_with_dims(file, BANNER_MAX, label="Banner")
 
-    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"banners/{current_user.id}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
     os.makedirs(os.path.dirname(dest), exist_ok=True)

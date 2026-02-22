@@ -119,8 +119,7 @@ async def delete_server(server_id: uuid.UUID, current_user: CurrentUser, db: DB)
 async def _upload_server_image(server_id: uuid.UUID, file: UploadFile, field: str, db) -> Server:
     # Validate magic bytes and enforce maximum dimensions
     from app.utils.file_validation import verify_image_magic_with_dims, SERVER_IMAGE_MAX
-    content = await verify_image_magic_with_dims(file, SERVER_IMAGE_MAX, label="Server image")
-    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
+    content, ext = await verify_image_magic_with_dims(file, SERVER_IMAGE_MAX, label="Server image")
     filename = f"servers/{server_id}/{field}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
     os.makedirs(os.path.dirname(dest), exist_ok=True)

@@ -45,10 +45,19 @@ def _check_image_dimensions(content: bytes, max_wh: Tuple[int, int], label: str 
         )
 
 
-async def verify_image_magic(file: UploadFile) -> bytes:
-    """Read the entire upload, check its magic bytes, and return the raw bytes.
+_MIME_TO_EXT: dict[str, str] = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+}
 
-    Raises HTTP 400 if the file's real MIME type is not an allowed image type.
+
+async def verify_image_magic(file: UploadFile) -> tuple[bytes, str]:
+    """Read the entire upload, check its magic bytes, and return ``(raw_bytes, ext)``.
+
+    The extension is derived from the detected MIME type (e.g. ``"gif"``, ``"jpg"``),
+    never from the user-supplied filename.  Raises HTTP 400 for disallowed types.
     NOTE: Callers that need dimension limits should call ``verify_image_magic_with_dims``.
     """
     content = await file.read()
@@ -58,18 +67,24 @@ async def verify_image_magic(file: UploadFile) -> bytes:
             status_code=400,
             detail="File content does not match an allowed image type (jpeg/png/gif/webp).",
         )
-    return content
+    ext = _MIME_TO_EXT.get(kind.mime, kind.extension)
+    return content, ext
 
 
 async def verify_image_magic_with_dims(
     file: UploadFile,
     max_wh: Tuple[int, int],
     label: str = "Image",
-) -> bytes:
-    """Like ``verify_image_magic`` but also enforces maximum pixel dimensions."""
-    content = await verify_image_magic(file)
+) -> tuple[bytes, str]:
+    """Like ``verify_image_magic`` but also enforces maximum pixel dimensions.
+
+    Returns ``(raw_bytes, ext)`` where *ext* is derived from the detected MIME type.
+    GIFs are checked on their first-frame dimensions only so animated GIFs are
+    accepted as long as each frame fits within *max_wh*.
+    """
+    content, ext = await verify_image_magic(file)
     _check_image_dimensions(content, max_wh, label)
-    return content
+    return content, ext
 
 
 async def verify_attachment_magic(file: UploadFile) -> bytes:
