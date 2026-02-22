@@ -56,3 +56,10 @@ export async function getNote(userId: string): Promise<string> {
 export async function setNote(userId: string, content: string): Promise<void> {
   await client.put(`/users/${userId}/note`, { content })
 }
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await client.post('/users/me/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  })
+}

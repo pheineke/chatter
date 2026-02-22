@@ -3,15 +3,19 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB
 from app.schemas.message import DMConversationRead
 from app.schemas.user import UserRead
+from models.block import UserBlock
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
+from models.friend import FriendRequest, FriendRequestStatus
 from models.message import Message
+from models.server import ServerMember
+from models.user import DMPermission, User
 
 router = APIRouter(prefix="/dms", tags=["direct_messages"])
 
@@ -55,6 +59,62 @@ async def get_or_create_dm_channel(user_id: uuid.UUID, current_user: CurrentUser
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot DM yourself")
 
+    # Fetch target user
+    target_result = await db.execute(select(User).where(User.id == user_id))
+    target_user = target_result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if either party has blocked the other
+    block_result = await db.execute(
+        select(UserBlock).where(
+            or_(
+                and_(UserBlock.blocker_id == current_user.id, UserBlock.blocked_id == user_id),
+                and_(UserBlock.blocker_id == user_id, UserBlock.blocked_id == current_user.id),
+            )
+        ).limit(1)
+    )
+    if block_result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="You cannot send a direct message to this user")
+
+    # Enforce the target user's DM permission
+    if target_user.dm_permission != DMPermission.everyone:
+        if target_user.dm_permission == DMPermission.friends_only:
+            fr_result = await db.execute(
+                select(FriendRequest).where(
+                    FriendRequest.status == FriendRequestStatus.accepted,
+                    or_(
+                        and_(
+                            FriendRequest.sender_id == current_user.id,
+                            FriendRequest.recipient_id == user_id,
+                        ),
+                        and_(
+                            FriendRequest.sender_id == user_id,
+                            FriendRequest.recipient_id == current_user.id,
+                        ),
+                    ),
+                )
+            )
+            if not fr_result.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=403,
+                    detail="This user only accepts direct messages from friends",
+                )
+        elif target_user.dm_permission == DMPermission.server_members_only:
+            shared_result = await db.execute(
+                select(ServerMember).where(
+                    ServerMember.user_id == current_user.id,
+                    ServerMember.server_id.in_(
+                        select(ServerMember.server_id).where(ServerMember.user_id == user_id)
+                    ),
+                ).limit(1)
+            )
+            if not shared_result.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=403,
+                    detail="This user only accepts direct messages from people in shared servers",
+                )
+
     # Normalise pair so (a,b) and (b,a) always map to the same row
     a, b = sorted([current_user.id, user_id])
 
@@ -73,5 +133,4 @@ async def get_or_create_dm_channel(user_id: uuid.UUID, current_user: CurrentUser
     dm_chan = DMChannel(channel_id=channel.id, user_a_id=a, user_b_id=b)
     db.add(dm_chan)
     await db.commit()
-    return {"channel_id": str(channel.id)}
     return {"channel_id": str(channel.id)}

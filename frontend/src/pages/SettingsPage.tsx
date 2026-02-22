@@ -3,20 +3,24 @@ import { useRef, useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icon'
 import { UserAvatar } from '../components/UserAvatar'
-import { updateMe, uploadAvatar, uploadBanner } from '../api/users'
+import { updateMe, uploadAvatar, uploadBanner, changePassword } from '../api/users'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { UserStatus } from '../api/types'
+import type { UserStatus, DMPermission } from '../api/types'
 import { COLOR_SWATCHES, loadColorOverrides, applyColorOverrides } from '../utils/colorOverrides'
 import { useSoundManager } from '../hooks/useSoundManager'
+import { useBlocks } from '../hooks/useBlocks'
 
-type Tab = 'account' | 'appearance' | 'voice'
+type Tab = 'account' | 'appearance' | 'voice' | 'privacy'
 
 // ─── Sidebar nav ─────────────────────────────────────────────────────────────
 
 const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[] = [
   {
     group: 'User Settings',
-    items: [{ id: 'account', label: 'My Account', icon: 'person' }],
+    items: [
+      { id: 'account', label: 'My Account', icon: 'person' },
+      { id: 'privacy', label: 'Privacy & Safety', icon: 'lock-closed' },
+    ],
   },
   {
     group: 'App Settings',
@@ -37,6 +41,15 @@ function AccountTab() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+
+  // Change-password form state
+  const [pwCurrent, setPwCurrent] = useState('')
+  const [pwNew, setPwNew] = useState('')
+  const [pwConfirm, setPwConfirm] = useState('')
+  const [pwError, setPwError] = useState<string | null>(null)
+  const [pwSuccess, setPwSuccess] = useState(false)
+  const [pwLoading, setPwLoading] = useState(false)
 
   const updateMut = useMutation({
     mutationFn: (patch: any) => updateMe(patch),
@@ -45,17 +58,27 @@ function AccountTab() {
       qc.invalidateQueries({ queryKey: ['me'] })
       setEditing(null)
       setIsSubmitting(false)
+      setProfileError(null)
+    },
+    onError: (err: any) => {
+      setIsSubmitting(false)
+      const detail = err?.response?.data?.detail
+      setProfileError(typeof detail === 'string' ? detail : 'Failed to save changes')
     },
   })
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') {
     if (!e.target.files?.[0]) return
     setIsSubmitting(true)
+    setProfileError(null)
     try {
       if (type === 'avatar') await uploadAvatar(e.target.files[0])
       else await uploadBanner(e.target.files[0])
       await refreshUser()
       qc.invalidateQueries({ queryKey: ['me'] })
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setProfileError(typeof detail === 'string' ? detail : 'Upload failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -69,6 +92,26 @@ function AccountTab() {
   async function saveEdit() {
     setIsSubmitting(true)
     if (editing) updateMut.mutate({ [editing]: editValue })
+  }
+
+  async function handleChangePassword() {
+    setPwError(null)
+    setPwSuccess(false)
+    if (!pwCurrent) { setPwError('Please enter your current password'); return }
+    if (pwNew.length < 8) { setPwError('New password must be at least 8 characters'); return }
+    if (pwNew !== pwConfirm) { setPwError('New passwords do not match'); return }
+    setPwLoading(true)
+    try {
+      await changePassword(pwCurrent, pwNew)
+      setPwCurrent(''); setPwNew(''); setPwConfirm('')
+      setPwSuccess(true)
+      setTimeout(() => setPwSuccess(false), 4000)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setPwError(typeof detail === 'string' ? detail : 'Failed to update password')
+    } finally {
+      setPwLoading(false)
+    }
   }
 
   const statusColors: Record<string, string> = {
@@ -169,11 +212,43 @@ function AccountTab() {
           />
         </div>
       </div>
+
+      {/* Profile error banner */}
+      {profileError && (
+        <div className="mt-4 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+          {profileError}
+        </div>
+      )}
+
+      {/* Change Password */}
+      <div className="bg-discord-sidebar rounded-lg p-4 mt-6">
+        <div className="text-xs font-bold text-discord-muted uppercase mb-4">Change Password</div>
+        <div className="space-y-2">
+          <input
+            type="password" className="input w-full" placeholder="Current password"
+            value={pwCurrent} onChange={e => setPwCurrent(e.target.value)}
+          />
+          <input
+            type="password" className="input w-full" placeholder="New password (min. 8 characters)"
+            value={pwNew} onChange={e => setPwNew(e.target.value)}
+          />
+          <input
+            type="password" className="input w-full" placeholder="Confirm new password"
+            value={pwConfirm} onChange={e => setPwConfirm(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleChangePassword() }}
+          />
+          {pwError && <p className="text-red-400 text-sm">{pwError}</p>}
+          {pwSuccess && <p className="text-green-400 text-sm">Password updated successfully!</p>}
+          <div className="flex justify-end pt-1">
+            <button onClick={handleChangePassword} disabled={pwLoading} className="btn py-1.5">
+              {pwLoading ? 'Saving…' : 'Update Password'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
-}
-
-// ─── Appearance tab ───────────────────────────────────────────────────────────
+}───────────
 
 const PRESETS: { id: string; label: string; accent: string; bg: string; sidebar: string; servers: string; input: string; text: string; muted: string }[] = [
   { id: 'default', label: 'Default', accent: '#7289da', bg: '#36393f', sidebar: '#2f3136', servers: '#202225', input: '#40444b', text: '#dcddde', muted: '#72767d' },
@@ -565,6 +640,87 @@ function VoiceTab() {
   )
 }
 
+// ─── Privacy & Safety tab ──────────────────────────────────────
+
+const DM_PERM_OPTIONS: { value: DMPermission; label: string; desc: string }[] = [
+  { value: 'everyone', label: 'Everyone', desc: 'Anyone can send you a direct message' },
+  { value: 'friends_only', label: 'Friends only', desc: 'Only accepted friends can send you direct messages' },
+  { value: 'server_members_only', label: 'Server members only', desc: 'Only people sharing a server can send you direct messages' },
+]
+
+function PrivacyTab() {
+  const { user, refreshUser } = useAuth()
+  const qc = useQueryClient()
+  const { blockedUsers, unblock } = useBlocks()
+
+  const updateMut = useMutation({
+    mutationFn: (patch: any) => updateMe(patch),
+    onSuccess: async () => {
+      await refreshUser()
+      qc.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold">Privacy &amp; Safety</h2>
+
+      {/* DM permissions */}
+      <div className="bg-discord-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Who can message you</div>
+        <div className="space-y-1">
+          {DM_PERM_OPTIONS.map(opt => (
+            <label
+              key={opt.value}
+              className="flex items-start gap-3 cursor-pointer py-2.5 px-3 rounded hover:bg-discord-bg transition-colors"
+            >
+              <input
+                type="radio"
+                name="dm_permission"
+                value={opt.value}
+                checked={(user?.dm_permission ?? 'everyone') === opt.value}
+                onChange={() => updateMut.mutate({ dm_permission: opt.value })}
+                className="mt-0.5 accent-discord-mention shrink-0"
+              />
+              <div>
+                <div className="text-sm font-medium">{opt.label}</div>
+                <div className="text-xs text-discord-muted">{opt.desc}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Blocked users */}
+      <div className="bg-discord-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-discord-muted uppercase mb-3">
+          Blocked Users{blockedUsers.length > 0 && ` (${blockedUsers.length})`}
+        </div>
+        {blockedUsers.length === 0 ? (
+          <p className="text-sm text-discord-muted italic">You haven't blocked anyone.</p>
+        ) : (
+          <div className="space-y-1">
+            {blockedUsers.map(u => (
+              <div key={u.id} className="flex items-center justify-between py-2 px-2 rounded hover:bg-discord-bg">
+                <div className="flex items-center gap-3">
+                  <UserAvatar user={u} size={32} />
+                  <span className="text-sm font-medium">{u.username}</span>
+                </div>
+                <button
+                  onClick={() => unblock(u.id)}
+                  className="text-xs px-3 py-1 rounded bg-discord-input hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                >
+                  Unblock
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Shared EditableField ─────────────────────────────────────────────────────
 
 function EditableField({ label, value, placeholder, readOnly, multiline, isEditing, editValue, setEditValue, onEdit, onSave, onCancel, disabled }: any) {
@@ -646,6 +802,7 @@ export function SettingsPage() {
         <div className="flex-1 overflow-y-auto p-8">
           <div className="max-w-2xl mx-auto">
             {tab === 'account'    && <AccountTab />}
+            {tab === 'privacy'    && <PrivacyTab />}
             {tab === 'appearance' && <AppearanceTab />}
             {tab === 'voice'      && <VoiceTab />}
           </div>

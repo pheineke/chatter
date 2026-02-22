@@ -1,6 +1,7 @@
 // Shared TypeScript types mirroring the backend Pydantic schemas
 
 export type UserStatus = 'online' | 'away' | 'dnd' | 'offline'
+export type DMPermission = 'everyone' | 'friends_only' | 'server_members_only'
 
 export interface User {
   id: string
@@ -11,6 +12,7 @@ export interface User {
   pronouns: string | null
   status: UserStatus
   preferred_status: UserStatus
+  dm_permission: DMPermission
   created_at: string
 }
 

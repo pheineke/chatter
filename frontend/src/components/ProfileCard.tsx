@@ -10,6 +10,7 @@ import { sendMessage } from '../api/messages'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useBlocks } from '../hooks/useBlocks'
 import { Linkified } from '../utils/linkify'
 
 function UserTag({ userId }: { userId: string }) {
@@ -51,6 +52,8 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { user: currentUser } = useAuth()
   const isSelf = !!currentUser && currentUser.id === userId
+  const { blockedIds, block, unblock, isPending: blockPending } = useBlocks()
+  const isBlocked = blockedIds.has(userId)
 
   const { data: user } = useQuery({ queryKey: ['user', userId], queryFn: () => getUser(userId) })
 
@@ -176,6 +179,22 @@ export function ProfileCard({ userId, onClose, position }: Props) {
                    />
                  )}
              </form>
+
+             {!isSelf && (
+               <div className="mt-3 pt-3 border-t border-discord-input">
+                 <button
+                   onClick={() => isBlocked ? unblock(userId) : block(userId)}
+                   disabled={blockPending}
+                   className={`w-full text-sm py-1.5 px-3 rounded transition-colors font-medium
+                     ${ isBlocked
+                       ? 'bg-discord-input hover:bg-green-500/20 hover:text-green-400'
+                       : 'bg-discord-input hover:bg-red-500/20 hover:text-red-400 text-discord-muted'
+                     }`}
+                 >
+                   {isBlocked ? 'Unblock User' : 'Block User'}
+                 </button>
+               </div>
+             )}
           </div>
        </div>
     </div>

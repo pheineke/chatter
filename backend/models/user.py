@@ -15,6 +15,18 @@ class UserStatus(str, enum.Enum):
     offline = "offline"
 
 
+class DMPermission(str, enum.Enum):
+    everyone = "everyone"
+    friends_only = "friends_only"
+    server_members_only = "server_members_only"
+
+
+class DMPermission(str, enum.Enum):
+    everyone = "everyone"
+    friends_only = "friends_only"
+    server_members_only = "server_members_only"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -30,6 +42,9 @@ class User(Base):
     # Defaults to 'online'; setting status to 'offline' acts as invisible mode.
     preferred_status: Mapped[UserStatus] = mapped_column(
         Enum(UserStatus, name="user_status"), default=UserStatus.online, server_default="online"
+    )
+    dm_permission: Mapped[DMPermission] = mapped_column(
+        String(20), default=DMPermission.everyone, server_default="everyone"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

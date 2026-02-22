@@ -9,6 +9,7 @@ import { EmojiPicker } from './EmojiPicker'
 import { ContextMenu } from './ContextMenu'
 import type { Message } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useBlocks } from '../hooks/useBlocks'
 import { Linkified } from '../utils/linkify'
 
 interface Props {
@@ -44,8 +45,10 @@ function Content({ text }: { text: string }) {
 
 export function MessageBubble({ message: msg, channelId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
   const { user } = useAuth()
+  const { blockedIds } = useBlocks()
   const qc = useQueryClient()
   const isOwn = user?.id === msg.author.id
+  const [showBlocked, setShowBlocked] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content ?? '')
   const [hovered, setHovered] = useState(false)
@@ -89,6 +92,26 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
     mutationFn: (emoji: string) => removeReaction(channelId, msg.id, emoji),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', channelId] }),
   })
+
+  // Blocked-user early return (all hooks already called above)
+  const isBlocked = !isOwn && blockedIds.has(msg.author.id)
+  if (isBlocked && !showBlocked) {
+    return (
+      <div className={`flex gap-3 px-4 py-0.5 ${compact ? 'mt-0' : 'mt-3'}`}>
+        <div className="w-10 shrink-0" />
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          <span className="text-xs text-discord-muted italic">Blocked message</span>
+          <span className="text-discord-muted text-xs">—</span>
+          <button
+            onClick={() => setShowBlocked(true)}
+            className="text-xs text-discord-muted underline hover:text-discord-text transition-colors"
+          >
+            Show message
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>

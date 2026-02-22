@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from models.user import UserStatus
+from models.user import UserStatus, DMPermission
 from app.utils.sanitize import strip_html
 
 
@@ -34,6 +34,7 @@ class UserUpdate(BaseModel):
     pronouns: str | None = None
     status: UserStatus | None = None
     banner: str | None = None
+    dm_permission: DMPermission | None = None
 
     @field_validator('description', 'pronouns', mode='before')
     @classmethod
@@ -48,6 +49,7 @@ class UserRead(UserBase):
     avatar: str | None
     banner: str | None
     preferred_status: UserStatus = UserStatus.online
+    dm_permission: DMPermission = DMPermission.everyone
     created_at: datetime
 
 
