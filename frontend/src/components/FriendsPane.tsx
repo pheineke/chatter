@@ -11,7 +11,6 @@ import {
 import { getUserByUsername } from '../api/users'
 import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
-import { getDMs } from '../api/dms'
 
 type Tab = 'online' | 'all' | 'pending' | 'add'
 

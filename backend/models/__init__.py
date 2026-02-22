@@ -3,7 +3,6 @@ from models.user import User, UserStatus
 from models.server import Server, ServerMember, Role, UserRole
 from models.channel import Category, Channel, ChannelType, ChannelPerm, ChannelPermission, MutedChannel
 from models.message import Message, Attachment, Reaction, Mention
-from models.dm import DirectMessage, DMAttachment
 from models.dm_channel import DMChannel
 from models.friend import FriendRequest, FriendRequestStatus
 from models.invite import ServerInvite
@@ -29,8 +28,6 @@ __all__ = [
     "Attachment",
     "Reaction",
     "Mention",
-    "DirectMessage",
-    "DMAttachment",
     "DMChannel",
     "FriendRequest",
     "FriendRequestStatus",

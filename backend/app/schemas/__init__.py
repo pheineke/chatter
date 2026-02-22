@@ -24,9 +24,6 @@ from app.schemas.message import (
     MessageRead,
     AttachmentRead,
     ReactionRead,
-    DMCreate,
-    DMRead,
-    DMAttachmentRead,
 )
 from app.schemas.friend import FriendRequestCreate, FriendRequestRead, FriendRead
 
@@ -36,6 +33,5 @@ __all__ = [
     "CategoryCreate", "CategoryUpdate", "CategoryRead",
     "ChannelCreate", "ChannelUpdate", "ChannelRead", "ChannelPermissionRead", "ChannelPermissionSet",
     "MessageCreate", "MessageUpdate", "MessageRead", "AttachmentRead", "ReactionRead",
-    "DMCreate", "DMRead", "DMAttachmentRead",
     "FriendRequestCreate", "FriendRequestRead", "FriendRead",
 ]

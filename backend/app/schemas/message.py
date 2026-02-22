@@ -111,33 +111,6 @@ class PinnedMessageRead(BaseModel):
     message: MessageRead
 
 
-class DMBase(BaseModel):
-    content: str
-
-
-class DMCreate(DMBase):
-    pass
-
-
-class DMAttachmentRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    file_path: str
-    file_type: str
-
-
-class DMRead(DMBase):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    sender: UserRead
-    recipient: UserRead
-    is_deleted: bool
-    created_at: datetime
-    attachments: list[DMAttachmentRead] = []
-
-
 class DMConversationRead(BaseModel):
     channel_id: uuid.UUID
     other_user: UserRead

@@ -43,12 +43,6 @@ class User(Base):
         "Message", back_populates="author", foreign_keys="Message.author_id"
     )
     reactions: Mapped[list["Reaction"]] = relationship("Reaction", back_populates="user")
-    sent_dms: Mapped[list["DirectMessage"]] = relationship(
-        "DirectMessage", back_populates="sender", foreign_keys="DirectMessage.sender_id"
-    )
-    received_dms: Mapped[list["DirectMessage"]] = relationship(
-        "DirectMessage", back_populates="recipient", foreign_keys="DirectMessage.recipient_id"
-    )
     sent_friend_requests: Mapped[list["FriendRequest"]] = relationship(
         "FriendRequest", back_populates="sender", foreign_keys="FriendRequest.sender_id"
     )
