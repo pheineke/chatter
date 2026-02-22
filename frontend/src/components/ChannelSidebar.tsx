@@ -87,6 +87,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [editChannelDesc, setEditChannelDesc] = useState('')
   const [editSlowmode, setEditSlowmode] = useState(0)
   const [dragId, setDragId] = useState<string | null>(null)
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(() => {
+    const stored = serverId ? localStorage.getItem(`cats_collapsed_${serverId}`) : null
+    return stored ? new Set(stored.split(',').filter(Boolean)) : new Set()
+  })
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -171,11 +175,29 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   })
   byCategory.forEach((v, k) => byCategory.set(k, [...v].sort((a, b) => a.position - b.position)))
   const flatIds: string[] = []
+  const visibleFlatIds: string[] = []
   sortedCats.forEach(cat => {
     flatIds.push(`cat:${cat.id}`)
-    byCategory.get(cat.id)?.forEach(ch => flatIds.push(`ch:${ch.id}`))
+    visibleFlatIds.push(`cat:${cat.id}`)
+    byCategory.get(cat.id)?.forEach(ch => {
+      flatIds.push(`ch:${ch.id}`)
+      if (!collapsedCats.has(cat.id)) visibleFlatIds.push(`ch:${ch.id}`)
+    })
   })
-  byCategory.get(null)?.forEach(ch => flatIds.push(`ch:${ch.id}`))
+  byCategory.get(null)?.forEach(ch => {
+    flatIds.push(`ch:${ch.id}`)
+    visibleFlatIds.push(`ch:${ch.id}`)
+  })
+
+  function toggleCat(catId: string) {
+    setCollapsedCats(prev => {
+      const next = new Set(prev)
+      if (next.has(catId)) next.delete(catId)
+      else next.add(catId)
+      if (serverId) localStorage.setItem(`cats_collapsed_${serverId}`, [...next].join(','))
+      return next
+    })
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -203,11 +225,11 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     }
 
     if (activeStr.startsWith('ch:')) {
-      // Reorder / move channel
-      const oldIdx = flatIds.indexOf(activeStr)
-      const newIdx = flatIds.indexOf(overStr)
+      // Reorder / move channel (use visibleFlatIds so collapsed channels stay put)
+      const oldIdx = visibleFlatIds.indexOf(activeStr)
+      const newIdx = visibleFlatIds.indexOf(overStr)
       if (oldIdx === -1 || newIdx === -1) return
-      const newFlatIds = arrayMove(flatIds, oldIdx, newIdx)
+      const newFlatIds = arrayMove(visibleFlatIds, oldIdx, newIdx)
       // Rebuild category assignments from new position in flat list
       let currentCatId: string | null = null
       const catChannelCount = new Map<string | null, number>()
@@ -257,12 +279,12 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
             onDragStart={e => setDragId(e.active.id as string)}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={flatIds} strategy={verticalListSortingStrategy}>
-              {flatIds.map(itemId => {
+            <SortableContext items={visibleFlatIds} strategy={verticalListSortingStrategy}>
+              {visibleFlatIds.map(itemId => {
                 if (itemId.startsWith('cat:')) {
                   const cat = categories.find(c => c.id === itemId.replace('cat:', ''))
                   if (!cat) return null
-                  return <SortableCatHeader key={itemId} id={itemId} title={cat.title} />
+                  return <SortableCatHeader key={itemId} id={itemId} title={cat.title} collapsed={collapsedCats.has(cat.id)} onToggle={() => toggleCat(cat.id)} />
                 }
                 const ch = channels.find(c => c.id === itemId.replace('ch:', ''))
                 if (!ch) return null
@@ -314,14 +336,20 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         ) : (
           /* Non-admin: read-only ordered list */
           <>
-            {flatIds.map(itemId => {
+            {visibleFlatIds.map(itemId => {
               if (itemId.startsWith('cat:')) {
                 const cat = categories.find(c => c.id === itemId.replace('cat:', ''))
                 if (!cat) return null
+                const collapsed = collapsedCats.has(cat.id)
                 return (
-                  <div key={itemId} className="px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider">
+                  <button
+                    key={itemId}
+                    onClick={() => toggleCat(cat.id)}
+                    className="w-full flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider hover:text-discord-text transition-colors select-none"
+                  >
+                    <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
                     {cat.title}
-                  </div>
+                  </button>
                 )
               }
               const ch = channels.find(c => c.id === itemId.replace('ch:', ''))
@@ -395,6 +423,11 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         >
           <Icon name="settings" size={18} />
         </button>
+        {user?.status === 'dnd' && (
+          <span title="Do Not Disturb — notifications silenced" className="text-discord-dnd">
+            <Icon name="bell-off" size={16} />
+          </span>
+        )}
       </div>
 
       {/* Add channel modal */}
@@ -638,17 +671,25 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
 
 // ---- Drag-and-drop wrappers (used only in admin mode) ----------------------
 
-function SortableCatHeader({ id, title }: { id: string; title: string }) {
+function SortableCatHeader({ id, title, collapsed, onToggle }: { id: string; title: string; collapsed?: boolean; onToggle?: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider cursor-grab active:cursor-grabbing select-none ${isDragging ? 'opacity-0' : ''}`}
+      className={`flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider select-none ${isDragging ? 'opacity-0' : ''}`}
       {...listeners}
       {...attributes}
     >
-      {title}
+      <button
+        onPointerDown={e => e.stopPropagation()}
+        onClick={onToggle}
+        className="text-discord-muted hover:text-discord-text transition-colors cursor-default"
+        tabIndex={-1}
+      >
+        <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} />
+      </button>
+      <span className="cursor-grab active:cursor-grabbing">{title}</span>
     </div>
   )
 }

@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Enum, Text, DateTime, Uuid
+from sqlalchemy import String, Enum, Text, DateTime, Uuid, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -46,6 +46,7 @@ class User(Base):
     dm_permission: Mapped[DMPermission] = mapped_column(
         String(20), default=DMPermission.everyone, server_default="everyone"
     )
+    hide_status: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

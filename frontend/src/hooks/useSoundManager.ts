@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useRef } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 
 export type SoundKey =
   | 'connectSound'
@@ -48,10 +49,16 @@ function getSoundVolume(): number {
 }
 
 export function useSoundManager() {
+  const { user } = useAuth()
   // Cache Audio instances to avoid re-creation allocations
   const cache = useRef<Partial<Record<SoundKey, HTMLAudioElement>>>({})
+  // Use a ref so playSound (empty-dep callback) can always read the latest status
+  const userRef = useRef(user)
+  userRef.current = user
 
   const playSound = useCallback((key: SoundKey) => {
+    // DND mode: suppress all notification/chat sounds (but allow voice sounds like mute)
+    if (userRef.current?.status === 'dnd' && (key === 'notificationSound' || key === 'callSound')) return
     if (!isSoundEnabled(key)) return
 
     try {

@@ -205,8 +205,9 @@ async def personal_ws(
                 user_id,
                 {"type": "user.status_changed", "data": {"user_id": str(user_id), "status": restore_to}},
             )
-            # Inform servers and friends
-            await broadcast_presence(user_id, restore_to, db)
+            # Inform servers and friends; hide_status users always appear offline to others
+            broadcast_status = "offline" if user.hide_status else restore_to
+            await broadcast_presence(user_id, broadcast_status, db)
     # db connection returned to pool here ^
 
     try:

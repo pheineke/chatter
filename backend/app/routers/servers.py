@@ -21,7 +21,7 @@ from app.schemas.server import (
 from app.schemas.user import UserRead
 from app.ws_manager import manager
 from models.server import Server, ServerMember, Role, UserRole
-from models.user import User
+from models.user import User, UserStatus
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -185,7 +185,11 @@ async def list_members(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
         MemberRead(
             user_id=m.user_id,
             server_id=m.server_id,
-            user=UserRead.model_validate(m.user),
+            user=(
+                lambda u: UserRead.model_validate(u).model_copy(update={'status': UserStatus.offline})
+                if u.hide_status and u.id != current_user.id
+                else UserRead.model_validate(u)
+            )(m.user),
             joined_at=m.joined_at,
             roles=sorted(user_role_map.get(m.user_id, []), key=lambda r: r.position, reverse=True),
         )

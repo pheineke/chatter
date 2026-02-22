@@ -13,6 +13,7 @@ export interface User {
   status: UserStatus
   preferred_status: UserStatus
   dm_permission: DMPermission
+  hide_status: boolean
   created_at: string
 }
 

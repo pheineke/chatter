@@ -129,11 +129,12 @@ Two-level protection prevents message flooding:
 -   **Ctrl+/** — opens the keyboard shortcuts cheat-sheet dialog (`KeyboardShortcutsDialog`).
 -   **Escape** — closes open modals and context menus (via `onClose`/`onMouseDown` guards throughout the UI).
 
-### 4.10. Category Collapse
--   Clicking a category header in the channel sidebar should toggle that category's channels open or closed (collapsed state).
+### ~~4.10. Category Collapse~~ ✅ Implemented
+-   Clicking a category header in the channel sidebar toggles that category's channels open or closed (collapsed state).
 -   Collapsed state is stored in `localStorage` (keyed by `serverId + categoryId`) so it persists across page loads.
--   A collapsed category shows only the header row; no channels or voice participants are visible.
+-   A chevron icon (▼/▶) is shown on every category header (both admin drag mode and read-only mode).
 -   Non-admin members can also collapse categories (purely a local UI preference, no API call needed).
+-   The drag-and-drop system in admin mode uses `visibleFlatIds` (collapsed channels excluded), so channels in collapsed categories are not reorderable while hidden.
 
 ## 5. Feature Requests: Messaging
 
@@ -244,9 +245,11 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   Pixel-dimension caps enforced: avatars 1024×1024, banners & server images 1920×1080.
 -   Extension on saved file is derived from detected MIME type (not user-supplied filename).
 
-### 8.6. Hide Online Status
--   Users can choose to hide their online status from non-friends so they appear offline to everyone except their friend list.
--   This preference is stored in account settings and respected by all presence-broadcast WebSocket events.
+### ~~8.6. Hide Online Status~~ ✅ Implemented
+-   Users can hide their online status — they appear offline to all other users.
+-   Toggle in Settings → Privacy & Safety → Presence section.
+-   Backend: `hide_status` boolean column on `users` (migration `k3l4m5n6o7p8`). When `True`, `broadcast_presence` always sends `offline` to servers/friends; `GET /users/{id}` and member-list responses mask status as `offline` for other viewers.
+-   The user's own status indicator in their panel is unaffected (shows real status).
 
 ### 8.7. End-to-End Encryption for Private DMs
 -   DM messages between two users are encrypted client-side before being sent to the server, so the server never has access to plaintext content.
@@ -304,14 +307,15 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   Controlled by a toggle in Settings → Notifications: "Enable desktop notifications".
 -   No notification is shown if the tab is already focused and the user is in the relevant channel.
 
-### 9.3. Do Not Disturb (DND) Mode Integration
--   When a user's status is set to **Do Not Disturb**, all client-side sounds and browser notifications are suppressed regardless of per-channel settings.
--   The existing red status dot already communicates DND to others; this wires it up to the notification pipeline on the client that sets it.
--   Implementation: `useSoundManager.playSound()` and the browser `Notification` dispatch both check `user.status === 'dnd'` (from `AuthContext`) before firing.
--   A subtle visual indicator (e.g. a muted bell icon in the user panel) confirms that notifications are silenced while in DND.
+### ~~9.3. Do Not Disturb (DND) Mode Integration~~ ✅ Implemented
+-   When a user's status is set to **Do Not Disturb**, notification sounds (`notificationSound`, `callSound`) are suppressed in `useSoundManager.playSound()`.
+-   Other voice sounds (mute, deafen, connect, disconnect) still play in DND — they are local-action feedback, not interruptions.
+-   A 🔕 bell-off icon appears in both the server and DM sidebar user panels while DND is active, making the silenced state visible.
+-   The tab badge (9.4) also respects DND.
 
-### 9.4. Notification Badge on Browser Tab (Favicon & Title)
--   When there are any unread messages (channels or DMs), the browser tab title is prefixed with the unread count in parentheses: `(3) My App`.
--   A small red dot is overlaid on the favicon using a `<canvas>`-drawn favicon swap so the user can see there are unread messages even from another tab.
--   Badge clears when all unread indicators are dismissed (i.e. `unreadChannels` and `unreadDMs` sets are both empty).
+### ~~9.4. Notification Badge on Browser Tab (Favicon & Title)~~ ✅ Implemented
+-   Browser tab title is prefixed with the unread count: `(N) Chat`.
+-   A canvas-drawn favicon displays a red dot badge when there are unread messages.
+-   Badge and title clear when all unreads are dismissed.
 -   Respects DND: no badge update while the user's status is Do Not Disturb.
+-   `useTabBadge(count, isDND)` hook called from `AppShell` using `unreadChannels.size + (hasUnreadDMs ? 1 : 0)` as the count.

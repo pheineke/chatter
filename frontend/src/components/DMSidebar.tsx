@@ -144,6 +144,11 @@ export function DMSidebar() {
         >
           <Icon name="settings" size={18} />
         </button>
+        {user?.status === 'dnd' && (
+          <span title="Do Not Disturb — notifications silenced" className="text-discord-dnd">
+            <Icon name="bell-off" size={16} />
+          </span>
+        )}
       </div>
 
       {contextMenu && (

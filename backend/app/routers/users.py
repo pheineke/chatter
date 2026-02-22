@@ -13,10 +13,18 @@ from app.presence import broadcast_presence
 from app.schemas.user import UserRead, UserUpdate
 from app.utils.file_validation import verify_image_magic_with_dims, AVATAR_MAX, BANNER_MAX
 from app.utils.rate_limiter import image_limiter, profile_limiter
-from models.user import User
+from models.user import User, UserStatus
 from models.note import UserNote
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+def _mask_user_read(user: "User", viewer_id: uuid.UUID) -> "UserRead":
+    """Return a UserRead for `user`, hiding status if hide_status is set and viewer != user."""
+    read = UserRead.model_validate(user)
+    if user.hide_status and user.id != viewer_id:
+        read = read.model_copy(update={'status': UserStatus.offline})
+    return read
 
 
 @router.get("/me", response_model=UserRead)
@@ -36,6 +44,7 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
                 detail=f"You're updating your profile too quickly. Please wait {retry_after} seconds.",
             )
     status_changed = body.status is not None and body.status != current_user.status
+    hide_status_changed = body.hide_status is not None and body.hide_status != current_user.hide_status
     if body.description is not None:
         current_user.description = body.description
     if body.status is not None:
@@ -49,13 +58,16 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
         current_user.banner = body.banner
     if body.dm_permission is not None:
         current_user.dm_permission = body.dm_permission
+    if body.hide_status is not None:
+        current_user.hide_status = body.hide_status
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
 
-    # Broadcast status change to servers and friends
-    if status_changed:
-        await broadcast_presence(current_user.id, current_user.status.value, db)
+    # Broadcast status change; if hide_status is on, always broadcast offline
+    if status_changed or hide_status_changed:
+        broadcast_status = "offline" if current_user.hide_status else current_user.status.value
+        await broadcast_presence(current_user.id, broadcast_status, db)
 
     return current_user
 
@@ -134,7 +146,7 @@ async def search_user_by_username(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return _mask_user_read(user, current_user.id)
 
 
 @router.get("/{user_id}", response_model=UserRead)
@@ -143,7 +155,7 @@ async def get_user(user_id: uuid.UUID, db: DB, current_user: CurrentUser):
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return _mask_user_read(user, current_user.id)
 
 
 class NoteBody(BaseModel):

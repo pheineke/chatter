@@ -667,6 +667,23 @@ function PrivacyTab() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold">Privacy &amp; Safety</h2>
 
+      {/* Hide online status */}
+      <div className="bg-discord-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Presence</div>
+        <label className="flex items-center justify-between cursor-pointer py-2 px-3 rounded hover:bg-discord-bg transition-colors select-none">
+          <div>
+            <div className="text-sm font-medium">Hide my online status</div>
+            <div className="text-xs text-discord-muted mt-0.5">You will appear offline to all other users</div>
+          </div>
+          <div
+            className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ml-4 shrink-0 ${user?.hide_status ? 'bg-discord-mention' : 'bg-discord-input'}`}
+            onClick={() => updateMut.mutate({ hide_status: !user?.hide_status })}
+          >
+            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${user?.hide_status ? 'left-5' : 'left-0.5'}`} />
+          </div>
+        </label>
+      </div>
+
       {/* DM permissions */}
       <div className="bg-discord-sidebar rounded-lg p-4">
         <div className="text-xs font-bold text-discord-muted uppercase mb-3">Who can message you</div>

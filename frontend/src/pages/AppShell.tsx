@@ -16,6 +16,8 @@ import { ServerSettingsPage } from './ServerSettingsPage'
 import { QuickSwitcher } from '../components/QuickSwitcher'
 import { KeyboardShortcutsDialog } from '../components/KeyboardShortcutsDialog'
 import { useUnreadDMs } from '../hooks/useUnreadDMs'
+import { useTabBadge } from '../hooks/useTabBadge'
+import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getChannels } from '../api/channels'
 import { getMyServers } from '../api/servers'
@@ -31,6 +33,8 @@ export default function AppShell() {
   const { user } = useAuth()
   const [voiceSession, setVoiceSession] = useState<VoiceSession | null>(null)
   const hasUnreadDMs = useUnreadDMs()
+  const { unreadChannels } = useUnreadChannels()
+  useTabBadge(unreadChannels.size + (hasUnreadDMs ? 1 : 0), user?.status === 'dnd')
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const location = useLocation()
