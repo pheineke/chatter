@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Uuid
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Uuid, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -66,6 +66,9 @@ class Attachment(Base):
 
 class Reaction(Base):
     __tablename__ = "reactions"
+    __table_args__ = (
+        UniqueConstraint("message_id", "user_id", "emoji", name="uq_reaction_message_user_emoji"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     message_id: Mapped[uuid.UUID] = mapped_column(

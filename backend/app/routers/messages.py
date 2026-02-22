@@ -9,6 +9,7 @@ from typing import List, Dict
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
 from sqlalchemy import select, delete, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
@@ -360,8 +361,14 @@ async def add_reaction(
         )
     )
     if not existing.scalar_one_or_none():
-        db.add(Reaction(message_id=message_id, user_id=current_user.id, emoji=emoji))
-        await db.commit()
+        try:
+            db.add(Reaction(message_id=message_id, user_id=current_user.id, emoji=emoji))
+            await db.commit()
+        except IntegrityError:
+            # Race condition: another request inserted the same reaction between
+            # our SELECT check and this INSERT. The DB constraint caught it — ignore.
+            await db.rollback()
+            return
         await manager.broadcast_channel(
             channel_id,
             {"type": "reaction.added", "data": {"message_id": str(message_id), "user_id": str(current_user.id), "emoji": emoji}},
