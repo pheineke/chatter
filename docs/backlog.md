@@ -190,17 +190,11 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 
 ## 7. Feature Requests: Client Sounds
 
-### 7.1. Sound Effects Integration
-See full spec: [`docs/specs/client_sounds_spec.md`](specs/client_sounds_spec.md)
-
-- Implement a global sound manager to play notification sounds.
-- **Events**:
-  - Join/Leave channel (self & others)
-  - Mute/Unmute (self)
-  - Deafen/Undeafen (self)
-  - Incoming Message (when not focused)
-- **Settings**: Respect user preferences for toggling individual sounds.
-- **Assets**: Use provided `frontend/public/sounds/` files.
+### ~~7.1. Sound Effects Integration~~ ✅ Implemented
+- `useSoundManager` hook manages playback with per-sound enable/disable flags and a master volume stored in `localStorage`.
+- **Events covered**: connect (join), disconnect (leave), mute, unmute, deafen, undeafen, new message notification.
+- Voice events fire from `useVoiceChannel` on self-mute/deafen/connect/disconnect; `useUnreadDMs` fires `notificationSound` on incoming DMs.
+- Settings → Audio section exposes individual toggles for each sound key plus a master volume slider.
 
 ## 8. Feature Requests: Security & Privacy
 
