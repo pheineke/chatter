@@ -8,7 +8,7 @@ interface Props {
 const STATUS_COLORS: Record<UserStatus, string> = {
   online: 'bg-discord-online',
   away: 'bg-discord-idle',
-  busy: 'bg-discord-dnd',
+  dnd: 'bg-discord-dnd',
   offline: 'bg-discord-offline',
 }
 

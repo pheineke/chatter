@@ -1,6 +1,6 @@
 // Shared TypeScript types mirroring the backend Pydantic schemas
 
-export type UserStatus = 'online' | 'away' | 'busy' | 'offline'
+export type UserStatus = 'online' | 'away' | 'dnd' | 'offline'
 
 export interface User {
   id: string

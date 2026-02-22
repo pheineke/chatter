@@ -11,7 +11,7 @@ from models.base import Base
 class UserStatus(str, enum.Enum):
     online = "online"
     away = "away"
-    busy = "busy"
+    dnd = "dnd"
     offline = "offline"
 
 

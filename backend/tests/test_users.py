@@ -23,7 +23,7 @@ async def test_update_me_description(client: AsyncClient, alice_headers):
 
 
 async def test_update_me_status(client: AsyncClient, alice_headers):
-    for status in ("online", "away", "busy", "offline"):
+    for status in ("online", "away", "dnd", "offline"):
         r = await client.patch("/users/me", json={"status": status}, headers=alice_headers)
         assert r.status_code == 200
         assert r.json()["status"] == status

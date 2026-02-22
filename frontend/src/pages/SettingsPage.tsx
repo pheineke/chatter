@@ -74,11 +74,11 @@ function AccountTab() {
   const statusColors: Record<string, string> = {
     online: 'bg-discord-online',
     away: 'bg-discord-idle',
-    busy: 'bg-discord-dnd',
+    dnd: 'bg-discord-dnd',
     offline: 'bg-discord-offline',
   }
   const statusLabels: Record<string, string> = {
-    online: 'Online', away: 'Away', busy: 'Do Not Disturb', offline: 'Offline',
+    online: 'Online', away: 'Away', dnd: 'Do Not Disturb', offline: 'Offline',
   }
 
   return (
@@ -132,7 +132,7 @@ function AccountTab() {
       <div className="bg-discord-sidebar rounded-lg p-4 mb-6">
         <div className="text-xs font-bold text-discord-muted uppercase mb-3">Online Status</div>
         <div className="grid grid-cols-2 gap-2">
-          {(['online', 'away', 'busy', 'offline'] as const).map(s => (
+          {(['online', 'away', 'dnd', 'offline'] as const).map(s => (
             <button
               key={s}
               onClick={() => updateMut.mutate({ status: s as UserStatus })}

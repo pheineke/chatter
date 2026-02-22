@@ -106,7 +106,7 @@ export function DMSidebar() {
             const statuses: { label: string; value: string; icon: string }[] = [
               { label: 'Online',         value: 'online',  icon: 'ellipse' },
               { label: 'Away',           value: 'away',    icon: 'time' },
-              { label: 'Do Not Disturb', value: 'busy',    icon: 'remove-circle' },
+              { label: 'Do Not Disturb', value: 'dnd',     icon: 'remove-circle' },
               { label: 'Offline',        value: 'offline', icon: 'ellipse' },
             ]
             setContextMenu({
