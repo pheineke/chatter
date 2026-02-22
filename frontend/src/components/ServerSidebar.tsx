@@ -6,7 +6,7 @@ import { joinViaInvite } from '../api/invites'
 import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
 import { createInvite } from '../api/invites'
-import type { Server } from '../api/types'
+import type { Server, Channel } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 
 function ServerIcon({ server, active, hasUnread, onContextMenu }: { server: Server; active: boolean; hasUnread: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
@@ -57,7 +57,14 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
   const [inviteCopied, setInviteCopied] = useState(false)
 
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers })
-  const { unreadServers } = useUnreadChannels()
+  const { unreadChannels } = useUnreadChannels()
+
+  // Derive unread badge: check cached channel list for each server against unreadChannels.
+  // ['channels', serverId] is already populated by ChannelSidebar — no extra fetch needed.
+  function serverHasUnread(sId: string): boolean {
+    const channels = qc.getQueryData<Channel[]>(['channels', sId]) ?? []
+    return channels.some(ch => ch.type === 'text' && unreadChannels.has(ch.id))
+  }
 
   const handleCreateInvite = async (sId: string) => {
     const invite = await createInvite(sId, { expires_hours: 24 })
@@ -118,7 +125,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
           key={s.id}
           server={s}
           active={s.id === serverId}
-          hasUnread={unreadServers.has(s.id)}
+          hasUnread={serverHasUnread(s.id)}
           onContextMenu={(e) => {
             e.preventDefault()
             setContextMenu({ x: e.clientX, y: e.clientY, serverId: s.id })

@@ -27,14 +27,13 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
   const [showPins, setShowPins] = useState(false)
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const scrollToMessageRef = useRef<((id: string) => void) | null>(null)
-  const { markRead, markServerRead } = useUnreadChannels()
+  const { markRead } = useUnreadChannels()
   const qc = useQueryClient()
 
-  // Mark channel + server as read when navigating to a channel
+  // Mark channel as read when navigating to it
   useEffect(() => {
     if (channelId) markRead(channelId)
-    if (serverId) markServerRead(serverId)
-  }, [channelId, serverId, markRead, markServerRead])
+  }, [channelId, markRead])
 
   const handleReply = useCallback((msg: Message) => setReplyTo(msg), [])
   const handleCancelReply = useCallback(() => setReplyTo(null), [])
