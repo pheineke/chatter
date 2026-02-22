@@ -248,7 +248,9 @@ function AccountTab() {
       </div>
     </div>
   )
-}───────────
+}
+
+// ─── Appearance tab ──────────────────────────────────────────────────────────
 
 const PRESETS: { id: string; label: string; accent: string; bg: string; sidebar: string; servers: string; input: string; text: string; muted: string }[] = [
   { id: 'default', label: 'Default', accent: '#7289da', bg: '#36393f', sidebar: '#2f3136', servers: '#202225', input: '#40444b', text: '#dcddde', muted: '#72767d' },
