@@ -1,7 +1,7 @@
 import { useNavigate, useParams, useMatch } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useCallback, type ReactNode } from 'react'
-import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories } from '../api/channels'
+import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory } from '../api/channels'
 import { getMembers, getServer } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
 import { StatusIndicator } from './StatusIndicator'
@@ -87,6 +87,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [editChannelDesc, setEditChannelDesc] = useState('')
   const [editSlowmode, setEditSlowmode] = useState(0)
   const [dragId, setDragId] = useState<string | null>(null)
+  const [showAddCategory, setShowAddCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(() => {
     const stored = serverId ? localStorage.getItem(`cats_collapsed_${serverId}`) : null
     return stored ? new Set(stored.split(',').filter(Boolean)) : new Set()
@@ -97,7 +99,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     const items: ContextMenuItem[] = []
-    if (isAdmin) items.push({ label: 'Create Channel', icon: 'hash', onClick: () => setShowAddChannel(true) })
+    if (isAdmin) {
+      items.push({ label: 'Create Channel', icon: 'hash', onClick: () => setShowAddChannel(true) })
+      items.push({ label: 'Create Category', icon: 'folder', onClick: () => setShowAddCategory(true) })
+    }
     items.push({ label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite })
     setContextMenu({ x: e.clientX, y: e.clientY, items })
   }, [isAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -124,6 +129,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     qc.invalidateQueries({ queryKey: ['channels', serverId] })
     setShowAddChannel(false)
     setNewChannelName('')
+  }
+
+  async function handleCreateCategory() {
+    if (!serverId || !newCategoryName.trim()) return
+    await createCategory(serverId, newCategoryName.trim())
+    qc.invalidateQueries({ queryKey: ['categories', serverId] })
+    setShowAddCategory(false)
+    setNewCategoryName('')
   }
 
   function openChannelContextMenu(e: React.MouseEvent, ch: Channel) {
@@ -429,6 +442,26 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
           </span>
         )}
       </div>
+
+      {/* Add category modal */}
+      {showAddCategory && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddCategory(false)}>
+          <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">Create Category</h2>
+            <input
+              autoFocus
+              className="input w-full mb-3"
+              placeholder="Category name"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory() }}
+            />
+            <button className="btn w-full" onClick={handleCreateCategory} disabled={!newCategoryName.trim()}>
+              Create Category
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add channel modal */}
       {showAddChannel && (
