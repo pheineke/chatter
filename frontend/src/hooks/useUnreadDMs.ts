@@ -4,6 +4,7 @@ import { useMatch } from 'react-router-dom'
 import { useWebSocket } from './useWebSocket'
 import { useAuth } from '../contexts/AuthContext'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
+import { useSoundManager } from './useSoundManager'
 import { getConversations } from '../api/dms'
 import type { DMConversation, Friend, Message, UserStatus } from '../api/types'
 
@@ -23,6 +24,7 @@ export function useUnreadDMs(): boolean {
   const qc = useQueryClient()
   const { user, updateUser } = useAuth()
   const { notifyMessage, notifyServer } = useUnreadChannels()
+  const { playSound } = useSoundManager()
   const match = useMatch('/channels/@me/:dmUserId')
   const channelMatch = useMatch('/channels/:serverId/:channelId')
   const activeDmUserId = match?.params.dmUserId ?? null
@@ -83,6 +85,7 @@ export function useUnreadDMs(): boolean {
         if (channel_id === activeChannelId) return
         notifyMessage(channel_id)
         if (server_id !== activeServerId) notifyServer(server_id)
+        playSound('notificationSound')
         return
       }
 
