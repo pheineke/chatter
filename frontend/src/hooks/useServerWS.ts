@@ -10,7 +10,7 @@ const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
  * Subscribes to the server-level WebSocket and keeps channel/category
  * caches up-to-date in real time for all connected clients.
  */
-export function useServerWS(serverId: string | null) {
+export function useServerWS(serverId: string | null, currentChannelId?: string) {
   const qc = useQueryClient()
   const { notifyMessage } = useUnreadChannels()
 
@@ -87,7 +87,8 @@ export function useServerWS(serverId: string | null) {
         }
         case 'channel.message': {
           const { channel_id } = msg.data as { channel_id: string }
-          notifyMessage(channel_id)
+          // Don't mark the channel the user is currently viewing as unread
+          if (channel_id !== currentChannelId) notifyMessage(channel_id)
           break
         }
         case 'channels.reordered': {

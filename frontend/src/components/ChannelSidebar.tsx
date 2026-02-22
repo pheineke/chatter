@@ -35,7 +35,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const { user, logout, refreshUser } = useAuth()
   const qc = useQueryClient()
 
-  useServerWS(serverId ?? null)
+  useServerWS(serverId ?? null, channelId)
   const { unreadChannels } = useUnreadChannels()
 
   const { data: server } = useQuery({
