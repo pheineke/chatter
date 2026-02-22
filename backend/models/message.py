@@ -17,7 +17,7 @@ class Message(Base):
     author_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
     reply_to_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
     )

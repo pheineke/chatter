@@ -41,7 +41,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
   const qc = useQueryClient()
   const isOwn = user?.id === msg.author.id
   const [editing, setEditing] = useState(false)
-  const [editText, setEditText] = useState(msg.content)
+  const [editText, setEditText] = useState(msg.content ?? '')
   const [hovered, setHovered] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const closePreview = useCallback(() => setPreviewUrl(null), [])
@@ -118,9 +118,9 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
                 <UserAvatar user={msg.reply_to.author} size={16} className="rounded-full shrink-0" />
                 <span className="font-medium text-discord-text/80">{msg.reply_to.author.username}</span>
                 <span className="truncate italic opacity-70">
-                  {msg.reply_to.content.length > 80
-                    ? msg.reply_to.content.slice(0, 80) + '…'
-                    : msg.reply_to.content}
+                  {msg.reply_to.content
+                    ? (msg.reply_to.content.length > 80 ? msg.reply_to.content.slice(0, 80) + '…' : msg.reply_to.content)
+                    : '📎 Attachment'}
                 </span>
               </>
             ) : (
@@ -160,7 +160,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
           </div>
         ) : (
           <p className="text-sm text-discord-text break-words whitespace-pre-wrap leading-relaxed">
-            <Content text={msg.content} />
+            {msg.content && <Content text={msg.content} />}
             {msg.is_edited && (
               <span className="text-[11px] text-discord-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
             )}

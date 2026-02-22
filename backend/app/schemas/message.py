@@ -34,18 +34,18 @@ class MentionRead(BaseModel):
 
 
 class MessageBase(BaseModel):
-    content: str
+    content: str | None = None
     reply_to_id: uuid.UUID | None = None
 
-    @field_validator('content')
+    @field_validator('content', mode='before')
     @classmethod
-    def sanitize_content(cls, v: str) -> str:
-        cleaned = strip_html(v) or ''
-        if not cleaned.strip():
-            raise ValueError('Message content cannot be empty')
+    def sanitize_content(cls, v) -> str | None:
+        if v is None:
+            return None
+        cleaned = strip_html(str(v)) or ''
         if len(cleaned) > 2000:
             raise ValueError('Message content cannot exceed 2000 characters')
-        return cleaned
+        return cleaned or None
 
 
 class MessageCreate(MessageBase):
@@ -87,7 +87,7 @@ class MessageReplyRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    content: str
+    content: str | None
     is_deleted: bool
     author: UserRead
 

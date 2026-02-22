@@ -188,7 +188,7 @@ async def send_message(
     await db.flush()
 
     if channel.server_id:
-        await _parse_and_save_mentions(body.content, msg.id, channel.server_id, db)
+        await _parse_and_save_mentions(body.content or '', msg.id, channel.server_id, db)
 
     result = await db.execute(
         select(Message)

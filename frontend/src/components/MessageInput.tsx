@@ -124,7 +124,7 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
 
   const uploadMut = useMutation({
     mutationFn: async (file: File) => {
-      const msg = await sendMessage(channelId, file.name)
+      const msg = await sendMessage(channelId, null)
       return uploadAttachment(channelId, msg.id, file)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', channelId] }),

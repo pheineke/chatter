@@ -8,9 +8,9 @@ export async function getMessages(channelId: string, before?: string, limit = 50
   return data
 }
 
-export async function sendMessage(channelId: string, content: string, replyToId?: string): Promise<Message> {
+export async function sendMessage(channelId: string, content: string | null, replyToId?: string): Promise<Message> {
   const { data } = await client.post<Message>(`/channels/${channelId}/messages`, {
-    content,
+    content: content || null,
     reply_to_id: replyToId ?? null,
   })
   return data

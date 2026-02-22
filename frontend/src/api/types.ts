@@ -101,7 +101,7 @@ export interface MessageReply {
 export interface Message {
   id: string
   channel_id: string
-  content: string
+  content: string | null
   author: User
   reply_to_id: string | null
   reply_to: MessageReply | null
