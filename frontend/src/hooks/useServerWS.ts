@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
+import { useSoundManager } from './useSoundManager'
+import { activeServerIds } from './serverRegistry'
 import type { Channel, Category, Member, VoiceParticipant } from '../api/types'
 
 /** Voice presence query key for a given server. */
@@ -12,7 +15,15 @@ const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
  */
 export function useServerWS(serverId: string | null, currentChannelId?: string) {
   const qc = useQueryClient()
-  const { notifyMessage } = useUnreadChannels()
+  const { notifyMessage, notifyServer } = useUnreadChannels()
+  const { playSound } = useSoundManager()
+
+  // Register/unregister so useUnreadDMs knows not to double-notify for this server.
+  useEffect(() => {
+    if (!serverId) return
+    activeServerIds.add(serverId)
+    return () => { activeServerIds.delete(serverId) }
+  }, [serverId])
 
   useWebSocket(serverId ? `/ws/servers/${serverId}` : '', {
     enabled: serverId !== null,
@@ -87,8 +98,14 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
         }
         case 'channel.message': {
           const { channel_id } = msg.data as { channel_id: string }
-          // Don't mark the channel the user is currently viewing as unread
-          if (channel_id !== currentChannelId) notifyMessage(channel_id)
+          // Only notify if the user isn't already viewing this channel.
+          // This fires for ALL server members via broadcast_server — including the sender.
+          // The sender is in `currentChannelId`, so the check correctly skips them.
+          if (channel_id !== currentChannelId) {
+            notifyMessage(channel_id)
+            if (serverId) notifyServer(serverId)
+            playSound('notificationSound')
+          }
           break
         }
         case 'channels.reordered': {

@@ -5,6 +5,7 @@ import { useWebSocket } from './useWebSocket'
 import { useAuth } from '../contexts/AuthContext'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useSoundManager } from './useSoundManager'
+import { activeServerIds } from './serverRegistry'
 import { getConversations } from '../api/dms'
 import type { DMConversation, Friend, Message, UserStatus } from '../api/types'
 
@@ -81,10 +82,15 @@ export function useUnreadDMs(): boolean {
 
       if (msg.type === 'channel.message') {
         const { channel_id, server_id } = msg.data as { channel_id: string; server_id: string }
-        // Skip if user is already viewing this channel
+        // If the user has an active server WS for this server, useServerWS already
+        // handles the unread indicator and sound — skip here to avoid double-notification
+        // and to prevent the sender from getting a ping on their own message.
+        if (activeServerIds.has(server_id)) return
+        // Fallback for users not currently subscribed to the server WS
+        // (e.g. viewing a different server or the DM page).
         if (channel_id === activeChannelId) return
         notifyMessage(channel_id)
-        if (server_id !== activeServerId) notifyServer(server_id)
+        notifyServer(server_id)
         playSound('notificationSound')
         return
       }
