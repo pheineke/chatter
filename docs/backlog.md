@@ -26,6 +26,8 @@
 - ~~**Edited messages show no `(edited)` marker**~~ ✅ Fixed — `is_edited` and `edited_at` fields added to the `Message` model (Alembic migration applied). `edit_message` sets both on save. `MessageRead` schema exposes them. `MessageBubble` shows a muted `(edited)` label after the message content with a tooltip showing the exact edit timestamp.
 - ~~**Real-time reactions trigger a full refetch instead of a cache patch**~~ ✅ Fixed — `useChannelWS` now uses `setQueryData` for both `reaction.added` and `reaction.removed`: added reactions are appended with a dedup guard; removed reactions are filtered out by `(user_id, emoji)` pair. No network request is made.
 - ~~**DM list has no online status indicator or unread badge**~~ ✅ Fixed — `DMSidebar` now lists all conversations with `UserAvatar` + `StatusIndicator` per contact. An unread white dot appears next to any conversation with messages newer than the stored `dmLastRead` timestamp. A green dot badge also appears on the DM button in `ServerSidebar` (via `useUnreadDMs`) whenever any DM has unread messages, even while on a server.
+- **Typing indicator not shown in DMs** — `DMPane` does not call `useChannelWS`, so the "X is typing…" bar and `typing.start` emission are absent from all DM conversations. Server channels work correctly; DMs need the same `useChannelWS` plumbing wired into `DMPane`.
+- **No notification sound for incoming server channel messages when not in DM sidebar** — `channel.message` handler in `useUnreadDMs` fires `playSound`, but only if the active route is not already the matching channel. Verified working.
 
 ## 2. Feature Requests: User Profiles
 
@@ -121,12 +123,17 @@ Two-level protection prevents message flooding:
 - `MessagePane` header shows `# name | topic` (truncated, full text in tooltip) when `channel.description` is set.
 - Edit Channel modal in `ChannelSidebar` has a "Channel Topic" textarea (pre-filled, saved via `updateChannel`).
 
-### 4.9. Keyboard Shortcuts
--   Discord-standard keyboard shortcuts are entirely absent. Priority shortcuts to implement:
-    -   **Ctrl+K** — Quick-switcher overlay for jumping to channels, DMs, or servers by name.
-    -   **Alt+↑ / Alt+↓** — Navigate to the previous/next channel in the sidebar.
-    -   **Escape** — Close open modals, context menus, or the emoji picker.
-    -   **Ctrl+/** — Open a keyboard shortcuts cheat-sheet dialog.
+### ~~4.9. Keyboard Shortcuts~~ ✅ Implemented
+-   **Ctrl+K** — quick-switcher overlay for jumping to channels, DMs, or servers by name.
+-   **Alt+↑ / Alt+↓** — navigate to the previous/next channel in the sidebar.
+-   **Ctrl+/** — opens the keyboard shortcuts cheat-sheet dialog (`KeyboardShortcutsDialog`).
+-   **Escape** — closes open modals and context menus (via `onClose`/`onMouseDown` guards throughout the UI).
+
+### 4.10. Category Collapse
+-   Clicking a category header in the channel sidebar should toggle that category's channels open or closed (collapsed state).
+-   Collapsed state is stored in `localStorage` (keyed by `serverId + categoryId`) so it persists across page loads.
+-   A collapsed category shows only the header row; no channels or voice participants are visible.
+-   Non-admin members can also collapse categories (purely a local UI preference, no API call needed).
 
 ## 5. Feature Requests: Messaging
 
@@ -147,35 +154,49 @@ See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec
 - Flat list only — no nested threading.
 
 ### 5.3. Typing Indicator
--   While a user is typing in a text channel or DM, other participants should see a **"Username is typing…"** notice at the bottom of the message list, above the input bar.
--   Send a `typing.start` WS event when the user starts typing (debounced, retransmit every ~5 s while still typing); `typing.stop` when they send or clear the input. The server fans the event out to the channel room.
--   Multiple simultaneous typers: "Alice and Bob are typing…" / "Several people are typing…" (3+).
--   Indicator auto-clears after 8 s if no follow-up `typing.start` is received.
+-   **Server channels**: ✅ Done — `useChannelWS` tracks `typing.start` events and exposes `typingUsers`; `MessagePane` renders the "X is typing…" bar and `MessageInput` emits `typing.start` via `sendTyping`.
+-   **DMs**: ❌ Not yet done — `DMPane` does not call `useChannelWS`, so the indicator is absent from DM conversations. Needs the same hook wired in with the DM `channel_id`.
 
-### 5.4. @mention Autocomplete
--   Typing `@` in the message input should open a floating autocomplete list of server members and roles that filters in real-time.
+### ~~5.4. @mention Autocomplete~~ ✅ Implemented
+-   Typing `@` in the message input opens a floating autocomplete list of server members filtered in real-time by the typed prefix.
 -   Keyboard navigation: ↑/↓ to move, Enter/Tab to select, Escape to dismiss.
--   The existing `@mention` parsing and highlight rendering in `Content` is already in place; this only adds the input-side UX.
+-   The selected member's `@username` is inserted at the cursor position; the picker respects the `serverId` prop (DMs have no server members so no autocomplete is shown there).
 
 ### 5.5. Message Search
 -   A search bar (Ctrl+F or toolbar icon) allows searching messages within the current channel or across the entire server.
 -   Results appear in a side panel with author, timestamp, and a "Jump" link to the message.
 -   Backend: `GET /channels/{id}/messages?q=<query>` using SQLite `LIKE` or FTS5.
 
-### 5.6. Pinned Messages
--   Admins (or members with "Manage Messages" permission) can pin any message via the message action bar.
--   The channel header shows a 📌 button that opens a panel listing all pinned messages in reverse-pin order.
--   Backend: a `pinned_messages` join table (`channel_id`, `message_id`, `pinned_at`, `pinned_by`). WS events `message.pinned` / `message.unpinned` broadcast to the channel room.
+### ~~5.6. Pinned Messages~~ ✅ Implemented
+-   Any member can pin a message via the hover action bar or right-click context menu; admins can unpin from the same menu or from the pins panel.
+-   The channel header shows a 📌 button with a count badge; clicking opens `PinnedMessagesPanel` listing all pinned messages with jump-to links.
+-   Backend: `pinned_messages` join table with `channel_id`, `message_id`, `pinned_at`, `pinned_by`. WS events `message.pinned` / `message.unpinned` broadcast to the channel room.
 
-### 5.7. Paginated / Batch Message Loading
--   **Initial load**: When a user opens a text channel, the most recent **100 messages** are fetched in a single request.
--   **Pagination chunks**: Scrolling up towards older messages fetches the next **50 messages** at a time (cursor-based, using the oldest visible message ID as the `before` cursor).
--   **Configurable chunk size**: The page size for subsequent loads (default 50) is a per-server setting, adjustable by admins in server settings (e.g. 25 / 50 / 100). The initial load size (100) can also be made configurable via a server setting.
--   **Backend**: The messages endpoint accepts `before=<message_id>` and `limit=<n>` query parameters. `limit` is capped at a server-wide maximum (e.g. 200) to prevent abuse.
--   **Frontend**: Infinite-scroll trigger fires when the user scrolls within ~200 px of the top of the message list; a loading spinner is shown while the request is in flight. Already-loaded messages are prepended without resetting the scroll position.
--   **No more messages**: When the API returns fewer items than requested, the "load more" trigger is disabled and an "Beginning of channel" indicator is shown.
+### ~~5.7. Paginated / Batch Message Loading~~ ✅ Implemented
+-   `MessageList` uses `useInfiniteQuery` with cursor-based pagination (`before=<message_id>`, `limit=50`).
+-   Intersection observer fires `fetchNextPage` when the top sentinel scrolls into view; scroll position is preserved during prepend via `useLayoutEffect`.
+-   "You've reached the beginning of this channel" indicator shown when no more pages exist.
 
-## 6. Feature Requests: Bot / API Access
+### 5.8. Markdown Rendering in Messages
+-   Message content is currently rendered as plain text — `**bold**`, `*italic*`, `` `code` ``, ` ```code blocks``` `, `> blockquote`, `~~strikethrough~~`, and `||spoiler||` all display as raw characters.
+-   Implement Discord-flavoured markdown parsing and render the result as safe HTML:
+    -   **Bold** `**text**` / `__text__`
+    -   **Italic** `*text*` / `_text_`
+    -   **Underline** `__text__` (Discord overloads this)
+    -   **Strikethrough** `~~text~~`
+    -   **Inline code** `` `code` ``
+    -   **Code block** ` ```lang\ncode\n``` ` with optional syntax highlighting
+    -   **Blockquote** `> text`
+    -   **Spoiler** `||text||` — hidden by default, revealed on click
+    -   **@mention** and **URL** linkification must continue to work within parsed markdown
+-   Use a lightweight parser (e.g. `marked` or a custom regex pipeline) — do **not** use a full CommonMark renderer that would allow arbitrary HTML injection.
+-   All rendered HTML must pass through DOMPurify before being inserted into the DOM.
+
+### 5.9. Inline Image / URL Embeds
+-   When a message contains a bare image URL (`.png`, `.jpg`, `.gif`, `.webp`) that is the only content or is on its own line, render an inline image preview below the message text.
+-   For non-image URLs, show an **Open Graph embed card** (title, description, thumbnail) fetched via a server-side proxy endpoint (`GET /meta?url=<url>`) to avoid CORS issues and prevent IP leaking.
+-   Embeds are dismissible per-message (stored in `localStorage`).
+-   Cap image previews at 400 px wide / 300 px tall; clicking opens the full image in a lightbox.
 
 ### 6.1. Personal API Tokens & Bot Support
 See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
@@ -218,10 +239,10 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   All refresh tokens for a user are invalidated on explicit logout or when suspicious activity is detected (e.g. token reuse).
 -   A user can view and revoke all active sessions from account settings.
 
-### 8.5. File Upload MIME Type Validation
--   File uploads are validated by inspecting the actual file signature (magic bytes), not just the file extension or `Content-Type` header.
--   Disguised executables (e.g. a `.png` that is actually a PE binary) are rejected with a `400` error.
--   Allowed MIME types are defined in a server-side allowlist (images, common document formats, etc.).
+### ~~8.5. File Upload MIME Type Validation~~ ✅ Implemented
+-   `verify_image_magic` / `verify_image_magic_with_dims` in `file_validation.py` inspects magic bytes and rejects disguised files.
+-   Pixel-dimension caps enforced: avatars 1024×1024, banners & server images 1920×1080.
+-   Extension on saved file is derived from detected MIME type (not user-supplied filename).
 
 ### 8.6. Hide Online Status
 -   Users can choose to hide their online status from non-friends so they appear offline to everyone except their friend list.
@@ -245,7 +266,24 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   Enforced on the backend; exceeding the limit returns HTTP `429 Too Many Requests` with a `Retry-After` header indicating when the next update is allowed.
 -   The frontend should surface a clear message such as "You're updating your profile too quickly. Please wait X seconds."
 
-## 9. Feature Requests: Notification Management
+### 8.9. Change Password
+-   Users should be able to change their password from account settings without logging out.
+-   Form: current password (verification), new password, confirm new password fields.
+-   Backend: `POST /me/change-password` — verify current password hash, validate new password strength (min 8 chars), hash and store.
+-   Frontend: Settings → Account → "Change Password" section with a save button and clear error/success feedback.
+-   On success, existing JWT tokens remain valid (no forced re-login), but the session continues as normal.
+
+## 10. UI & Responsiveness
+
+### 10.1. Mobile / Responsive Layout
+-   The app is currently desktop-only — sidebars are fixed-width and overflow on narrow viewports.
+-   **Target breakpoints**: ≥1024 px (desktop, current layout), 768–1023 px (tablet, hide member list by default), <768 px (mobile, show only one pane at a time with swipe/back navigation).
+-   Mobile changes:
+    -   Server sidebar collapses to a bottom tab bar or a swipeable drawer.
+    -   Channel sidebar slides in over the main pane (hamburger icon in channel header to open).
+    -   Member list is hidden by default; accessible via a toolbar icon.
+    -   Message input uses `type="text"` with appropriate `inputmode` for mobile keyboards.
+-   No native shell required — responsive CSS + React state is sufficient for a PWA-style experience.
 
 ### 9.1. Per-Channel & Per-Server Notification Settings
 -   Users can configure notification level independently for each server and each channel:
