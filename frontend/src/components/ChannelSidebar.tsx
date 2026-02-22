@@ -705,38 +705,49 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
 // ---- Drag-and-drop wrappers (used only in admin mode) ----------------------
 
 function SortableCatHeader({ id, title, collapsed, onToggle }: { id: string; title: string; collapsed?: boolean; onToggle?: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id })
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider select-none ${isDragging ? 'opacity-0' : ''}`}
-      {...listeners}
+      className={`group flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider select-none cursor-pointer hover:text-discord-text transition-colors ${isDragging ? 'opacity-0' : ''}`}
+      onClick={onToggle}
       {...attributes}
     >
-      <button
-        onPointerDown={e => e.stopPropagation()}
-        onClick={onToggle}
-        className="text-discord-muted hover:text-discord-text transition-colors cursor-default"
-        tabIndex={-1}
+      {/* Drag handle — only this initiates reordering */}
+      <span
+        ref={setActivatorNodeRef}
+        {...listeners}
+        onClick={e => e.stopPropagation()}
+        title="Drag to reorder"
+        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 cursor-grab active:cursor-grabbing shrink-0 transition-opacity"
       >
-        <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} />
-      </button>
-      <span className="cursor-grab active:cursor-grabbing">{title}</span>
+        <Icon name="menu" size={11} />
+      </span>
+      <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
+      <span>{title}</span>
     </div>
   )
 }
 
 function SortableChannelItem({ id, children }: { id: string; children: ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id })
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={isDragging ? 'opacity-0' : ''}
-      {...listeners}
+      className={`group relative ${isDragging ? 'opacity-0' : ''}`}
       {...attributes}
     >
+      {/* Drag handle — absolutely positioned so it doesn't shift channel content */}
+      <span
+        ref={setActivatorNodeRef}
+        {...listeners}
+        title="Drag to reorder"
+        className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing text-discord-muted transition-opacity"
+      >
+        <Icon name="menu" size={11} />
+      </span>
       {children}
     </div>
   )
