@@ -55,7 +55,11 @@ class Attachment(Base):
         ForeignKey("messages.id", ondelete="CASCADE"), nullable=False
     )
     file_path: Mapped[str] = mapped_column(String(255), nullable=False)
-    file_type: Mapped[str] = mapped_column(String(50), nullable=False)  # image, gif, audio
+    file_type: Mapped[str] = mapped_column(String(50), nullable=False)  # image, audio
+    filename: Mapped[str | None] = mapped_column(String(255), nullable=True)  # original upload name
+    file_size: Mapped[int | None] = mapped_column(nullable=True)  # bytes
+    width: Mapped[int | None] = mapped_column(nullable=True)   # pixels (images only)
+    height: Mapped[int | None] = mapped_column(nullable=True)  # pixels (images only)
 
     message: Mapped["Message"] = relationship("Message", back_populates="attachments")
 

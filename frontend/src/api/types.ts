@@ -75,6 +75,10 @@ export interface Attachment {
   id: string
   file_path: string
   file_type: string
+  filename: string | null
+  file_size: number | null
+  width: number | null
+  height: number | null
 }
 
 export interface Reaction {

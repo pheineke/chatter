@@ -289,22 +289,48 @@ async def upload_attachment(
     if msg.channel_id != channel_id or msg.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    # Capture original filename before reading (sanitise path separators)
+    original_name: str | None = None
+    if file.filename:
+        original_name = file.filename.replace('\\', '/').split('/')[-1] or None
+
     # Validate magic bytes (ignores spoofed Content-Type headers)
     content = await verify_attachment_magic(file)
 
-    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
-    filename = f"attachments/{message_id}/{uuid.uuid4()}.{ext}"
-    dest = os.path.join(settings.static_dir, filename)
+    import filetype as _ft
+    import io as _io
+    kind = _ft.guess(content)
+    file_type = kind.mime.split("/")[0] if kind else "image"  # "image" or "audio"
+    file_size = len(content)
+
+    # Extract pixel dimensions for image attachments
+    img_width: int | None = None
+    img_height: int | None = None
+    if file_type == "image":
+        try:
+            from PIL import Image as _Image
+            with _Image.open(_io.BytesIO(content)) as _img:
+                img_width, img_height = _img.size
+        except Exception:
+            pass
+
+    ext = (original_name.rsplit(".", 1)[-1] if original_name and "." in original_name else None) or (kind.extension if kind else "bin")
+    storage_path = f"attachments/{message_id}/{uuid.uuid4()}.{ext}"
+    dest = os.path.join(settings.static_dir, storage_path)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
 
     async with aiofiles.open(dest, "wb") as f:
         await f.write(content)
 
-    # Derive the broad type from the validated magic-byte MIME
-    import filetype as _ft
-    kind = _ft.guess(content)
-    file_type = kind.mime.split("/")[0] if kind else "image"  # "image" or "audio"
-    db.add(Attachment(message_id=message_id, file_path=filename, file_type=file_type))
+    db.add(Attachment(
+        message_id=message_id,
+        file_path=storage_path,
+        file_type=file_type,
+        filename=original_name,
+        file_size=file_size,
+        width=img_width,
+        height=img_height,
+    ))
     await db.commit()
     db.expire_all()
 

@@ -13,6 +13,10 @@ class AttachmentRead(BaseModel):
     id: uuid.UUID
     file_path: str
     file_type: str
+    filename: str | None = None
+    file_size: int | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 class ReactionRead(BaseModel):

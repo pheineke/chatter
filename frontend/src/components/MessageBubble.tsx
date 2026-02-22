@@ -31,6 +31,12 @@ function formatTime(iso: string) {
   return format(d, 'dd/MM/yyyy HH:mm')
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 /** Render plain text content, turning @mentions blue and URLs into links. */
 function Content({ text }: { text: string }) {
   return <Linkified text={text} />
@@ -169,20 +175,33 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
 
         {/* Attachments */}
         {msg.attachments?.map((att) => {
-          const filename = att.file_path.split('/').pop() ?? att.file_path
+          const displayName = att.filename ?? att.file_path.split('/').pop() ?? att.file_path
           const url = `/api/static/${att.file_path}`
           return (
             <div key={att.id} className="mt-1">
               {att.file_type === 'image' ? (
                 <img
                   src={url}
-                  alt={filename}
+                  alt={displayName}
+                  width={att.width ?? undefined}
+                  height={att.height ?? undefined}
                   className="max-w-xs max-h-64 rounded object-cover cursor-zoom-in hover:brightness-90 transition"
+                  style={att.width && att.height ? { aspectRatio: `${att.width}/${att.height}` } : undefined}
                   onClick={() => setPreviewUrl(url)}
                 />
               ) : (
-                <a href={url} target="_blank" rel="noreferrer" className="text-discord-mention underline text-sm">
-                  📎 {filename}
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  download={displayName}
+                  className="inline-flex items-center gap-2 bg-discord-sidebar rounded px-3 py-2 text-sm hover:bg-white/10 transition"
+                >
+                  <span className="text-discord-muted text-lg">📎</span>
+                  <span className="text-discord-mention underline truncate max-w-[200px]">{displayName}</span>
+                  {att.file_size != null && (
+                    <span className="text-discord-muted text-xs shrink-0">{formatFileSize(att.file_size)}</span>
+                  )}
                 </a>
               )}
             </div>
