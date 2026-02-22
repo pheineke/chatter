@@ -41,6 +41,7 @@ class Channel(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     type: Mapped[ChannelType] = mapped_column(Enum(ChannelType, name="channel_type"), default=ChannelType.text)
     position: Mapped[int] = mapped_column(Integer, default=0)
+    slowmode_delay: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     server: Mapped["Server"] = relationship("Server", back_populates="channels")
     category: Mapped["Category | None"] = relationship("Category", back_populates="channels")

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import axios from 'axios'
 import { sendMessage, uploadAttachment } from '../api/messages'
 import { getMembers } from '../api/servers'
 import { Icon } from './Icon'
@@ -16,6 +17,8 @@ interface Props {
   replyTo?: Message | null
   onCancelReply?: () => void
   onTyping?: () => void
+  /** slowmode_delay in seconds from the channel settings; 0 = disabled */
+  slowmodeDelay?: number
 }
 
 /** Scan backwards from `cursorPos` in `text` to find an active @ trigger.
@@ -33,7 +36,7 @@ function findMentionTrigger(text: string, cursorPos: number): { query: string; t
   return { query: query.toLowerCase(), triggerStart: i }
 }
 
-export function MessageInput({ channelId, serverId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping }: Props) {
+export function MessageInput({ channelId, serverId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping, slowmodeDelay = 0 }: Props) {
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -41,6 +44,29 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const qc = useQueryClient()
   const lastTypingSent = useRef(0)
+
+  // Cooldown state: timestamp (ms) when the user is allowed to send again
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
+  const [cooldownSecs, setCooldownSecs] = useState(0)
+
+  // Tick the countdown every second
+  useEffect(() => {
+    if (!cooldownUntil) return
+    const tick = () => {
+      const remaining = Math.ceil((cooldownUntil - Date.now()) / 1000)
+      if (remaining <= 0) {
+        setCooldownUntil(null)
+        setCooldownSecs(0)
+      } else {
+        setCooldownSecs(remaining)
+      }
+    }
+    tick()
+    const id = setInterval(tick, 500)
+    return () => clearInterval(id)
+  }, [cooldownUntil])
+
+  const inCooldown = cooldownSecs > 0
 
   // @mention autocomplete state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -82,6 +108,17 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['messages', channelId] })
       onCancelReply?.()
+      // Start client-side cooldown so the user sees the countdown immediately
+      if (slowmodeDelay > 0) {
+        setCooldownUntil(Date.now() + slowmodeDelay * 1000)
+      }
+    },
+    onError: (err) => {
+      // Handle 429 from both global rate-limiter and per-channel slowmode
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
+        const retryAfter = Number(err.response.headers?.['retry-after'] ?? 5)
+        setCooldownUntil(Date.now() + retryAfter * 1000)
+      }
     },
   })
 
@@ -94,6 +131,7 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
   })
 
   function handleSend() {
+    if (inCooldown) return
     const trimmed = text.trim()
     if (!trimmed) return
     sendMut.mutate(trimmed)
@@ -217,6 +255,14 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
         </div>
       )}
 
+      {/* Slowmode banner */}
+      {inCooldown && (
+        <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-1.5 mb-1.5 text-xs text-yellow-300">
+          <Icon name="clock" size={13} className="shrink-0" />
+          <span>Slowmode — you can send another message in <strong>{cooldownSecs}s</strong></span>
+        </div>
+      )}
+
       {/* Reply banner */}
       {replyTo && (
         <div className="flex items-center gap-2 bg-discord-input/60 rounded-t-lg px-3 py-1.5 text-xs text-discord-muted border-b border-white/5">
@@ -253,10 +299,11 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
         {/* Text area */}
         <textarea
           ref={textareaRef}
-          className="flex-1 bg-transparent resize-none outline-none text-sm text-discord-text placeholder:text-discord-muted max-h-36 leading-6 py-0 mx-2"
+          className={`flex-1 bg-transparent resize-none outline-none text-sm text-discord-text placeholder:text-discord-muted max-h-36 leading-6 py-0 mx-2 ${inCooldown ? 'opacity-50 cursor-not-allowed' : ''}`}
           rows={1}
           value={text}
-          placeholder={placeholder}
+          placeholder={inCooldown ? `Slowmode — wait ${cooldownSecs}s…` : placeholder}
+          disabled={inCooldown}
           onChange={(e) => {
             const newText = e.target.value
             setText(newText)
@@ -291,9 +338,9 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
         {/* Send button */}
         <button
           onClick={handleSend}
-          disabled={!text.trim() || sendMut.isPending}
+          disabled={!text.trim() || sendMut.isPending || inCooldown}
           className="text-discord-muted hover:text-discord-text disabled:opacity-30 transition-colors shrink-0 mt-[2px]"
-          title="Send"
+          title={inCooldown ? `Slowmode — wait ${cooldownSecs}s` : 'Send'}
         >
           <Icon name="paper-plane" size={20} />
         </button>

@@ -204,6 +204,8 @@ async def update_channel(
         channel.position = body.position
     if body.category_id is not None:
         channel.category_id = body.category_id
+    if body.slowmode_delay is not None:
+        channel.slowmode_delay = max(0, body.slowmode_delay)
     await db.commit()
     await db.refresh(channel)
     return channel

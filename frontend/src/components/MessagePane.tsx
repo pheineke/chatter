@@ -192,6 +192,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
             replyTo={replyTo}
             onCancelReply={handleCancelReply}
             onTyping={sendTyping}
+            slowmodeDelay={channel?.slowmode_delay ?? 0}
           />
         </div>
 

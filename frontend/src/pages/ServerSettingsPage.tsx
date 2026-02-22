@@ -9,6 +9,7 @@ import {
 import { listInvites, revokeInvite } from '../api/invites'
 import { UserAvatar } from '../components/UserAvatar'
 import { Icon } from '../components/Icon'
+import { InviteModal } from '../components/InviteModal'
 import { useAuth } from '../contexts/AuthContext'
 import type { Member, Role } from '../api/types'
 import type { ServerInvite } from '../api/invites'
@@ -123,7 +124,7 @@ export function ServerSettingsPage() {
           {tab === 'overview'  && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
           {tab === 'members'   && <MembersTab  serverId={serverId} members={members} roles={[]} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
           {tab === 'roles'     && <RolesTab    serverId={serverId} />}
-          {tab === 'invites'   && <InvitesTab  serverId={serverId} />}
+          {tab === 'invites'   && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
         </div>
 
         {/* Close button */}
@@ -560,8 +561,9 @@ function RolesTab({ serverId }: { serverId: string }) {
 
 // ─── Invites Tab ──────────────────────────────────────────────────────────────
 
-function InvitesTab({ serverId }: { serverId: string }) {
+function InvitesTab({ serverId, serverTitle }: { serverId: string; serverTitle: string }) {
   const qc = useQueryClient()
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const { data: invites = [] } = useQuery<ServerInvite[]>({
     queryKey: ['invites', serverId],
     queryFn: () => listInvites(serverId),
@@ -581,7 +583,24 @@ function InvitesTab({ serverId }: { serverId: string }) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">Invites</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">Invites</h2>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 bg-discord-mention text-white text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-discord-mention/80 transition-colors"
+        >
+          <Icon name="add" size={16} />
+          Create Invite
+        </button>
+      </div>
+
+      {showCreateModal && (
+        <InviteModal
+          serverId={serverId}
+          serverName={serverTitle}
+          onClose={() => { setShowCreateModal(false); qc.invalidateQueries({ queryKey: ['invites', serverId] }) }}
+        />
+      )}
 
       {invites.length === 0 ? (
         <div className="text-discord-muted text-center py-10">No invites created yet.</div>

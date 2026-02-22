@@ -17,7 +17,7 @@ export async function createChannel(
 export async function updateChannel(
   serverId: string,
   channelId: string,
-  patch: { title?: string; description?: string | null },
+  patch: { title?: string; description?: string | null; slowmode_delay?: number },
 ): Promise<Channel> {
   const { data } = await client.patch<Channel>(`/servers/${serverId}/channels/${channelId}`, patch)
   return data

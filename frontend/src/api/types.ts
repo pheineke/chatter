@@ -59,6 +59,7 @@ export interface Channel {
   type: ChannelType
   position: number
   category_id: string | null
+  slowmode_delay: number  // seconds; 0 = disabled
 }
 
 export interface Category {

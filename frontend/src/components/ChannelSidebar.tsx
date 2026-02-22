@@ -15,7 +15,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { updateMe } from '../api/users'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { createInvite } from '../api/invites'
+import { InviteModal } from './InviteModal'
 import type { Channel, VoiceParticipant, Member, User } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import type { VoiceSession } from '../pages/AppShell'
@@ -81,11 +81,11 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text')
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
-  const [inviteLink, setInviteLink] = useState<string | null>(null)
-  const [inviteCopied, setInviteCopied] = useState(false)
+  const [inviteModalOpen, setInviteModalOpen] = useState(false)
   const [editChannel, setEditChannel] = useState<Channel | null>(null)
   const [editChannelName, setEditChannelName] = useState('')
   const [editChannelDesc, setEditChannelDesc] = useState('')
+  const [editSlowmode, setEditSlowmode] = useState(0)
   const [dragId, setDragId] = useState<string | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -110,17 +110,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     })
   }
 
-  async function handleCreateInvite() {
-    if (!serverId) return
-    const invite = await createInvite(serverId, { expires_hours: 24 })
-    setInviteLink(`${window.location.origin}/invite/${invite.code}`)
-  }
-
-  function copyInviteLink() {
-    if (!inviteLink) return
-    navigator.clipboard.writeText(inviteLink)
-    setInviteCopied(true)
-    setTimeout(() => setInviteCopied(false), 2000)
+  function handleCreateInvite() {
+    setInviteModalOpen(true)
   }
 
   async function handleCreateChannel() {
@@ -142,7 +133,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         {
           label: 'Edit Channel',
           icon: 'edit-2',
-          onClick: () => { setEditChannel(ch); setEditChannelName(ch.title); setEditChannelDesc(ch.description ?? '') },
+          onClick: () => { setEditChannel(ch); setEditChannelName(ch.title); setEditChannelDesc(ch.description ?? ''); setEditSlowmode(ch.slowmode_delay ?? 0) },
         },
         {
           label: 'Delete Channel',
@@ -163,6 +154,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     await updateChannel(serverId, editChannel.id, {
       title: editChannelName.trim(),
       description: editChannelDesc.trim() || null,
+      slowmode_delay: editSlowmode,
     })
     qc.invalidateQueries({ queryKey: ['channels', serverId] })
     setEditChannel(null)
@@ -446,26 +438,13 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         />
       )}
 
-      {/* Invite link modal */}
-      {inviteLink && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setInviteLink(null); setInviteCopied(false) }}>
-          <div className="bg-discord-sidebar rounded-lg p-6 w-96" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-1">Invite People</h2>
-            <p className="text-sm text-discord-muted mb-4">Share this link — it expires in 24 hours.</p>
-            <div className="flex gap-2">
-              <input
-                readOnly
-                value={inviteLink}
-                className="input flex-1 text-sm font-mono"
-                onFocus={(e) => e.target.select()}
-              />
-              <button className="btn shrink-0 flex items-center gap-1.5" onClick={copyInviteLink}>
-                <Icon name={inviteCopied ? 'checkmark-circle' : 'copy'} size={16} />
-                {inviteCopied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Invite modal */}
+      {inviteModalOpen && serverId && (
+        <InviteModal
+          serverId={serverId}
+          serverName={server?.title ?? 'Server'}
+          onClose={() => setInviteModalOpen(false)}
+        />
       )}
       {/* Edit channel modal */}
       {editChannel && (
@@ -489,6 +468,23 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               onChange={(e) => setEditChannelDesc(e.target.value)}
               maxLength={1024}
             />
+            <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Slowmode</label>
+            <select
+              className="input w-full mb-4 text-sm"
+              value={editSlowmode}
+              onChange={(e) => setEditSlowmode(Number(e.target.value))}
+            >
+              <option value={0}>Off</option>
+              <option value={5}>5 seconds</option>
+              <option value={10}>10 seconds</option>
+              <option value={15}>15 seconds</option>
+              <option value={30}>30 seconds</option>
+              <option value={60}>1 minute</option>
+              <option value={120}>2 minutes</option>
+              <option value={300}>5 minutes</option>
+              <option value={600}>10 minutes</option>
+              <option value={3600}>1 hour</option>
+            </select>
             <div className="flex gap-2">
               <button className="btn flex-1" onClick={handleSaveEditChannel} disabled={!editChannelName.trim()}>
                 Save

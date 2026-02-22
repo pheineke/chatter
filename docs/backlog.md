@@ -81,61 +81,21 @@
 -   `GET /servers/{id}/members` now eagerly loads roles for all members in one query and returns them sorted by position.
 -   `ServerSettingsPage` → Members tab `MemberRolePicker` now shows each role as assigned (highlighted with role colour) or unassigned, with explicit assign/remove actions.
 
-### 4.4. Spam / Rate-Limit Protection
-Two-level protection to prevent message flooding:
-
-**Per-server (Server Settings UI)**
--   Optional slowmode toggle per server (or per channel).
--   Configurable cooldown: minimum milliseconds a user must wait between messages.
--   Stored as a server/channel setting and enforced on the backend for every message send in that server/channel.
+### ~~4.4. Spam / Rate-Limit Protection~~ ✅ Implemented
+Two-level protection prevents message flooding:
 
 **Global backend default (`.env`)**
--   `RATELIMIT_ENABLED` — toggle global rate limiting on/off.
--   `RATELIMIT_MESSAGES` — message quota per window (e.g. `10`).
--   `RATELIMIT_WINDOW_SECONDS` — rolling window size in seconds (e.g. `5` → max 10 messages per 5 s per user).
--   Implemented as a token/leaky-bucket counter keyed by user ID, applied before any per-server slowmode checks.
--   Returns HTTP `429 Too Many Requests` with a `Retry-After` header when the quota is exceeded; the frontend should surface a friendly "Slow down!" notice.
+-   `RATELIMIT_ENABLED`, `RATELIMIT_MESSAGES`, `RATELIMIT_WINDOW_SECONDS` in `.env`.
+-   Token/leaky-bucket counter keyed by user ID; applies before per-channel slowmode checks.
+-   Returns HTTP `429 Too Many Requests` with a `Retry-After` header; frontend surfaces a "Slow down!" notice.
 
-**Attack example (what this must prevent)**
-
-The following script, runnable from a browser console or any JS environment, demonstrates how an authenticated user can trivially flood a channel at ~20 requests/second with no current server-side resistance. Credentials redacted.
-
-```js
-const url = "http://<host>:5173/api/channels/<channel-id>/messages";
-const token = "<jwt-token>";
-
-let running = true;
-
-function randomString(length = 6) {
-    const chars = "abcdefghijklmnopqrstuvwxyz";
-    return Array.from({ length }, () =>
-        chars[Math.floor(Math.random() * chars.length)]
-    ).join("");
-}
-
-async function spamLoop() {
-    while (running) {
-        fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + token
-            },
-            body: JSON.stringify({
-                content: randomString(),
-                reply_to_id: null
-            })
-        }).catch(() => {});
-
-        // 50 ms delay → ~20 req/sec
-        await new Promise(r => setTimeout(r, 50));
-    }
-}
-
-spamLoop();
-```
-
-At 50 ms per request this produces ~20 messages/second, ~1 200/minute — the rate limiter must reject this well before the database or WebSocket fan-out become a bottleneck.
+**Per-channel slowmode (Channel Settings → Edit Channel)**
+-   `slowmode_delay` column (`INT NOT NULL DEFAULT 0`) added to `channels` table (Alembic migration `e5f6a7b8c9d0`).
+-   Enforced in `send_message` with an in-memory `_slowmode_last` dict (channel_id → user_id → monotonic timestamp).
+-   Configurable options: Off, 5s, 10s, 15s, 30s, 1 min, 2 min, 5 min, 10 min, 1 hour.
+-   Backend returns `429` with `detail` and `Retry-After` header when a user sends too soon.
+-   `ChannelSidebar` edit modal includes a Slowmode dropdown (admins only).
+-   `MessageInput` shows a yellow countdown banner + disabled textarea/send button for the duration of the cooldown; client-side countdown starts immediately on success (no round-trip needed), and a server `429` also triggers the cooldown via the `Retry-After` header.
 
 ### 4.5. Per-Server Word / Phrase Blocklist
 -   Server admins can maintain a list of blocked words or phrases in server settings.
@@ -148,12 +108,14 @@ At 50 ms per request this produces ~20 messages/second, ~1 200/minute — the ra
 -   Overrides are additive or restrictive and take precedence over the server-wide role value.
 -   Displayed in channel settings under a "Permissions" tab showing each role with allow/deny/inherit toggles per permission.
 
-### 4.7. Invite Link Controls
--   When creating an invite link, users can optionally set:
-    -   **Expiry** — never, 30 min, 1 h, 6 h, 12 h, 1 day, 7 days.
-    -   **Max uses** — unlimited or a fixed cap (1, 5, 10, 25, 50, 100).
--   Server admins can see all active invite links in server settings, and can **pause** (temporarily disable) or **revoke** (delete) any link.
--   Expired or fully-used links return a clear error on the invite page.
+### ~~4.7. Invite Link Controls~~ ✅ Implemented
+-   New `InviteModal` component replaces the old "24 hour invite" inline modals in `ChannelSidebar` and `ServerSidebar`.
+-   **Expiry** dropdown: Never, 30 min, 1 h, 6 h, 12 h, 24 h, 7 days.
+-   **Max uses** dropdown: Unlimited, 1, 5, 10, 25, 50, 100.
+-   "Generate Invite Link" button calls `POST /servers/{id}/invites` with the chosen settings.
+-   After generation: shows the full link in a monospace box with a **Copy** button (green "Copied!" feedback for 2 s) and invite metadata (uses / max, expiry timestamp).
+-   "Generate a new link with different settings" resets the form without closing the modal.
+-   Server Settings → Invites tab gains a **"Create Invite"** button (top-right) that opens `InviteModal`; closing the modal invalidates the `['invites']` query so the table refreshes.
 
 ### ~~4.8. Channel Topic / Description in Header~~ ✅ Implemented
 - `MessagePane` header shows `# name | topic` (truncated, full text in tooltip) when `channel.description` is set.

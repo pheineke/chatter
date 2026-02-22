@@ -43,6 +43,7 @@ class ChannelBase(BaseModel):
     type: ChannelType = ChannelType.text
     position: int = 0
     category_id: uuid.UUID | None = None
+    slowmode_delay: int = 0  # seconds between messages per user; 0 = disabled
 
     @field_validator('title', 'description', mode='before')
     @classmethod
@@ -59,6 +60,7 @@ class ChannelUpdate(BaseModel):
     description: str | None = None
     position: int | None = None
     category_id: uuid.UUID | None = None
+    slowmode_delay: int | None = None  # 0 = disable slowmode
 
 
 class ChannelReorderItem(BaseModel):

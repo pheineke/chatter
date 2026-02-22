@@ -5,7 +5,7 @@ import { getMyServers, createServer } from '../api/servers'
 import { joinViaInvite } from '../api/invites'
 import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
-import { createInvite } from '../api/invites'
+import { InviteModal } from './InviteModal'
 import type { Server } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 
@@ -53,22 +53,13 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
   const [name, setName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; serverId: string } | null>(null)
-  const [inviteLink, setInviteLink] = useState<string | null>(null)
-  const [inviteCopied, setInviteCopied] = useState(false)
+  const [inviteModalServerId, setInviteModalServerId] = useState<string | null>(null)
 
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers })
   const { unreadServers } = useUnreadChannels()
 
-  const handleCreateInvite = async (sId: string) => {
-    const invite = await createInvite(sId, { expires_hours: 24 })
-    setInviteLink(`${window.location.origin}/invite/${invite.code}`)
-  }
-
-  const copyInviteLink = () => {
-    if (!inviteLink) return
-    navigator.clipboard.writeText(inviteLink)
-    setInviteCopied(true)
-    setTimeout(() => setInviteCopied(false), 2000)
+  const handleCreateInvite = (sId: string) => {
+    setInviteModalServerId(sId)
   }
 
   const createMut = useMutation({
@@ -158,23 +149,13 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
         />
       )}
 
-      {/* Invite Link Modal */}
-      {inviteLink && (
-        <Modal title="Invite People" onClose={() => { setInviteLink(null); setInviteCopied(false) }} className="w-96">
-          <p className="text-sm text-discord-muted mb-4">Share this link — it expires in 24 hours.</p>
-          <div className="flex gap-2">
-            <input
-              readOnly
-              value={inviteLink}
-              className="input flex-1 text-sm font-mono"
-              onFocus={(e) => e.target.select()}
-            />
-            <button className="btn shrink-0 flex items-center gap-1.5" onClick={copyInviteLink}>
-              <Icon name={inviteCopied ? 'checkmark-circle' : 'copy'} size={16} />
-              {inviteCopied ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-        </Modal>
+      {/* Invite Modal */}
+      {inviteModalServerId && (
+        <InviteModal
+          serverId={inviteModalServerId}
+          serverName={servers.find((s) => s.id === inviteModalServerId)?.title ?? 'Server'}
+          onClose={() => setInviteModalServerId(null)}
+        />
       )}
 
       {/* Create server modal */}

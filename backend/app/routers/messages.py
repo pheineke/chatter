@@ -1,8 +1,10 @@
 import os
 import re
+import time
 import uuid
+from collections import defaultdict
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Dict
 
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
@@ -26,6 +28,9 @@ from models.user import User
 router = APIRouter(prefix="/channels/{channel_id}", tags=["messages"])
 
 _MENTION_RE = re.compile(r"@(\w+)")
+
+# Per-channel per-user slowmode tracker: channel_id_str -> user_id_str -> last_send_time
+_slowmode_last: Dict[str, Dict[str, float]] = defaultdict(dict)
 
 
 async def _parse_and_save_mentions(
@@ -156,6 +161,22 @@ async def send_message(
 ):
     channel = await _get_channel_or_404(channel_id, db)
     await _require_channel_access(channel, current_user.id, db)
+
+    # Enforce per-channel slowmode (skip for voice/dm channels which have no slowmode)
+    if getattr(channel, 'slowmode_delay', 0) and channel.slowmode_delay > 0:
+        ch_key = str(channel_id)
+        user_key = str(current_user.id)
+        now = time.monotonic()
+        last = _slowmode_last[ch_key].get(user_key, 0.0)
+        elapsed = now - last
+        if elapsed < channel.slowmode_delay:
+            retry_after = max(1, int(channel.slowmode_delay - elapsed) + 1)
+            raise HTTPException(
+                status_code=429,
+                detail=f"Slowmode is enabled. Please wait {retry_after} second(s) before sending another message.",
+                headers={"Retry-After": str(retry_after)},
+            )
+        _slowmode_last[ch_key][user_key] = now
 
     msg = Message(
         channel_id=channel_id,
