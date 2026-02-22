@@ -714,18 +714,18 @@ function SortableCatHeader({ id, title, collapsed, onToggle }: { id: string; tit
       onClick={onToggle}
       {...attributes}
     >
+      <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
+      <span>{title}</span>
       {/* Drag handle — only this initiates reordering */}
       <span
         ref={setActivatorNodeRef}
         {...listeners}
         onClick={e => e.stopPropagation()}
         title="Drag to reorder"
-        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 cursor-grab active:cursor-grabbing shrink-0 transition-opacity"
+        className="ml-auto opacity-0 group-hover:opacity-60 hover:!opacity-100 cursor-grab active:cursor-grabbing shrink-0 transition-opacity"
       >
         <Icon name="menu" size={11} />
       </span>
-      <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
-      <span>{title}</span>
     </div>
   )
 }
@@ -744,7 +744,7 @@ function SortableChannelItem({ id, children }: { id: string; children: ReactNode
         ref={setActivatorNodeRef}
         {...listeners}
         title="Drag to reorder"
-        className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing text-discord-muted transition-opacity"
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing text-discord-muted transition-opacity"
       >
         <Icon name="menu" size={11} />
       </span>
