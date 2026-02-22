@@ -14,6 +14,10 @@ interface Props {
   channelId: string
   /** If true, collapse the header (same author, within 7 min of previous) */
   compact?: boolean
+  /** Called when the user clicks Reply on this message */
+  onReply?: (msg: Message) => void
+  /** Called with a message id to scroll to it (provided by MessageList) */
+  onScrollToMessage?: (id: string) => void
 }
 
 function formatTime(iso: string) {
@@ -40,7 +44,7 @@ function Content({ text }: { text: string }) {
   )
 }
 
-export function MessageBubble({ message: msg, channelId, compact = false }: Props) {
+export function MessageBubble({ message: msg, channelId, compact = false, onReply, onScrollToMessage }: Props) {
   const { user } = useAuth()
   const qc = useQueryClient()
   const isOwn = user?.id === msg.author.id
@@ -102,6 +106,30 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
 
       {/* Content column */}
       <div className="flex-1 min-w-0">
+        {/* Reply header - quoted reference */}
+        {msg.reply_to_id && (
+          <button
+            className="flex items-center gap-1.5 text-xs text-discord-muted mb-0.5 max-w-full hover:text-discord-text transition-colors cursor-pointer text-left"
+            onClick={() => msg.reply_to && onScrollToMessage?.(msg.reply_to.id)}
+            title={msg.reply_to ? 'Jump to original message' : undefined}
+          >
+            <Icon name="corner-up-left" size={11} className="shrink-0 text-discord-muted/70" />
+            {msg.reply_to && !msg.reply_to.is_deleted ? (
+              <>
+                <UserAvatar user={msg.reply_to.author} size={16} className="rounded-full shrink-0" />
+                <span className="font-medium text-discord-text/80">{msg.reply_to.author.username}</span>
+                <span className="truncate italic opacity-70">
+                  {msg.reply_to.content.length > 80
+                    ? msg.reply_to.content.slice(0, 80) + '…'
+                    : msg.reply_to.content}
+                </span>
+              </>
+            ) : (
+              <span className="italic opacity-50">Original message was deleted</span>
+            )}
+          </button>
+        )}
+
         {!compact && (
           <div className="flex items-baseline gap-2 mb-0.5">
             <span 
@@ -199,6 +227,9 @@ export function MessageBubble({ message: msg, channelId, compact = false }: Prop
             }}
           >
             <Icon name="smiling-face" size={16} />
+          </ActionBtn>
+          <ActionBtn title="Reply" onClick={() => onReply?.(msg)}>
+            <Icon name="corner-up-left" size={16} />
           </ActionBtn>
           {isOwn && <ActionBtn title="Edit" onClick={() => { setEditing(true); setEditText(msg.content) }}><Icon name="edit-2" size={16} /></ActionBtn>}
           {isOwn && <ActionBtn title="Delete" onClick={() => deleteMut.mutate()} className="hover:text-red-400"><Icon name="trash-2" size={16} /></ActionBtn>}

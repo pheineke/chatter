@@ -10,7 +10,7 @@ from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.presence import broadcast_presence
 from app.schemas.user import UserRead, UserUpdate
-from app.utils.file_validation import verify_image_magic
+from app.utils.file_validation import verify_image_magic_with_dims, AVATAR_MAX, BANNER_MAX
 from models.user import User
 from models.note import UserNote
 
@@ -53,8 +53,8 @@ async def upload_avatar(
     db: DB,
     file: UploadFile = File(...),
 ):
-    # Validate magic bytes (rejects disguised executables / spoofed headers)
-    content = await verify_image_magic(file)
+    # Validate magic bytes and enforce maximum dimensions
+    content = await verify_image_magic_with_dims(file, AVATAR_MAX, label="Avatar")
 
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"avatars/{current_user.id}.{ext}"
@@ -77,8 +77,8 @@ async def upload_banner(
     db: DB,
     file: UploadFile = File(...),
 ):
-    # Validate magic bytes (rejects disguised executables / spoofed headers)
-    content = await verify_image_magic(file)
+    # Validate magic bytes and enforce maximum dimensions
+    content = await verify_image_magic_with_dims(file, BANNER_MAX, label="Banner")
 
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"banners/{current_user.id}.{ext}"

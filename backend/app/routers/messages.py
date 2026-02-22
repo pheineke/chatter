@@ -91,16 +91,22 @@ async def _get_dm_participants(channel_id: uuid.UUID, db) -> tuple[uuid.UUID, uu
     return (dmc.user_a_id, dmc.user_b_id)
 
 
+def _message_load_options():
+    """Standard eager-load options for a fully hydrated Message."""
+    return [
+        selectinload(Message.author),
+        selectinload(Message.attachments),
+        selectinload(Message.reactions),
+        selectinload(Message.mentions).selectinload(Mention.mentioned_user),
+        selectinload(Message.mentions).selectinload(Mention.mentioned_role),
+        selectinload(Message.reply_to).selectinload(Message.author),
+    ]
+
+
 async def _get_message_or_404(message_id: uuid.UUID, db) -> Message:
     result = await db.execute(
         select(Message)
-        .options(
-            selectinload(Message.author),
-            selectinload(Message.attachments),
-            selectinload(Message.reactions),
-            selectinload(Message.mentions).selectinload(Mention.mentioned_user),
-            selectinload(Message.mentions).selectinload(Mention.mentioned_role),
-        )
+        .options(*_message_load_options())
         .where(Message.id == message_id)
     )
     msg = result.scalar_one_or_none()
@@ -124,13 +130,7 @@ async def list_messages(
 
     query = (
         select(Message)
-        .options(
-            selectinload(Message.author),
-            selectinload(Message.attachments),
-            selectinload(Message.reactions),
-            selectinload(Message.mentions).selectinload(Mention.mentioned_user),
-            selectinload(Message.mentions).selectinload(Mention.mentioned_role),
-        )
+        .options(*_message_load_options())
         .where(Message.channel_id == channel_id, Message.is_deleted == False)
         .order_by(Message.created_at.desc())
         .limit(limit)
@@ -170,19 +170,19 @@ async def send_message(
 
     result = await db.execute(
         select(Message)
-        .options(
-            selectinload(Message.author),
-            selectinload(Message.attachments),
-            selectinload(Message.reactions),
-            selectinload(Message.mentions).selectinload(Mention.mentioned_user),
-            selectinload(Message.mentions).selectinload(Mention.mentioned_role),
-        )
+        .options(*_message_load_options())
         .where(Message.id == msg.id)
     )
     await db.commit()
     sent = result.scalar_one()
     event = {"type": "message.created", "data": MessageRead.model_validate(sent).model_dump(mode="json")}
     await manager.broadcast_channel(channel_id, event)
+    # Notify server members about new activity in this channel (for unread indicators)
+    if channel.server_id:
+        await manager.broadcast_server(
+            channel.server_id,
+            {"type": "channel.message", "data": {"channel_id": str(channel_id)}},
+        )
     # For DM channels also push to each participant's personal room
     if channel.type == ChannelType.dm:
         participants = await _get_dm_participants(channel_id, db)
@@ -241,7 +241,7 @@ async def delete_message(
     await db.commit()
     await manager.broadcast_channel(
         channel_id,
-        {"type": "message.deleted", "data": {"id": str(message_id), "channel_id": str(channel_id)}},
+        {"type": "message.deleted", "data": {"message_id": str(message_id), "channel_id": str(channel_id)}},
     )
 
 

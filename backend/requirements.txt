@@ -10,6 +10,7 @@ asyncpg
 python-dotenv
 aiofiles
 filetype
+Pillow
 
 # Testing
 pytest

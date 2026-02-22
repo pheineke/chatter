@@ -90,12 +90,20 @@ export interface MentionInfo {
   mentioned_role_name: string | null
 }
 
+export interface MessageReply {
+  id: string
+  content: string
+  is_deleted: boolean
+  author: User
+}
+
 export interface Message {
   id: string
   channel_id: string
   content: string
   author: User
   reply_to_id: string | null
+  reply_to: MessageReply | null
   is_deleted: boolean
   is_edited: boolean
   edited_at: string | null

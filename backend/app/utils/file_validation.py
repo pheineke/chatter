@@ -2,11 +2,14 @@
 
 Validates the actual file content (not just the browser-supplied Content-Type
 header) to prevent disguised executables and MIME-sniff attacks.
+Also enforces maximum image dimensions to prevent denial-of-service via huge images.
 """
-from typing import Set
+import io
+from typing import Set, Tuple
 
 import filetype
 from fastapi import HTTPException, UploadFile
+from PIL import Image
 
 _IMAGE_MIMES: Set[str] = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
@@ -18,11 +21,35 @@ _ATTACHMENT_MIMES: Set[str] = _IMAGE_MIMES | {
     "audio/wav",
 }
 
+# Maximum allowed dimensions per image purpose
+AVATAR_MAX: Tuple[int, int] = (1024, 1024)
+BANNER_MAX: Tuple[int, int] = (1920, 1080)
+SERVER_IMAGE_MAX: Tuple[int, int] = (1920, 1080)
+
+
+def _check_image_dimensions(content: bytes, max_wh: Tuple[int, int], label: str = "Image") -> None:
+    """Open image from bytes and raise HTTP 400 if dimensions exceed the limit.
+
+    GIFs: only the first frame dimensions are checked.
+    """
+    try:
+        with Image.open(io.BytesIO(content)) as img:
+            w, h = img.size
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"{label} could not be opened as a valid image.")
+    max_w, max_h = max_wh
+    if w > max_w or h > max_h:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{label} dimensions {w}×{h} exceed the maximum allowed {max_w}×{max_h}.",
+        )
+
 
 async def verify_image_magic(file: UploadFile) -> bytes:
     """Read the entire upload, check its magic bytes, and return the raw bytes.
 
     Raises HTTP 400 if the file's real MIME type is not an allowed image type.
+    NOTE: Callers that need dimension limits should call ``verify_image_magic_with_dims``.
     """
     content = await file.read()
     kind = filetype.guess(content)
@@ -31,6 +58,17 @@ async def verify_image_magic(file: UploadFile) -> bytes:
             status_code=400,
             detail="File content does not match an allowed image type (jpeg/png/gif/webp).",
         )
+    return content
+
+
+async def verify_image_magic_with_dims(
+    file: UploadFile,
+    max_wh: Tuple[int, int],
+    label: str = "Image",
+) -> bytes:
+    """Like ``verify_image_magic`` but also enforces maximum pixel dimensions."""
+    content = await verify_image_magic(file)
+    _check_image_dimensions(content, max_wh, label)
     return content
 
 

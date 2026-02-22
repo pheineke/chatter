@@ -77,6 +77,23 @@ class ConnectionManager:
     async def broadcast_channel(self, channel_id: uuid.UUID, event: dict[str, Any]) -> None:
         await self.broadcast(self.channel_room(channel_id), event)
 
+    async def broadcast_channel_except(
+        self, channel_id: uuid.UUID, exclude: WebSocket, event: dict[str, Any]
+    ) -> None:
+        """Broadcast to a channel room, skipping one specific connection (the sender)."""
+        payload = json.dumps(event, default=str)
+        room = self.channel_room(channel_id)
+        dead: list[WebSocket] = []
+        for ws in list(self._rooms.get(room, [])):
+            if ws is exclude:
+                continue
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            await self.disconnect(room, ws)
+
     async def broadcast_server(self, server_id: uuid.UUID, event: dict[str, Any]) -> None:
         await self.broadcast(self.server_room(server_id), event)
 

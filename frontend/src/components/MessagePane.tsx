@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getChannels } from '../api/channels'
 import { MessageList } from './MessageList'
@@ -8,6 +8,9 @@ import { MemberSidebar } from './MemberSidebar'
 import { VoiceGridPane } from './VoiceGridPane'
 import { Icon } from './Icon'
 import type { VoiceSession } from '../pages/AppShell'
+import type { Message } from '../api/types'
+import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
+import { useChannelWS } from '../hooks/useChannelWS'
 
 interface Props {
   voiceSession: VoiceSession | null
@@ -18,6 +21,23 @@ interface Props {
 export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) {
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
   const [showMembers, setShowMembers] = useState(true)
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const scrollToMessageRef = useRef<((id: string) => void) | null>(null)
+  const { markRead } = useUnreadChannels()
+
+  // Mark channel as read when navigating to it
+  useEffect(() => {
+    if (channelId) markRead(channelId)
+  }, [channelId, markRead])
+
+  const handleReply = useCallback((msg: Message) => setReplyTo(msg), [])
+  const handleCancelReply = useCallback(() => setReplyTo(null), [])
+  const handleRegisterScrollTo = useCallback((fn: (id: string) => void) => {
+    scrollToMessageRef.current = fn
+  }, [])
+
+  // Real-time channel events (WS lifted here so sendTyping/typingUsers can be passed to children)
+  const { typingUsers, sendTyping } = useChannelWS(channelId ?? null)
 
   const { data: channels = [], isLoading: channelsLoading } = useQuery({
     queryKey: ['channels', serverId],
@@ -97,12 +117,20 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
       <div className="flex flex-1 min-h-0">
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {/* Messages */}
-          <MessageList channelId={channelId} />
+          <MessageList
+            channelId={channelId}
+            onReply={handleReply}
+            onRegisterScrollTo={handleRegisterScrollTo}
+            typingUsers={typingUsers}
+          />
 
           {/* Input */}
           <MessageInput
             channelId={channelId}
             placeholder={`Message #${channel?.title ?? channelId}`}
+            replyTo={replyTo}
+            onCancelReply={handleCancelReply}
+            onTyping={sendTyping}
           />
         </div>
 

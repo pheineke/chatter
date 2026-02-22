@@ -61,3 +61,13 @@ body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Reply jump highlight */
+@keyframes highlight-flash {
+  0%   { background-color: rgba(88, 101, 242, 0.25); }
+  80%  { background-color: rgba(88, 101, 242, 0.10); }
+  100% { background-color: transparent; }
+}
+.highlight-flash {
+  animation: highlight-flash 1.5s ease-out forwards;
+}

@@ -78,9 +78,26 @@ async def channel_ws(
     room = manager.channel_room(channel_id)
     await manager.connect(room, ws)
     try:
-        # Keep alive – drain any client pings / close frames
+        # Handle client messages (typing events, pings)
         while True:
-            await ws.receive_text()
+            try:
+                text = await ws.receive_text()
+            except Exception:
+                break
+            try:
+                data = json.loads(text)
+                if isinstance(data, dict) and data.get("type") == "typing":
+                    # Fan out typing indicator to all OTHER members of the channel room
+                    async with AsyncSessionLocal() as db:
+                        user = await db.get(User, user_id)
+                        username = user.username if user else str(user_id)
+                    await manager.broadcast_channel_except(
+                        channel_id,
+                        ws,
+                        {"type": "typing.start", "data": {"user_id": str(user_id), "username": username}},
+                    )
+            except (json.JSONDecodeError, Exception):
+                pass
     except WebSocketDisconnect:
         pass
     finally:

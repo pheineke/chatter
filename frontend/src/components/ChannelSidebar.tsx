@@ -17,6 +17,7 @@ import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import { createInvite } from '../api/invites'
 import type { Channel, VoiceParticipant, Member, User } from '../api/types'
+import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import type { VoiceSession } from '../pages/AppShell'
 import { ProfileCard } from './ProfileCard'
 
@@ -35,6 +36,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const qc = useQueryClient()
 
   useServerWS(serverId ?? null)
+  const { unreadChannels } = useUnreadChannels()
 
   const { data: server } = useQuery({
     queryKey: ['server', serverId],
@@ -277,6 +279,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                     <ChannelRow
                       channel={ch}
                       active={ch.id === channelId}
+                      hasUnread={unreadChannels.has(ch.id)}
                       serverId={serverId!}
                       voiceSession={voiceSession}
                       channelPresence={voicePresence[ch.id] ?? []}
@@ -336,6 +339,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   key={itemId}
                   channel={ch}
                   active={ch.id === channelId}
+                  hasUnread={unreadChannels.has(ch.id)}
                   serverId={serverId!}
                   voiceSession={voiceSession}
                   channelPresence={voicePresence[ch.id] ?? []}
@@ -503,6 +507,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 interface RowProps {
   channel: Channel
   active: boolean
+  hasUnread?: boolean
   serverId: string
   voiceSession: VoiceSession | null
   channelPresence: VoiceParticipant[]
@@ -514,7 +519,7 @@ interface RowProps {
   onContextMenu?: (e: React.MouseEvent) => void
 }
 
-function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {
+function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {
   const isVoice = channel.type === 'voice'
   const inThisVoice = voiceSession?.channelId === channel.id
   const [activeProfile, setActiveProfile] = useState<{ id: string; pos: { x: number; y: number } } | null>(null)
@@ -574,10 +579,15 @@ function ChannelRow({ channel, active, serverId, voiceSession, channelPresence, 
         className={`w-full flex items-center gap-1.5 px-2 py-1 mx-1 rounded text-sm transition-colors
           ${active
             ? 'bg-white/10 text-discord-text font-medium'
-            : 'text-discord-muted hover:bg-white/5 hover:text-discord-text'}`}
+            : hasUnread
+              ? 'text-discord-text font-semibold hover:bg-white/5'
+              : 'text-discord-muted hover:bg-white/5 hover:text-discord-text'}`}
       >
         <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
         <span className="truncate">{channel.title}</span>
+        {hasUnread && !active && (
+          <span className="ml-auto w-2 h-2 rounded-full bg-white shrink-0" aria-label="Unread messages" />
+        )}
         {inThisVoice && (
           <span className="ml-auto text-discord-online text-xs">● Live</span>
         )}

@@ -79,6 +79,21 @@ class MessageRead(MessageBase):
     attachments: list[AttachmentRead] = []
     reactions: list[ReactionRead] = []
     mentions: list[MentionRead] = []
+    reply_to: 'MessageReplyRead | None' = None
+
+
+class MessageReplyRead(BaseModel):
+    """Lightweight message snapshot embedded inside a reply."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    content: str
+    is_deleted: bool
+    author: UserRead
+
+
+# Keep the forward-reference resolved
+MessageRead.model_rebuild()
 
 
 class DMBase(BaseModel):

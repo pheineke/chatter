@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
+import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import type { Channel, Category, Member, VoiceParticipant } from '../api/types'
 
 /** Voice presence query key for a given server. */
@@ -11,6 +12,7 @@ const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
  */
 export function useServerWS(serverId: string | null) {
   const qc = useQueryClient()
+  const { notifyMessage } = useUnreadChannels()
 
   useWebSocket(serverId ? `/ws/servers/${serverId}` : '', {
     enabled: serverId !== null,
@@ -81,6 +83,11 @@ export function useServerWS(serverId: string | null) {
               ),
             }
           })
+          break
+        }
+        case 'channel.message': {
+          const { channel_id } = msg.data as { channel_id: string }
+          notifyMessage(channel_id)
           break
         }
         case 'channels.reordered': {

@@ -1,30 +1,53 @@
-import { useState, useRef, type KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { sendMessage, uploadAttachment } from '../api/messages'
 import { Icon } from './Icon'
 import { EmojiPicker } from './EmojiPicker'
+import type { Message } from '../api/types'
+
+const TYPING_THROTTLE_MS = 5_000  // retransmit at most every 5s while typing
 
 interface Props {
   channelId: string
   placeholder?: string
+  replyTo?: Message | null
+  onCancelReply?: () => void
+  onTyping?: () => void
 }
 
-export function MessageInput({ channelId, placeholder = 'Send a message…' }: Props) {
+export function MessageInput({ channelId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping }: Props) {
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiButtonRef = useRef<HTMLButtonElement>(null)
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const qc = useQueryClient()
+  const lastTypingSent = useRef(0)
+
+  // Throttled typing emit
+  const emitTyping = useCallback(() => {
+    const now = Date.now()
+    if (now - lastTypingSent.current > TYPING_THROTTLE_MS) {
+      lastTypingSent.current = now
+      onTyping?.()
+    }
+  }, [onTyping])
+
+  // Auto-focus textarea when entering reply mode
+  useEffect(() => {
+    if (replyTo) textareaRef.current?.focus()
+  }, [replyTo])
 
   const sendMut = useMutation({
-    mutationFn: (content: string) => sendMessage(channelId, content),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', channelId] }),
+    mutationFn: (content: string) => sendMessage(channelId, content, replyTo?.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['messages', channelId] })
+      onCancelReply?.()
+    },
   })
 
   const uploadMut = useMutation({
     mutationFn: async (file: File) => {
-      // Create a message entry first, then attach the file
       const msg = await sendMessage(channelId, file.name)
       return uploadAttachment(channelId, msg.id, file)
     },
@@ -42,6 +65,9 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
+    }
+    if (e.key === 'Escape' && replyTo) {
+      onCancelReply?.()
     }
   }
 
@@ -61,7 +87,6 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
     const end = ta.selectionEnd ?? text.length
     const next = text.slice(0, start) + emoji + text.slice(end)
     setText(next)
-    // Restore focus and cursor after state update
     requestAnimationFrame(() => {
       ta.focus()
       const pos = start + emoji.length
@@ -77,13 +102,34 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
     const btn = emojiButtonRef.current
     if (!btn) return
     const rect = btn.getBoundingClientRect()
-    // Open upward above the input bar
     setEmojiPickerPos({ x: rect.left, y: rect.top - 4 })
   }
 
   return (
     <div className="px-4 pb-4">
-      <div className="flex bg-discord-input rounded-lg px-3 py-2.5">
+      {/* Reply banner */}
+      {replyTo && (
+        <div className="flex items-center gap-2 bg-discord-input/60 rounded-t-lg px-3 py-1.5 text-xs text-discord-muted border-b border-white/5">
+          <Icon name="corner-up-left" size={13} className="text-discord-mention shrink-0" />
+          <span>
+            Replying to{' '}
+            <span className="font-semibold text-discord-text">{replyTo.author.username}</span>
+            {' — '}
+            <span className="truncate italic">
+              {replyTo.content.length > 80 ? replyTo.content.slice(0, 80) + '…' : replyTo.content}
+            </span>
+          </span>
+          <button
+            onClick={onCancelReply}
+            className="ml-auto text-discord-muted hover:text-red-400 transition-colors shrink-0"
+            title="Cancel reply"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+      )}
+
+      <div className={`flex bg-discord-input ${replyTo ? 'rounded-b-lg' : 'rounded-lg'} px-3 py-2.5`}>
         {/* Attachment button */}
         <button
           title="Attach File"
@@ -103,9 +149,9 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
           placeholder={placeholder}
           onChange={(e) => {
             setText(e.target.value)
-            // Auto-resize
             e.target.style.height = 'auto'
             e.target.style.height = `${e.target.scrollHeight}px`
+            emitTyping()
           }}
           onKeyDown={handleKeyDown}
         />
@@ -141,3 +187,4 @@ export function MessageInput({ channelId, placeholder = 'Send a message…' }: P
     </div>
   )
 }
+
