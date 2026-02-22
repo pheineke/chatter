@@ -22,7 +22,7 @@
 - ~~**GIF avatars should only animate on hover**~~ ✅ Fixed — `UserAvatar` now detects `.gif` files and renders a `GifAvatar` component that draws the first frame onto a `<canvas>` (shown by default) and swaps in the animated `<img>` only on hover. The GIF is kept in the DOM while hidden so it loads instantly on first hover.
 - **Image resolution for avatars and banners is not limited** — Currently, server/profile avatars and banners can be uploaded at any resolution. These should be constrained (e.g., max 1024x1024 for avatars, 1920x1080 for banners) to optimize storage and bandwidth.
 - ~~**Emoji picker is not implemented**~~ ✅ Fixed — Installed `emoji-mart` + `@emoji-mart/data` + `@emoji-mart/react`. New `EmojiPicker.tsx` portal wraps the dark-themed picker with outside-click and Escape dismissal and viewport clamping. The hover toolbar in `MessageBubble` opens the picker anchored below the button and sends the chosen emoji via `addReaction`. `MessageInput` gained a smiley-face button that opens the picker above the input bar and inserts the chosen emoji at the cursor position.
-- **Message replies UI is not implemented** — The backend model and `reply_to_id` field exist and the spec is written (`docs/specs/message_replies_spec.md`), but `MessageBubble` has no reply button and `MessageInput` has no reply-mode banner.
+- ~~**Message replies UI is not implemented**~~ ✅ Fixed — Reply button in hover action bar enters reply mode; right-click context menu also offers Reply (plus Copy Text, Edit, Delete). Reply banner above the input shows author + content preview with ✕ cancel. Replied messages render a quoted header (avatar + username + truncated preview) above the reply body; clicking jumps to & highlights the original. Deleted originals show a tombstone. Works in both server channels and DMs. Escape cancels reply mode.
 - ~~**Edited messages show no `(edited)` marker**~~ ✅ Fixed — `is_edited` and `edited_at` fields added to the `Message` model (Alembic migration applied). `edit_message` sets both on save. `MessageRead` schema exposes them. `MessageBubble` shows a muted `(edited)` label after the message content with a tooltip showing the exact edit timestamp.
 - ~~**Real-time reactions trigger a full refetch instead of a cache patch**~~ ✅ Fixed — `useChannelWS` now uses `setQueryData` for both `reaction.added` and `reaction.removed`: added reactions are appended with a dedup guard; removed reactions are filtered out by `(user_id, emoji)` pair. No network request is made.
 - ~~**DM list has no online status indicator or unread badge**~~ ✅ Fixed — `DMSidebar` now lists all conversations with `UserAvatar` + `StatusIndicator` per contact. An unread white dot appears next to any conversation with messages newer than the stored `dmLastRead` timestamp. A green dot badge also appears on the DM button in `ServerSidebar` (via `useUnreadDMs`) whenever any DM has unread messages, even while on a server.
@@ -177,7 +177,7 @@ At 50 ms per request this produces ~20 messages/second, ~1 200/minute — the ra
 - `+` button on pills opens picker to add more. Clicking an existing pill toggles it.
 - WS events `reaction.added` / `reaction.removed` patch the TanStack Query cache in place (no refetch).
 
-### 5.2. Reply to Messages
+### ~~5.2. Reply to Messages~~ ✅ Implemented
 See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec.md)
 
 - **Hover / context-menu** to enter reply mode.

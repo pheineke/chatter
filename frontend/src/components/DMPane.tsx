@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom'
+import { useState, useCallback, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getDMChannel } from '../api/dms'
 import { getUser } from '../api/users'
@@ -7,10 +8,18 @@ import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import type { Message } from '../api/types'
 
 export function DMPane() {
   const { dmUserId } = useParams<{ dmUserId: string }>()
   const { user } = useAuth()
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const handleReply = useCallback((msg: Message) => setReplyTo(msg), [])
+  const handleCancelReply = useCallback(() => setReplyTo(null), [])
+  const scrollToMessageRef = useRef<((id: string) => void) | null>(null)
+  const handleRegisterScrollTo = useCallback((fn: (id: string) => void) => {
+    scrollToMessageRef.current = fn
+  }, [])
   const isSelf = !!user && user.id === dmUserId
 
   const { data: otherUser } = useQuery({
@@ -52,11 +61,17 @@ export function DMPane() {
         </div>
       ) : (
         <>
-          <MessageList channelId={dmChannel.channel_id} />
+          <MessageList
+            channelId={dmChannel.channel_id}
+            onReply={handleReply}
+            onRegisterScrollTo={handleRegisterScrollTo}
+          />
           {!isSelf && (
             <MessageInput
               channelId={dmChannel.channel_id}
               placeholder={`Message ${otherUser?.username ?? '…'}`}
+              replyTo={replyTo}
+              onCancelReply={handleCancelReply}
             />
           )}
         </>

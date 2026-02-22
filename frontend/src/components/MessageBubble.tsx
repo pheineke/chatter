@@ -6,6 +6,7 @@ import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
 import { ProfileCard } from './ProfileCard'
 import { EmojiPicker } from './EmojiPicker'
+import { ContextMenu } from './ContextMenu'
 import type { Message } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -57,6 +58,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
   const closePreview = useCallback(() => setPreviewUrl(null), [])
   const [cardPos, setCardPos] = useState<{ x: number; y: number } | null>(null)
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   const pinMut = useMutation({
     mutationFn: () => isPinned ? unpinMessage(channelId, msg.id) : pinMessage(channelId, msg.id),
@@ -99,6 +101,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
       className={`group flex gap-3 px-4 py-0.5 hover:bg-white/[0.03] relative ${compact ? 'mt-0' : 'mt-3'}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
     >
       {/* Avatar / timestamp column */}
       <div className="w-10 shrink-0 flex justify-center select-none cursor-pointer" onClick={handleUserClick}>
@@ -263,6 +266,38 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
         position={emojiPickerPos}
         onPick={(emoji) => reactMut.mutate(emoji)}
         onClose={() => setEmojiPickerPos(null)}
+      />
+    )}
+    {contextMenu && (
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={() => setContextMenu(null)}
+        items={[
+          {
+            label: 'Reply',
+            icon: 'corner-up-left',
+            onClick: () => { onReply?.(msg); setContextMenu(null) },
+          },
+          {
+            label: 'Copy Text',
+            icon: 'copy',
+            onClick: () => { navigator.clipboard.writeText(msg.content); setContextMenu(null) },
+          },
+          ...(isOwn ? [
+            {
+              label: 'Edit',
+              icon: 'edit-2',
+              onClick: () => { setEditing(true); setEditText(msg.content); setContextMenu(null) },
+            },
+            {
+              label: 'Delete',
+              icon: 'trash-2',
+              danger: true as const,
+              onClick: () => { deleteMut.mutate(); setContextMenu(null) },
+            },
+          ] : []),
+        ]}
       />
     )}
   </>
