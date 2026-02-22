@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMatch } from 'react-router-dom'
 import { useWebSocket } from './useWebSocket'
 import { useAuth } from '../contexts/AuthContext'
+import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { getConversations } from '../api/dms'
 import type { DMConversation, Friend, Message, UserStatus } from '../api/types'
 
@@ -21,8 +22,12 @@ function loadLastRead(): Record<string, string> {
 export function useUnreadDMs(): boolean {
   const qc = useQueryClient()
   const { user, updateUser } = useAuth()
+  const { notifyMessage, notifyServer } = useUnreadChannels()
   const match = useMatch('/channels/@me/:dmUserId')
+  const channelMatch = useMatch('/channels/:serverId/:channelId')
   const activeDmUserId = match?.params.dmUserId ?? null
+  const activeChannelId = channelMatch?.params.channelId ?? null
+  const activeServerId = channelMatch?.params.serverId ?? null
   const [lastRead, setLastRead] = useState<Record<string, string>>(loadLastRead)
 
   // useQuery makes this component re-render whenever the cache changes
@@ -69,6 +74,15 @@ export function useUnreadDMs(): boolean {
               : c
           )
         )
+        return
+      }
+
+      if (msg.type === 'channel.message') {
+        const { channel_id, server_id } = msg.data as { channel_id: string; server_id: string }
+        // Skip if user is already viewing this channel
+        if (channel_id === activeChannelId) return
+        notifyMessage(channel_id)
+        if (server_id !== activeServerId) notifyServer(server_id)
         return
       }
 

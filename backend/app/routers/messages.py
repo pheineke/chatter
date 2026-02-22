@@ -180,10 +180,18 @@ async def send_message(
     await manager.broadcast_channel(channel_id, event)
     # Notify server members about new activity in this channel (for unread indicators)
     if channel.server_id:
-        await manager.broadcast_server(
-            channel.server_id,
-            {"type": "channel.message", "data": {"channel_id": str(channel_id)}},
+        notify_event = {"type": "channel.message", "data": {"channel_id": str(channel_id), "server_id": str(channel.server_id)}}
+        await manager.broadcast_server(channel.server_id, notify_event)
+        # Also push to each member's personal /ws/me room so they get notified
+        # regardless of which server they're currently viewing.
+        member_rows = await db.execute(
+            select(ServerMember.user_id).where(
+                ServerMember.server_id == channel.server_id,
+                ServerMember.user_id != current_user.id,
+            )
         )
+        for uid in member_rows.scalars().all():
+            await manager.broadcast_user(uid, notify_event)
     # For DM channels also push to each participant's personal room
     if channel.type == ChannelType.dm:
         participants = await _get_dm_participants(channel_id, db)
