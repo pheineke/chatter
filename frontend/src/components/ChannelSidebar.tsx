@@ -543,7 +543,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
 
   // Resolve participant user info from the per-channel presence list.
   // All clients (including non-voice ones) get this from useServerWS + voicePresence query.
-  const participantUsers: { user: User; isSelf: boolean; isSpeaking: boolean; isMuted: boolean; isDeafened: boolean }[] = isVoice
+  const participantUsers: { user: User; isSelf: boolean; isSpeaking: boolean; isMuted: boolean; isDeafened: boolean; isSharingScreen: boolean }[] = isVoice
     ? channelPresence.map((p) => {
         const isSelf = p.user_id === localUser?.id
         const m = members.find((m) => m.user_id === p.user_id)
@@ -556,7 +556,8 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
             username: p.username ?? `User ${p.user_id.slice(0, 4)}`,
             avatar: p.avatar ?? null,
             description: null,
-            status: 'offline',
+            status: 'offline' as const,
+            preferred_status: 'offline' as const,
             created_at: '',
             banner: null,
             pronouns: null,

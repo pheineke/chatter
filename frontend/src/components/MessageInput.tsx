@@ -272,7 +272,7 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
             <span className="font-semibold text-discord-text">{replyTo.author.username}</span>
             {' — '}
             <span className="truncate italic">
-              {replyTo.content.length > 80 ? replyTo.content.slice(0, 80) + '…' : replyTo.content}
+              {(replyTo.content ?? '').length > 80 ? (replyTo.content ?? '').slice(0, 80) + '…' : (replyTo.content ?? '')}
             </span>
           </span>
           <button

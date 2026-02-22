@@ -256,7 +256,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
           >
             <Icon name="pin" size={16} />
           </ActionBtn>
-          {isOwn && <ActionBtn title="Edit" onClick={() => { setEditing(true); setEditText(msg.content) }}><Icon name="edit-2" size={16} /></ActionBtn>}
+          {isOwn && <ActionBtn title="Edit" onClick={() => { setEditing(true); setEditText(msg.content ?? '') }}><Icon name="edit-2" size={16} /></ActionBtn>}
           {isOwn && <ActionBtn title="Delete" onClick={() => deleteMut.mutate()} className="hover:text-red-400"><Icon name="trash-2" size={16} /></ActionBtn>}
         </div>
       )}
@@ -290,13 +290,13 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
           {
             label: 'Copy Text',
             icon: 'copy',
-            onClick: () => { navigator.clipboard.writeText(msg.content); setContextMenu(null) },
+            onClick: () => { navigator.clipboard.writeText(msg.content ?? ''); setContextMenu(null) },
           },
           ...(isOwn ? [
             {
               label: 'Edit',
               icon: 'edit-2',
-              onClick: () => { setEditing(true); setEditText(msg.content); setContextMenu(null) },
+              onClick: () => { setEditing(true); setEditText(msg.content ?? ''); setContextMenu(null) },
             },
             {
               label: 'Delete',
