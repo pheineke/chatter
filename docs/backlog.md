@@ -291,3 +291,36 @@ See full spec: [`docs/specs/client_sounds_spec.md`](specs/client_sounds_spec.md)
     -   Display name / bio / pronouns: max **5 updates per 10 minutes** per user.
 -   Enforced on the backend; exceeding the limit returns HTTP `429 Too Many Requests` with a `Retry-After` header indicating when the next update is allowed.
 -   The frontend should surface a clear message such as "You're updating your profile too quickly. Please wait X seconds."
+
+## 9. Feature Requests: Notification Management
+
+### 9.1. Per-Channel & Per-Server Notification Settings
+-   Users can configure notification level independently for each server and each channel:
+    -   **All Messages** — every message triggers an unread indicator and sound.
+    -   **@Mentions Only** — only messages that `@mention` the user (or `@everyone` / `@here`) produce an unread indicator and sound.
+    -   **Nothing (Mute)** — no unread badge, no sound, no badge on the server icon.
+-   Server-level setting acts as the default for all its channels; a channel-level setting overrides the server default.
+-   Stored per-user per-server/channel in new `user_server_notification_settings` and `user_channel_notification_settings` tables (columns: `user_id`, `server_id`/`channel_id`, `level ENUM('all','mentions','mute')`).
+-   REST endpoints: `PUT /me/notification-settings/servers/{id}` and `PUT /me/notification-settings/channels/{id}`.
+-   UI entry point: right-clicking a server icon or channel name opens a "Notification Settings" sub-menu with the three options radio-selected.
+-   "Muted" channels and servers display a crossed-out bell icon (🔕) in the sidebar so the state is always discoverable.
+
+### 9.2. Browser / Desktop Push Notifications
+-   When the browser tab is in the background or minimised, qualifying messages (per the user's per-channel settings) trigger a native browser `Notification` via the [Web Notifications API](https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API).
+-   **Permission flow**: On first notification-worthy event after login, the app requests `Notification.requestPermission()`. If denied, a dismissible banner explains how to re-enable it in the browser.
+-   Notification content: sender avatar (via `icon`), sender display name + channel/server context as title, truncated message body.
+-   Clicking the notification focuses the tab and navigates to the relevant channel.
+-   Controlled by a toggle in Settings → Notifications: "Enable desktop notifications".
+-   No notification is shown if the tab is already focused and the user is in the relevant channel.
+
+### 9.3. Do Not Disturb (DND) Mode Integration
+-   When a user's status is set to **Do Not Disturb**, all client-side sounds and browser notifications are suppressed regardless of per-channel settings.
+-   The existing red status dot already communicates DND to others; this wires it up to the notification pipeline on the client that sets it.
+-   Implementation: `useSoundManager.playSound()` and the browser `Notification` dispatch both check `user.status === 'dnd'` (from `AuthContext`) before firing.
+-   A subtle visual indicator (e.g. a muted bell icon in the user panel) confirms that notifications are silenced while in DND.
+
+### 9.4. Notification Badge on Browser Tab (Favicon & Title)
+-   When there are any unread messages (channels or DMs), the browser tab title is prefixed with the unread count in parentheses: `(3) My App`.
+-   A small red dot is overlaid on the favicon using a `<canvas>`-drawn favicon swap so the user can see there are unread messages even from another tab.
+-   Badge clears when all unread indicators are dismissed (i.e. `unreadChannels` and `unreadDMs` sets are both empty).
+-   Respects DND: no badge update while the user's status is Do Not Disturb.
