@@ -566,7 +566,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
             pronouns: null,
           }
         }
-        return { user, isSelf, isSpeaking: p.is_speaking ?? false, isMuted: p.is_muted, isDeafened: p.is_deafened }
+        return { user, isSelf, isSpeaking: p.is_speaking ?? false, isMuted: p.is_muted, isDeafened: p.is_deafened, isSharingScreen: p.is_sharing_screen ?? false }
       })
     : []
 
@@ -596,7 +596,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
       {/* Voice participants */}
       {participantUsers.length > 0 && (
         <div className="ml-4 mb-1 space-y-0.5">
-          {participantUsers.map(({ user: u, isSelf, isSpeaking, isMuted, isDeafened }) => (
+          {participantUsers.map(({ user: u, isSelf, isSpeaking, isMuted, isDeafened, isSharingScreen }) => (
             <div 
               key={u.id} 
               className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-discord-muted hover:bg-discord-input/40 cursor-pointer"
@@ -611,12 +611,18 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
                 </span>
               </div>
               <span className={`truncate flex-1 transition-colors ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>
-              {isMuted && (
-                <Icon name="mic-off" size={11} className="text-red-400 shrink-0" />
-              )}
-              {isDeafened && (
-                <Icon name="headphones-off" size={11} className="text-red-400 shrink-0" />
-              )}
+              {/* Right-side status indicators */}
+              <div className="flex items-center gap-0.5 ml-auto shrink-0">
+                {isSharingScreen && (
+                  <span className="text-[9px] font-bold leading-none px-1 py-0.5 rounded bg-red-500 text-white">LIVE</span>
+                )}
+                {isMuted && (
+                  <Icon name="mic-off" size={11} className="text-red-400" />
+                )}
+                {isDeafened && (
+                  <Icon name="headphones-off" size={11} className="text-red-400" />
+                )}
+              </div>
             </div>
           ))}
         </div>

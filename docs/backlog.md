@@ -43,17 +43,13 @@
 
 ## 3. Feature Requests: Voice Chat Improvements
 
-### 3.1. Visual Status Indicators
-Enhance the voice participant list to clearly show the status of each user:
--   **Mute Indicator**: Display a "crossed microphone" icon next to the user's name/avatar when their microphone is muted (either self-muted or server-muted).
--   **Deafen Indicator**: Display a "crossed headphones" icon next to the user's name/avatar when they have deafened themselves (disabled output audio).
+### ~~3.1. Visual Status Indicators~~ ✅ Implemented
+- Mute (`mic-off`) and deafen (`headphones-off`) icons appear in red on the right side of each participant row in the voice channel list in `ChannelSidebar`, grouped in a `ml-auto` flex cluster so they're always flush-right.
+- Updates in real-time via `voice.state_changed` WS events → `voicePresence` cache invalidation.
 
-These icons should update in real-time as the user toggles their state.
-
-### 3.2. Live Streaming Indicator
-When a user shares their screen or streams an application:
--   **"LIVE" Badge**: Display a prominent red "LIVE" pill/badge next to the user's name in the voice channel list.
--   **Visibility**: This badge must be visible to all other participants in the channel to indicate active screen sharing.
+### ~~3.2. Live Streaming Indicator~~ ✅ Implemented
+- A red **LIVE** pill badge renders to the right of the username in the voice participant row (`ChannelSidebar`) when the participant's `is_sharing_screen` flag is true.
+- Badge is visible to all server members viewing the channel list, not just those in the voice channel.
 
 ### ~~3.3. Self-Status Menu~~ ✅ Implemented
 - Clicking the user panel avatar in both `ChannelSidebar` and `DMSidebar` opens a `ContextMenu` with Online / Away / Do Not Disturb / Offline options.
