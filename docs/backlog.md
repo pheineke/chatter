@@ -69,9 +69,10 @@
 - Optimistic cache update with server confirmation via `PUT /servers/{id}/channels/reorder` and `/categories/reorder`; `channels.reordered` / `categories.reordered` WS events keep all clients in sync.
 - Non-admins see a read-only ordered list — no drag UI shown.
 
-### 4.2. Unread Channel Indicators
--   **Visual Highlight**: Channels with new unread messages should be displayed with a brighter text color (e.g., white instead of muted grey) in the sidebar to attract attention.
--   **Read State**: The channel should revert to the default muted color once the user views the channel or scrolls to the bottom of the chat.
+### ~~4.2. Unread Channel Indicators~~ ✅ Implemented
+-   Channels with unread messages display bold white text in the sidebar (`text-discord-text font-semibold`) and a small white dot badge next to the channel name.
+-   Both revert to the muted default once the user opens the channel (`markRead` called in `MessagePane`).
+-   Server icons show a white dot badge when any channel in that server has unread messages (via `unreadServers` set in `UnreadChannelsContext`, populated by `channel.message` events on the always-on `/ws/me` connection).
 
 ### ~~4.3. Channel Member List (Right Sidebar)~~ ✅ Implemented
 -   Members sidebar shows all server members grouped by their highest hoisted (coloured) role, with a coloured dot and role-name section header.
