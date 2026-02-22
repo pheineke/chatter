@@ -33,11 +33,10 @@ export function MemberSidebar({ serverId }: Props) {
   const offline = members.filter(m => m.user.status === 'offline')
 
   // Build hoisted-role groups for online members.
-  // A role is "hoisted" if it has a color (non-null); Discord also has an explicit
-  // hoist flag but we use color as the proxy here.
+  // A role is hoisted when role.hoist === true (the dedicated flag, set by admins in Role settings).
   // Sort roles by position descending (highest position = most prominent)
   const hoistedRoles = [...roles]
-    .filter(r => r.color !== null)
+    .filter(r => r.hoist)
     .sort((a, b) => b.position - a.position)
 
   // Map role id → role
@@ -48,7 +47,7 @@ export function MemberSidebar({ serverId }: Props) {
     if (!m.roles.length) return null
     const hoisted = m.roles
       .map(r => roleMap[r.id])
-      .filter((r): r is Role => !!r && r.color !== null)
+      .filter((r): r is Role => !!r && r.hoist)
     if (!hoisted.length) return null
     return hoisted.reduce((best, r) => r.position > best.position ? r : best)
   }

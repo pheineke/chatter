@@ -48,12 +48,12 @@ export async function getRoles(serverId: string): Promise<Role[]> {
   return data
 }
 
-export async function createRole(serverId: string, body: { name: string; color?: string; is_admin?: boolean; position?: number }): Promise<Role> {
+export async function createRole(serverId: string, body: { name: string; color?: string; is_admin?: boolean; hoist?: boolean; mentionable?: boolean; position?: number }): Promise<Role> {
   const { data } = await client.post<Role>(`/servers/${serverId}/roles`, body)
   return data
 }
 
-export async function updateRole(serverId: string, roleId: string, body: { name?: string; color?: string; is_admin?: boolean }): Promise<Role> {
+export async function updateRole(serverId: string, roleId: string, body: { name?: string; color?: string; is_admin?: boolean; hoist?: boolean; mentionable?: boolean }): Promise<Role> {
   const { data } = await client.patch<Role>(`/servers/${serverId}/roles/${roleId}`, body)
   return data
 }

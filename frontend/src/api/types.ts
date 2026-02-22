@@ -36,6 +36,8 @@ export interface Role {
   name: string
   color: string | null
   is_admin: boolean
+  hoist: boolean
+  mentionable: boolean
   position: number
 }
 

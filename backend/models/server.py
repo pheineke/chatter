@@ -63,6 +63,8 @@ class Role(Base):
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     color: Mapped[str | None] = mapped_column(String(7), nullable=True)  # hex color e.g. #FF5733
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    hoist: Mapped[bool] = mapped_column(Boolean, default=False)         # show as separate group in member list
+    mentionable: Mapped[bool] = mapped_column(Boolean, default=False)   # anyone can @mention this role
     position: Mapped[int] = mapped_column(Integer, default=0)
 
     server: Mapped["Server"] = relationship("Server", back_populates="roles")

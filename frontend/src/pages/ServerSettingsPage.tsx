@@ -429,6 +429,8 @@ function RolesTab({ serverId }: { serverId: string }) {
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('#99aab5')
   const [editAdmin, setEditAdmin] = useState(false)
+  const [editHoist, setEditHoist] = useState(false)
+  const [editMentionable, setEditMentionable] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
 
@@ -437,13 +439,15 @@ function RolesTab({ serverId }: { serverId: string }) {
     setEditName(role.name)
     setEditColor(role.color ?? '#99aab5')
     setEditAdmin(role.is_admin)
+    setEditHoist(role.hoist)
+    setEditMentionable(role.mentionable)
   }
 
   async function handleSaveRole() {
     if (!selected) return
-    await updateRole(serverId, selected.id, { name: editName.trim() || selected.name, color: editColor, is_admin: editAdmin })
+    await updateRole(serverId, selected.id, { name: editName.trim() || selected.name, color: editColor, is_admin: editAdmin, hoist: editHoist, mentionable: editMentionable })
     qc.invalidateQueries({ queryKey: ['roles', serverId] })
-    setSelected(s => s ? { ...s, name: editName, color: editColor, is_admin: editAdmin } : s)
+    setSelected(s => s ? { ...s, name: editName, color: editColor, is_admin: editAdmin, hoist: editHoist, mentionable: editMentionable } : s)
   }
 
   async function handleDeleteRole(role: Role) {
@@ -482,7 +486,10 @@ function RolesTab({ serverId }: { serverId: string }) {
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: role.color ?? '#99aab5' }} />
                 <span className="text-sm font-medium truncate">{role.name}</span>
               </div>
-              {role.is_admin && <Icon name="shield" size={12} className="text-yellow-400 shrink-0" />}
+              <div className="flex items-center gap-1 shrink-0">
+                {role.hoist && <Icon name="users" size={12} className="text-blue-400" title="Hoisted" />}
+                {role.is_admin && <Icon name="shield" size={12} className="text-yellow-400" />}
+              </div>
             </div>
           ))}
           {roles.length === 0 && <p className="text-discord-muted text-xs px-2">No roles yet.</p>}
@@ -525,6 +532,30 @@ function RolesTab({ serverId }: { serverId: string }) {
                 <span className="text-sm font-medium">Administrator</span>
               </label>
               <p className="text-xs text-discord-muted mt-1 ml-12">Members with this role can manage the server.</p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <div
+                  onClick={() => setEditHoist(v => !v)}
+                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editHoist ? 'bg-discord-mention' : 'bg-discord-input'}`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editHoist ? 'translate-x-5' : 'translate-x-0'}`} />
+                </div>
+                <span className="text-sm font-medium">Display role members separately</span>
+              </label>
+              <p className="text-xs text-discord-muted mt-1 ml-12">Members with this role appear in their own section in the member list.</p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <div
+                  onClick={() => setEditMentionable(v => !v)}
+                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editMentionable ? 'bg-discord-mention' : 'bg-discord-input'}`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editMentionable ? 'translate-x-5' : 'translate-x-0'}`} />
+                </div>
+                <span className="text-sm font-medium">Allow anyone to @mention this role</span>
+              </label>
+              <p className="text-xs text-discord-muted mt-1 ml-12">Anyone can ping all members of this role.</p>
             </div>
             <button className="btn" onClick={handleSaveRole}>Save Role</button>
           </div>

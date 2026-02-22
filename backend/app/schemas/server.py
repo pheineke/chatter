@@ -45,6 +45,8 @@ class RoleBase(BaseModel):
     name: str
     color: str | None = None
     is_admin: bool = False
+    hoist: bool = False
+    mentionable: bool = False
     position: int = 0
 
 
@@ -56,6 +58,8 @@ class RoleUpdate(BaseModel):
     name: str | None = None
     color: str | None = None
     is_admin: bool | None = None
+    hoist: bool | None = None
+    mentionable: bool | None = None
     position: int | None = None
 
 
