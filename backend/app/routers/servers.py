@@ -16,6 +16,7 @@ from app.schemas.server import (
     RoleUpdate,
     RoleRead,
     MemberRead,
+    MemberNickUpdate,
 )
 from app.schemas.user import UserRead
 from app.ws_manager import manager
@@ -240,6 +241,38 @@ async def remove_member(
     )
 
 
+@router.patch("/{server_id}/members/{user_id}/nick", response_model=MemberRead)
+async def update_member_nick(
+    server_id: uuid.UUID, user_id: uuid.UUID, body: MemberNickUpdate, current_user: CurrentUser, db: DB
+):
+    """Change a member's server nickname. Members can change their own; admins can change anyone's."""
+    await _require_member(server_id, current_user.id, db)
+    if current_user.id != user_id:
+        server = await _get_server_or_404(server_id, db)
+        await _require_admin(server, current_user.id, db)
+    result = await db.execute(
+        select(ServerMember)
+        .options(selectinload(ServerMember.user))
+        .where(ServerMember.server_id == server_id, ServerMember.user_id == user_id)
+    )
+    member = result.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    member.nickname = body.nickname
+    await db.commit()
+    await manager.broadcast_server(
+        server_id,
+        {"type": "server.member_updated", "data": {"server_id": str(server_id), "user_id": str(user_id)}},
+    )
+    return MemberRead(
+        user_id=member.user_id,
+        server_id=member.server_id,
+        nickname=member.nickname,
+        user=UserRead.model_validate(member.user),
+        joined_at=member.joined_at,
+        roles=[],
+    )
+
 # ---- Roles ------------------------------------------------------------------
 
 @router.get("/{server_id}/roles", response_model=list[RoleRead])
@@ -258,6 +291,8 @@ async def create_role(server_id: uuid.UUID, body: RoleCreate, current_user: Curr
         name=body.name,
         color=body.color,
         is_admin=body.is_admin,
+        hoist=body.hoist,
+        mentionable=body.mentionable,
         position=body.position,
     )
     db.add(role)
@@ -286,6 +321,10 @@ async def update_role(
         role.color = body.color
     if body.is_admin is not None:
         role.is_admin = body.is_admin
+    if body.hoist is not None:
+        role.hoist = body.hoist
+    if body.mentionable is not None:
+        role.mentionable = body.mentionable
     if body.position is not None:
         role.position = body.position
     await db.commit()

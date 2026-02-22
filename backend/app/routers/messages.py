@@ -34,6 +34,23 @@ _MENTION_RE = re.compile(r"@(\w+)")
 _slowmode_last: Dict[str, Dict[str, float]] = defaultdict(dict)
 
 
+async def _enrich_message_read(msg: Message, server_id: 'uuid.UUID | None', db) -> MessageRead:
+    """Return a MessageRead with author_nickname populated when msg is in a server channel."""
+    read = MessageRead.model_validate(msg)
+    if server_id:
+        result = await db.execute(
+            select(ServerMember.nickname).where(
+                ServerMember.server_id == server_id,
+                ServerMember.user_id == msg.author_id,
+                ServerMember.nickname.isnot(None),
+            )
+        )
+        nick = result.scalar_one_or_none()
+        if nick:
+            read = read.model_copy(update={"author_nickname": nick})
+    return read
+
+
 async def _parse_and_save_mentions(
     content: str, message_id: uuid.UUID, server_id: uuid.UUID, db
 ) -> None:
@@ -149,7 +166,25 @@ async def list_messages(
             query = query.where(Message.created_at < bm.created_at)
 
     result = await db.execute(query)
-    return list(reversed(result.scalars().all()))
+    messages = list(reversed(result.scalars().all()))
+
+    # Bulk-load server nicknames for all message authors in one query
+    nick_map: dict[uuid.UUID, str] = {}
+    if channel.server_id and messages:
+        author_ids = list({m.author_id for m in messages})
+        nick_rows = await db.execute(
+            select(ServerMember.user_id, ServerMember.nickname).where(
+                ServerMember.server_id == channel.server_id,
+                ServerMember.user_id.in_(author_ids),
+                ServerMember.nickname.isnot(None),
+            )
+        )
+        nick_map = {row[0]: row[1] for row in nick_rows.all()}
+
+    return [
+        MessageRead.model_validate(m).model_copy(update={"author_nickname": nick_map.get(m.author_id)})
+        for m in messages
+    ]
 
 
 @router.post("/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED)
@@ -198,7 +233,8 @@ async def send_message(
     )
     await db.commit()
     sent = result.scalar_one()
-    event = {"type": "message.created", "data": MessageRead.model_validate(sent).model_dump(mode="json")}
+    msg_read = await _enrich_message_read(sent, channel.server_id, db)
+    event = {"type": "message.created", "data": msg_read.model_dump(mode="json")}
     await manager.broadcast_channel(channel_id, event)
     # Notify server members about new activity in this channel (for unread indicators)
     if channel.server_id:
@@ -219,7 +255,7 @@ async def send_message(
         participants = await _get_dm_participants(channel_id, db)
         for uid in participants:
             await manager.broadcast_user(uid, event)
-    return sent
+    return msg_read
 
 
 @router.patch("/messages/{message_id}", response_model=MessageRead)
@@ -242,11 +278,12 @@ async def edit_message(
     await db.commit()
     db.expire_all()
     updated = await _get_message_or_404(message_id, db)
+    msg_read = await _enrich_message_read(updated, channel.server_id, db)
     await manager.broadcast_channel(
         channel_id,
-        {"type": "message.updated", "data": MessageRead.model_validate(updated).model_dump(mode="json")},
+        {"type": "message.updated", "data": msg_read.model_dump(mode="json")},
     )
-    return updated
+    return msg_read
 
 
 @router.delete("/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -289,6 +326,8 @@ async def upload_attachment(
     msg = await _get_message_or_404(message_id, db)
     if msg.channel_id != channel_id or msg.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
+
+    channel = await _get_channel_or_404(channel_id, db)
 
     # Capture original filename before reading (sanitise path separators)
     original_name: str | None = None
@@ -336,11 +375,12 @@ async def upload_attachment(
     db.expire_all()
 
     updated = await _get_message_or_404(message_id, db)
+    upload_read = await _enrich_message_read(updated, channel.server_id, db)
     await manager.broadcast_channel(
         channel_id,
-        {"type": "message.updated", "data": MessageRead.model_validate(updated).model_dump(mode="json")},
+        {"type": "message.updated", "data": upload_read.model_dump(mode="json")},
     )
-    return updated
+    return upload_read
 
 
 # ---- Reactions --------------------------------------------------------------

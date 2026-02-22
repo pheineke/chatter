@@ -163,7 +163,7 @@ function MemberRow({ member, onClick }: { member: Member; onClick: (e: React.Mou
         } group-hover:text-white`}
         style={nameColor && member.user.status !== 'offline' ? { color: nameColor } : undefined}
       >
-        {member.user.username}
+        {member.nickname ?? member.user.username}
       </span>
     </button>
   )

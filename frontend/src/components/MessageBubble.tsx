@@ -141,7 +141,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
               className="font-semibold text-white hover:underline cursor-pointer"
               onClick={handleUserClick}
             >
-              {msg.author.username}
+              {msg.author_nickname ?? msg.author.username}
             </span>
             <span className="text-xs text-discord-muted">{formatTime(msg.created_at)}</span>
           </div>

@@ -76,6 +76,7 @@ class MessageRead(MessageBase):
     id: uuid.UUID
     channel_id: uuid.UUID
     author: UserRead
+    author_nickname: str | None = None  # per-server display name; null for DMs
     is_deleted: bool
     is_edited: bool
     edited_at: datetime | None

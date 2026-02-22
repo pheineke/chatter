@@ -48,6 +48,7 @@ class ServerMember(Base):
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    nickname: Mapped[str | None] = mapped_column(String(32), nullable=True)  # per-server display name
 
     server: Mapped["Server"] = relationship("Server", back_populates="members")
     user: Mapped["User"] = relationship("User", back_populates="server_memberships")

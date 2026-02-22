@@ -45,6 +45,7 @@ export interface Member {
   user_id: string
   server_id: string
   joined_at: string
+  nickname: string | null
   user: User
   roles: Role[]
 }
@@ -109,6 +110,7 @@ export interface Message {
   channel_id: string
   content: string | null
   author: User
+  author_nickname: string | null
   reply_to_id: string | null
   reply_to: MessageReply | null
   is_deleted: boolean

@@ -70,6 +70,10 @@ export async function removeRole(serverId: string, userId: string, roleId: strin
   await client.delete(`/servers/${serverId}/members/${userId}/roles/${roleId}`)
 }
 
+export async function updateMemberNick(serverId: string, userId: string, nickname: string | null): Promise<void> {
+  await client.patch(`/servers/${serverId}/members/${userId}/nick`, { nickname })
+}
+
 export async function uploadServerIcon(serverId: string, file: File): Promise<Server> {
   const form = new FormData()
   form.append('file', file)

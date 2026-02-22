@@ -113,6 +113,7 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
         case 'server.member_joined':
         case 'server.member_left':
         case 'server.member_kicked':
+        case 'server.member_updated':
         case 'role.assigned':
         case 'role.removed':
           qc.invalidateQueries({ queryKey: ['members', serverId] })

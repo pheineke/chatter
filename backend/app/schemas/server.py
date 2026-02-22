@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.user import UserRead
 from app.utils.sanitize import strip_html
 
-
 class ServerBase(BaseModel):
     title: str = Field(min_length=1, max_length=50)
     description: str | None = None
@@ -77,4 +76,19 @@ class MemberRead(BaseModel):
     server_id: uuid.UUID
     user: UserRead
     joined_at: datetime
+    nickname: str | None = None
     roles: list[RoleRead] = []
+
+
+class MemberNickUpdate(BaseModel):
+    nickname: str | None = None
+
+    @field_validator('nickname', mode='before')
+    @classmethod
+    def sanitize_nickname(cls, v):
+        if v is None:
+            return None
+        cleaned = (strip_html(str(v)) or '').strip()
+        if len(cleaned) > 32:
+            raise ValueError('Nickname cannot exceed 32 characters')
+        return cleaned or None
