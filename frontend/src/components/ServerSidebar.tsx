@@ -7,8 +7,9 @@ import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
 import { createInvite } from '../api/invites'
 import type { Server } from '../api/types'
+import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 
-function ServerIcon({ server, active, onContextMenu }: { server: Server; active: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
+function ServerIcon({ server, active, hasUnread, onContextMenu }: { server: Server; active: boolean; hasUnread: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
   const navigate = useNavigate()
   const initials = server.title
     .split(/\s+/)
@@ -18,19 +19,24 @@ function ServerIcon({ server, active, onContextMenu }: { server: Server; active:
     .toUpperCase()
 
   return (
-    <button
-      title={server.title}
-      onClick={() => navigate(`/channels/${server.id}`)}
-      onContextMenu={onContextMenu}
-      className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-150 select-none
-        ${active ? 'rounded-2xl bg-discord-mention text-white' : 'bg-discord-input text-discord-text hover:rounded-2xl hover:bg-discord-mention hover:text-white'}`}
-    >
-      {server.image ? (
-        <img src={`/api/static/${server.image}`} alt={server.title} className="w-full h-full rounded-[inherit] object-cover" />
-      ) : (
-        initials
+    <div className="relative">
+      <button
+        title={server.title}
+        onClick={() => navigate(`/channels/${server.id}`)}
+        onContextMenu={onContextMenu}
+        className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-150 select-none
+          ${active ? 'rounded-2xl bg-discord-mention text-white' : 'bg-discord-input text-discord-text hover:rounded-2xl hover:bg-discord-mention hover:text-white'}`}
+      >
+        {server.image ? (
+          <img src={`/api/static/${server.image}`} alt={server.title} className="w-full h-full rounded-[inherit] object-cover" />
+        ) : (
+          initials
+        )}
+      </button>
+      {hasUnread && !active && (
+        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-white border-2 border-discord-servers pointer-events-none" />
       )}
-    </button>
+    </div>
   )
 }
 
@@ -51,6 +57,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
   const [inviteCopied, setInviteCopied] = useState(false)
 
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers })
+  const { unreadServers } = useUnreadChannels()
 
   const handleCreateInvite = async (sId: string) => {
     const invite = await createInvite(sId, { expires_hours: 24 })
@@ -107,10 +114,11 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
       <div className="w-8 h-px bg-discord-input" />
 
       {servers.map((s) => (
-        <ServerIcon 
-          key={s.id} 
-          server={s} 
-          active={s.id === serverId} 
+        <ServerIcon
+          key={s.id}
+          server={s}
+          active={s.id === serverId}
+          hasUnread={unreadServers.has(s.id)}
           onContextMenu={(e) => {
             e.preventDefault()
             setContextMenu({ x: e.clientX, y: e.clientY, serverId: s.id })

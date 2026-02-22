@@ -12,7 +12,7 @@ const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
  */
 export function useServerWS(serverId: string | null) {
   const qc = useQueryClient()
-  const { notifyMessage } = useUnreadChannels()
+  const { notifyMessage, notifyServer } = useUnreadChannels()
 
   useWebSocket(serverId ? `/ws/servers/${serverId}` : '', {
     enabled: serverId !== null,
@@ -88,6 +88,7 @@ export function useServerWS(serverId: string | null) {
         case 'channel.message': {
           const { channel_id } = msg.data as { channel_id: string }
           notifyMessage(channel_id)
+          if (serverId) notifyServer(serverId)
           break
         }
         case 'channels.reordered': {
