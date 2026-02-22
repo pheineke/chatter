@@ -1,7 +1,8 @@
-import { useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import { useEffect, useRef, useCallback, useLayoutEffect, useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { getMessages } from '../api/messages'
 import { MessageBubble } from './MessageBubble'
+import { Icon } from './Icon'
 import type { Message } from '../api/types'
 
 const COMPACT_THRESHOLD_MS = 7 * 60 * 1000 // 7 minutes
@@ -30,6 +31,7 @@ export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds 
   const topSentinelRef = useRef<HTMLDivElement>(null)
   const prevScrollHeight = useRef<number>(0)
   const isFirstLoad = useRef(true)
+  const [showScrollDown, setShowScrollDown] = useState(false)
 
   const {
     data,
@@ -104,6 +106,23 @@ export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds 
 
   // Expose scroll-to-message helper to parent
   const bubbleRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
+    bottomRef.current?.scrollIntoView({ behavior })
+  }
+
+  // Show/hide the "jump to bottom" pill based on scroll distance
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    function onScroll() {
+      const dist = el!.scrollHeight - el!.scrollTop - el!.clientHeight
+      setShowScrollDown(dist > 200)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
   const scrollToMessage = useCallback((id: string) => {
     const el = bubbleRefs.current.get(id)
     if (el) {
@@ -135,9 +154,10 @@ export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds 
   }
 
   return (
-    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-2">
-      {/* Top sentinel for infinite scroll upward */}
-      <div ref={topSentinelRef} className="h-1" />
+    <div className="relative flex-1 overflow-hidden">
+      <div ref={scrollContainerRef} className="h-full overflow-y-auto py-2">
+        {/* Top sentinel for infinite scroll upward */}
+        <div ref={topSentinelRef} className="h-1" />
 
       {/* Spinner / beginning-of-channel indicator */}
       {isFetchingNextPage ? (
@@ -168,6 +188,18 @@ export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds 
         )
       })}
       <div ref={bottomRef} />
+      </div>
+
+      {/* Jump to bottom pill */}
+      {showScrollDown && (
+        <button
+          onClick={() => scrollToBottom()}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-discord-sidebar border border-white/10 text-discord-text text-sm font-semibold px-4 py-1.5 rounded-full shadow-xl hover:bg-discord-input transition-colors z-10 whitespace-nowrap"
+        >
+          <span>Jump to bottom</span>
+          <Icon name="arrow-down" size={14} />
+        </button>
+      )}
     </div>
   )
 }
