@@ -1,10 +1,29 @@
 import uuid
 import enum
 
-from sqlalchemy import String, Text, ForeignKey, Boolean, Integer, Enum, Uuid
+from sqlalchemy import String, Text, ForeignKey, BigInteger, Integer, Enum, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
+
+
+class ChannelPerm:
+    """Bitfield constants for ChannelPermission.allow_bits / deny_bits.
+
+    Matches Discord's channel permission overwrites structure.
+    Set a bit in allow_bits to explicitly ALLOW that permission for the role.
+    Set a bit in deny_bits  to explicitly DENY  that permission for the role.
+    If the same bit is in both, deny takes precedence.
+    """
+    VIEW_CHANNEL        = 1 << 0   #   1 — can see the channel
+    SEND_MESSAGES       = 1 << 1   #   2 — can post messages
+    MANAGE_MESSAGES     = 1 << 2   #   4 — can delete/pin others' messages
+    ATTACH_FILES        = 1 << 3   #   8 — can upload files
+    EMBED_LINKS         = 1 << 4   #  16 — links auto-embed
+    ADD_REACTIONS       = 1 << 5   #  32 — can add new emoji reactions
+    MENTION_EVERYONE    = 1 << 6   #  64 — can use @everyone / @here
+    USE_EXTERNAL_EMOJIS = 1 << 7   # 128 — can use emojis from other servers
+    MANAGE_ROLES        = 1 << 8   # 256 — can manage per-channel role overrides
 
 
 class ChannelType(str, enum.Enum):
@@ -57,6 +76,11 @@ class Channel(Base):
 
 
 class ChannelPermission(Base):
+    """Per-role channel permission override.
+
+    Discord-style bitfield: set bits in allow_bits to grant, deny_bits to revoke.
+    When both are 0 the role falls back to its server-level permissions.
+    """
     __tablename__ = "channel_permissions"
 
     channel_id: Mapped[uuid.UUID] = mapped_column(
@@ -65,9 +89,8 @@ class ChannelPermission(Base):
     role_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
     )
-    can_read: Mapped[bool] = mapped_column(Boolean, default=True)
-    can_write: Mapped[bool] = mapped_column(Boolean, default=True)
-    can_edit: Mapped[bool] = mapped_column(Boolean, default=False)
+    allow_bits: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    deny_bits: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
 
     channel: Mapped["Channel"] = relationship("Channel", back_populates="permissions")
     role: Mapped["Role"] = relationship("Role", back_populates="channel_permissions")

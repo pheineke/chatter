@@ -54,6 +54,28 @@ export interface Member {
 
 export type ChannelType = 'text' | 'voice'
 
+/** Bitfield constants for ChannelPermission.allow_bits / deny_bits. */
+export const ChannelPerm = {
+  VIEW_CHANNEL:        1 << 0,   //   1
+  SEND_MESSAGES:       1 << 1,   //   2
+  MANAGE_MESSAGES:     1 << 2,   //   4
+  ATTACH_FILES:        1 << 3,   //   8
+  EMBED_LINKS:         1 << 4,   //  16
+  ADD_REACTIONS:       1 << 5,   //  32
+  MENTION_EVERYONE:    1 << 6,   //  64
+  USE_EXTERNAL_EMOJIS: 1 << 7,   // 128
+  MANAGE_ROLES:        1 << 8,   // 256
+} as const
+
+export interface ChannelPermission {
+  channel_id: string
+  role_id: string
+  /** Bitfield of explicitly-allowed permissions (see ChannelPerm). */
+  allow_bits: number
+  /** Bitfield of explicitly-denied permissions (see ChannelPerm). */
+  deny_bits: number
+}
+
 export interface Channel {
   id: string
   server_id: string

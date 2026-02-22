@@ -86,12 +86,10 @@ class ChannelPermissionRead(BaseModel):
 
     channel_id: uuid.UUID
     role_id: uuid.UUID
-    can_read: bool
-    can_write: bool
-    can_edit: bool
+    allow_bits: int
+    deny_bits: int
 
 
 class ChannelPermissionSet(BaseModel):
-    can_read: bool = True
-    can_write: bool = True
-    can_edit: bool = False
+    allow_bits: int = 0
+    deny_bits: int = 0

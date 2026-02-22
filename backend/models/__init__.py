@@ -1,7 +1,7 @@
 from models.base import Base
 from models.user import User, UserStatus
 from models.server import Server, ServerMember, Role, UserRole
-from models.channel import Category, Channel, ChannelType, ChannelPermission, MutedChannel
+from models.channel import Category, Channel, ChannelType, ChannelPerm, ChannelPermission, MutedChannel
 from models.message import Message, Attachment, Reaction, Mention
 from models.dm import DirectMessage, DMAttachment
 from models.dm_channel import DMChannel
@@ -22,6 +22,7 @@ __all__ = [
     "Category",
     "Channel",
     "ChannelType",
+    "ChannelPerm",
     "ChannelPermission",
     "MutedChannel",
     "Message",

@@ -176,14 +176,16 @@ async def test_set_channel_permission(client: AsyncClient, alice_headers):
     roles_r = await client.get(f"/servers/{s['id']}/roles", headers=alice_headers)
     role_id = roles_r.json()[0]["id"]
 
+    # allow VIEW_CHANNEL (1) only — SEND_MESSAGES (2) denied
     r = await client.put(
         f"/servers/{s['id']}/channels/{ch['id']}/permissions/{role_id}",
-        json={"can_read": True, "can_write": False, "can_edit": False},
+        json={"allow_bits": 1, "deny_bits": 2},
         headers=alice_headers,
     )
     assert r.status_code == 200
     data = r.json()
-    assert data["can_write"] is False
+    assert data["allow_bits"] == 1
+    assert data["deny_bits"] == 2
 
 
 async def test_list_channel_permissions(client: AsyncClient, alice_headers):
@@ -191,16 +193,19 @@ async def test_list_channel_permissions(client: AsyncClient, alice_headers):
     ch = await create_channel(client, alice_headers, s["id"])
     roles_r = await client.get(f"/servers/{s['id']}/roles", headers=alice_headers)
     role_id = roles_r.json()[0]["id"]
+    # allow VIEW_CHANNEL | SEND_MESSAGES | MANAGE_MESSAGES (bits 0-2)
     await client.put(
         f"/servers/{s['id']}/channels/{ch['id']}/permissions/{role_id}",
-        json={"can_read": True, "can_write": True, "can_edit": True},
+        json={"allow_bits": 7, "deny_bits": 0},
         headers=alice_headers,
     )
     r = await client.get(
         f"/servers/{s['id']}/channels/{ch['id']}/permissions", headers=alice_headers
     )
     assert r.status_code == 200
-    assert len(r.json()) >= 1
+    data = r.json()
+    assert len(data) >= 1
+    assert data[0]["allow_bits"] == 7
 
 
 # ---------------------------------------------------------------------------

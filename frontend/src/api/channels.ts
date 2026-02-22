@@ -1,5 +1,5 @@
 import client from './client'
-import type { Channel, Category, VoiceParticipant } from './types'
+import type { Channel, Category, ChannelPermission, VoiceParticipant } from './types'
 
 export async function getChannels(serverId: string): Promise<Channel[]> {
   const { data } = await client.get<Channel[]>(`/servers/${serverId}/channels`)
@@ -39,6 +39,26 @@ export async function reorderCategories(
 
 export async function deleteChannel(serverId: string, channelId: string): Promise<void> {
   await client.delete(`/servers/${serverId}/channels/${channelId}`)
+}
+
+export async function getPermissions(serverId: string, channelId: string): Promise<ChannelPermission[]> {
+  const { data } = await client.get<ChannelPermission[]>(
+    `/servers/${serverId}/channels/${channelId}/permissions`,
+  )
+  return data
+}
+
+export async function setPermission(
+  serverId: string,
+  channelId: string,
+  roleId: string,
+  body: { allow_bits: number; deny_bits: number },
+): Promise<ChannelPermission> {
+  const { data } = await client.put<ChannelPermission>(
+    `/servers/${serverId}/channels/${channelId}/permissions/${roleId}`,
+    body,
+  )
+  return data
 }
 
 export async function getCategories(serverId: string): Promise<Category[]> {

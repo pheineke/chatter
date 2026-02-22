@@ -263,16 +263,14 @@ async def set_permission(
     )
     perm = result.scalar_one_or_none()
     if perm:
-        perm.can_read = body.can_read
-        perm.can_write = body.can_write
-        perm.can_edit = body.can_edit
+        perm.allow_bits = body.allow_bits
+        perm.deny_bits = body.deny_bits
     else:
         perm = ChannelPermission(
             channel_id=channel_id,
             role_id=role_id,
-            can_read=body.can_read,
-            can_write=body.can_write,
-            can_edit=body.can_edit,
+            allow_bits=body.allow_bits,
+            deny_bits=body.deny_bits,
         )
         db.add(perm)
     await db.commit()
