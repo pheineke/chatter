@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 
 const WS_BASE = import.meta.env.VITE_WS_URL ?? ''  // empty = use vite proxy
+const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
 export type WSMessage = { type: string; data?: unknown } & Record<string, unknown>
 
@@ -10,9 +11,32 @@ interface Options {
   enabled?: boolean
 }
 
+/** Attempt a silent token refresh. Returns true if successful. */
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('refreshToken')
+  if (!refreshToken) return false
+  try {
+    const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    localStorage.setItem('token', data.access_token)
+    localStorage.setItem('refreshToken', data.refresh_token)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Opens a WebSocket to `path?token=<JWT>` and calls `onMessage` for every
  * incoming JSON frame. Reconnects automatically with exponential back-off.
+ *
+ * Close code 4001 (expired/invalid token) triggers a token refresh before
+ * the next reconnect attempt.
  */
 export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }: Options) {
   const wsRef = useRef<WebSocket | null>(null)
@@ -44,11 +68,29 @@ export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }
       }
     }
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (generation.current !== gen) return   // cleanup already ran — don't reconnect
+
       const delay = reconnectDelay.current
       reconnectDelay.current = Math.min(delay * 2, 30_000)
-      setTimeout(() => connect(gen), delay)
+
+      if (event.code === 4001) {
+        // Token rejected — try to refresh before reconnecting
+        tryRefreshToken().then((ok) => {
+          if (!ok) {
+            // Refresh failed: clear auth and redirect to login
+            localStorage.removeItem('token')
+            localStorage.removeItem('refreshToken')
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+              window.location.href = '/login'
+            }
+            return
+          }
+          setTimeout(() => connect(gen), delay)
+        })
+      } else {
+        setTimeout(() => connect(gen), delay)
+      }
     }
 
     ws.onopen = () => {

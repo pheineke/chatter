@@ -1,14 +1,20 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.user import UserRead
+from app.utils.sanitize import strip_html
 
 
 class ServerBase(BaseModel):
     title: str = Field(min_length=1, max_length=50)
     description: str | None = None
+
+    @field_validator('title', 'description', mode='before')
+    @classmethod
+    def sanitize_fields(cls, v):
+        return strip_html(v)
 
 
 class ServerCreate(ServerBase):
@@ -18,6 +24,11 @@ class ServerCreate(ServerBase):
 class ServerUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=50)
     description: str | None = None
+
+    @field_validator('title', 'description', mode='before')
+    @classmethod
+    def sanitize_fields(cls, v):
+        return strip_html(v)
 
 
 class ServerRead(ServerBase):

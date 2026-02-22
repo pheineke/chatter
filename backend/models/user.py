@@ -26,6 +26,11 @@ class User(Base):
     pronouns: Mapped[str | None] = mapped_column(String(50), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), default=UserStatus.offline)
+    # The user's chosen non-transient status: restored when they reconnect.
+    # Defaults to 'online'; setting status to 'offline' acts as invisible mode.
+    preferred_status: Mapped[UserStatus] = mapped_column(
+        Enum(UserStatus, name="user_status"), default=UserStatus.online, server_default="online"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

@@ -10,6 +10,8 @@ interface AuthContextValue {
   register: (username: string, password: string) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
+  /** Patch a subset of fields on the current user without a network round-trip. */
+  updateUser: (patch: Partial<User>) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -25,6 +27,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setUser(null)
     }
+  }
+
+  const updateUser = (patch: Partial<User>) => {
+    setUser(prev => prev ? { ...prev, ...patch } : prev)
   }
 
   useEffect(() => {
@@ -43,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     )
     localStorage.setItem('token', data.access_token)
+    localStorage.setItem('refreshToken', data.refresh_token)
     await refreshUser()
   }
 
@@ -53,12 +60,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
+    const refreshToken = localStorage.getItem('refreshToken')
+    if (refreshToken) {
+      // Fire-and-forget – revoke the refresh token on the server
+      import('../api/client').then(m =>
+        m.default.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {})
+      )
+    }
     localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
     setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

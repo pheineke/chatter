@@ -8,6 +8,7 @@ from models.dm_channel import DMChannel
 from models.friend import FriendRequest, FriendRequestStatus
 from models.invite import ServerInvite
 from models.note import UserNote
+from models.refresh_token import RefreshToken
 
 __all__ = [
     "Base",
@@ -33,4 +34,5 @@ __all__ = [
     "FriendRequestStatus",
     "ServerInvite",
     "UserNote",
+    "RefreshToken",
 ]

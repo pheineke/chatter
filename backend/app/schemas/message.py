@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.schemas.user import UserRead
+from app.utils.sanitize import strip_html
 
 
 class AttachmentRead(BaseModel):
@@ -36,6 +37,16 @@ class MessageBase(BaseModel):
     content: str
     reply_to_id: uuid.UUID | None = None
 
+    @field_validator('content')
+    @classmethod
+    def sanitize_content(cls, v: str) -> str:
+        cleaned = strip_html(v) or ''
+        if not cleaned.strip():
+            raise ValueError('Message content cannot be empty')
+        if len(cleaned) > 2000:
+            raise ValueError('Message content cannot exceed 2000 characters')
+        return cleaned
+
 
 class MessageCreate(MessageBase):
     pass
@@ -43,6 +54,16 @@ class MessageCreate(MessageBase):
 
 class MessageUpdate(BaseModel):
     content: str
+
+    @field_validator('content')
+    @classmethod
+    def sanitize_content(cls, v: str) -> str:
+        cleaned = strip_html(v) or ''
+        if not cleaned.strip():
+            raise ValueError('Message content cannot be empty')
+        if len(cleaned) > 2000:
+            raise ValueError('Message content cannot exceed 2000 characters')
+        return cleaned
 
 
 class MessageRead(MessageBase):

@@ -9,6 +9,7 @@ alembic
 asyncpg
 python-dotenv
 aiofiles
+filetype
 
 # Testing
 pytest

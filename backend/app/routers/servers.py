@@ -117,14 +117,15 @@ async def delete_server(server_id: uuid.UUID, current_user: CurrentUser, db: DB)
 
 
 async def _upload_server_image(server_id: uuid.UUID, file: UploadFile, field: str, db) -> Server:
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
+    # Validate magic bytes (rejects disguised executables / spoofed Content-Type headers)
+    from app.utils.file_validation import verify_image_magic
+    content = await verify_image_magic(file)
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"servers/{server_id}/{field}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     async with aiofiles.open(dest, "wb") as f:
-        await f.write(await file.read())
+        await f.write(content)
     return filename
 
 

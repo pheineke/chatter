@@ -5,14 +5,16 @@ from datetime import datetime, timezone
 from typing import List
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
 from sqlalchemy import select, delete, or_
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.dependencies import CurrentUser, DB
+from app.rate_limiter import rate_limit_messages
 from app.routers.servers import _require_member
 from app.schemas.message import MessageCreate, MessageUpdate, MessageRead
+from app.utils.file_validation import verify_attachment_magic
 from app.ws_manager import manager
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
@@ -145,7 +147,11 @@ async def list_messages(
 
 @router.post("/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED)
 async def send_message(
-    channel_id: uuid.UUID, body: MessageCreate, current_user: CurrentUser, db: DB
+    channel_id: uuid.UUID,
+    body: MessageCreate,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_messages),
 ):
     channel = await _get_channel_or_404(channel_id, db)
     await _require_channel_access(channel, current_user.id, db)
@@ -252,8 +258,9 @@ async def upload_attachment(
     msg = await _get_message_or_404(message_id, db)
     if msg.channel_id != channel_id or msg.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    if file.content_type not in ALLOWED_ATTACHMENT_TYPES:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    # Validate magic bytes (ignores spoofed Content-Type headers)
+    content = await verify_attachment_magic(file)
 
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"attachments/{message_id}/{uuid.uuid4()}.{ext}"
@@ -261,9 +268,12 @@ async def upload_attachment(
     os.makedirs(os.path.dirname(dest), exist_ok=True)
 
     async with aiofiles.open(dest, "wb") as f:
-        await f.write(await file.read())
+        await f.write(content)
 
-    file_type = file.content_type.split("/")[0]  # "image" or "audio"
+    # Derive the broad type from the validated magic-byte MIME
+    import filetype as _ft
+    kind = _ft.guess(content)
+    file_type = kind.mime.split("/")[0] if kind else "image"  # "image" or "audio"
     db.add(Attachment(message_id=message_id, file_path=filename, file_type=file_type))
     await db.commit()
     db.expire_all()

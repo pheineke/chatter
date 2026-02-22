@@ -24,8 +24,7 @@ function formatTime(iso: string) {
 }
 
 /** Render plain text content, turning @mention spans blue. */
-function Content({ text, html }: { text: string; html?: string }) {
-  if (html) return <span dangerouslySetInnerHTML={{ __html: html }} />
+function Content({ text }: { text: string }) {
   // Highlight @Username mentions
   const parts = text.split(/(@\w+)/g)
   return (

@@ -10,13 +10,11 @@ from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.presence import broadcast_presence
 from app.schemas.user import UserRead, UserUpdate
-from app.ws_manager import manager
+from app.utils.file_validation import verify_image_magic
 from models.user import User
 from models.note import UserNote
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 
 @router.get("/me", response_model=UserRead)
@@ -31,7 +29,9 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB):
         current_user.description = body.description
     if body.status is not None:
         current_user.status = body.status
-        manager.set_preferred_status(str(current_user.id), body.status.value)
+        # Persist the preferred status so reconnects restore the right state.
+        # Setting 'offline' is the invisible mode — honoured on reconnect too.
+        current_user.preferred_status = body.status
     if body.pronouns is not None:
         current_user.pronouns = body.pronouns
     if body.banner is not None:
@@ -53,16 +53,16 @@ async def upload_avatar(
     db: DB,
     file: UploadFile = File(...),
 ):
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
-    
+    # Validate magic bytes (rejects disguised executables / spoofed headers)
+    content = await verify_image_magic(file)
+
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"avatars/{current_user.id}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
 
     async with aiofiles.open(dest, "wb") as f:
-        await f.write(await file.read())
+        await f.write(content)
 
     current_user.avatar = filename
     db.add(current_user)
@@ -77,16 +77,16 @@ async def upload_banner(
     db: DB,
     file: UploadFile = File(...),
 ):
-    if file.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
-    
+    # Validate magic bytes (rejects disguised executables / spoofed headers)
+    content = await verify_image_magic(file)
+
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"banners/{current_user.id}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
 
     async with aiofiles.open(dest, "wb") as f:
-        await f.write(await file.read())
+        await f.write(content)
 
     current_user.banner = filename
     db.add(current_user)

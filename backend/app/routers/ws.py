@@ -174,14 +174,22 @@ async def personal_ws(
     await manager.connect(room, ws)
 
     # --- restore preferred status on connect (short-lived session) -----
-    restore = manager.get_preferred_status(str(user_id))
+    # preferred_status is the DB-persisted status the user last chose.
+    # If they chose 'offline' (invisible mode), we honour it — no broadcast needed.
     async with AsyncSessionLocal() as db:
         user = await db.get(User, user_id)
-        if user and user.status == UserStatus.offline:
-            user.status = UserStatus(restore)
+        if user and user.status != user.preferred_status:
+            restore_to = user.preferred_status.value   # capture before commit expires attrs
+            user.status = user.preferred_status
             db.add(user)
             await db.commit()
-            await broadcast_presence(user_id, restore, db)
+            # Inform the reconnecting client itself so its UI reflects the restored status
+            await manager.broadcast_user(
+                user_id,
+                {"type": "user.status_changed", "data": {"user_id": str(user_id), "status": restore_to}},
+            )
+            # Inform servers and friends
+            await broadcast_presence(user_id, restore_to, db)
     # db connection returned to pool here ^
 
     try:
@@ -202,7 +210,8 @@ async def personal_ws(
     finally:
         await manager.disconnect(room, ws)
 
-        # --- set offline (short-lived session) --------------------------
+        # --- set offline when last connection for this user drops -------
+        # Do NOT touch preferred_status — it persists for the next reconnect.
         if not manager._rooms.get(room):
             async with AsyncSessionLocal() as db:
                 user = await db.get(User, user_id)

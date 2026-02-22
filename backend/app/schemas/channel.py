@@ -1,13 +1,19 @@
 import uuid
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from models.channel import ChannelType
+from app.utils.sanitize import strip_html
 
 
 class CategoryBase(BaseModel):
     title: str
     position: int = 0
+
+    @field_validator('title', mode='before')
+    @classmethod
+    def sanitize_title(cls, v):
+        return strip_html(v)
 
 
 class CategoryCreate(CategoryBase):
@@ -17,6 +23,11 @@ class CategoryCreate(CategoryBase):
 class CategoryUpdate(BaseModel):
     title: str | None = None
     position: int | None = None
+
+    @field_validator('title', mode='before')
+    @classmethod
+    def sanitize_title(cls, v):
+        return strip_html(v)
 
 
 class CategoryRead(CategoryBase):
@@ -32,6 +43,11 @@ class ChannelBase(BaseModel):
     type: ChannelType = ChannelType.text
     position: int = 0
     category_id: uuid.UUID | None = None
+
+    @field_validator('title', 'description', mode='before')
+    @classmethod
+    def sanitize_fields(cls, v):
+        return strip_html(v)
 
 
 class ChannelCreate(ChannelBase):

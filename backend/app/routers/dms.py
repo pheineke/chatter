@@ -193,8 +193,11 @@ async def upload_dm_attachment(
     dm = await _get_dm_or_404(dm_id, db)
     if dm.sender_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    if file.content_type not in ALLOWED_ATTACHMENT_TYPES:
-        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    # Validate magic bytes (rejects disguised executables / spoofed Content-Type headers)
+    from app.utils.file_validation import verify_attachment_magic
+    import filetype as _ft
+    content = await verify_attachment_magic(file)
 
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin"
     filename = f"dm_attachments/{dm_id}/{uuid.uuid4()}.{ext}"
@@ -202,9 +205,10 @@ async def upload_dm_attachment(
     os.makedirs(os.path.dirname(dest), exist_ok=True)
 
     async with aiofiles.open(dest, "wb") as f:
-        await f.write(await file.read())
+        await f.write(content)
 
-    file_type = file.content_type.split("/")[0]
+    kind = _ft.guess(content)
+    file_type = kind.mime.split("/")[0] if kind else "image"
     db.add(DMAttachment(dm_id=dm_id, file_path=filename, file_type=file_type))
     await db.commit()
     db.expire_all()

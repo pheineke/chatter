@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -30,3 +32,22 @@ def decode_access_token(token: str) -> uuid.UUID | None:
         return uuid.UUID(sub)
     except (JWTError, ValueError):
         return None
+
+
+# ---------------------------------------------------------------------------
+# Refresh token helpers
+# ---------------------------------------------------------------------------
+
+def generate_refresh_token() -> tuple[str, str]:
+    """Return (raw_token, sha256_hex_hash).
+
+    Store only the hash in the database; give the raw token to the client.
+    """
+    raw = secrets.token_urlsafe(48)
+    hashed = hashlib.sha256(raw.encode()).hexdigest()
+    return raw, hashed
+
+
+def hash_refresh_token(raw: str) -> str:
+    """SHA-256 hex digest of a raw refresh token."""
+    return hashlib.sha256(raw.encode()).hexdigest()
