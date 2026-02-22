@@ -10,6 +10,7 @@ export interface User {
   description: string | null
   pronouns: string | null
   status: UserStatus
+  preferred_status: UserStatus
   created_at: string
 }
 
@@ -52,7 +53,7 @@ export interface Member {
 
 // ---- Channels --------------------------------------------------------------
 
-export type ChannelType = 'text' | 'voice'
+export type ChannelType = 'text' | 'voice' | 'dm'
 
 /** Bitfield constants for ChannelPermission.allow_bits / deny_bits. */
 export const ChannelPerm = {
@@ -157,16 +158,6 @@ export interface DMConversation {
   channel_id: string
   other_user: User
   last_message_at: string | null
-}
-
-export interface DM {
-  id: string
-  sender: User
-  recipient: User
-  content: string
-  is_deleted: boolean
-  created_at: string
-  attachments: Attachment[]
 }
 
 // ---- Friends ---------------------------------------------------------------

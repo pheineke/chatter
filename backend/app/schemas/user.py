@@ -47,6 +47,7 @@ class UserRead(UserBase):
     id: uuid.UUID
     avatar: str | None
     banner: str | None
+    preferred_status: UserStatus = UserStatus.online
     created_at: datetime
 
 
