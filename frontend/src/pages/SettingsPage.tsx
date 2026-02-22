@@ -371,10 +371,11 @@ function AppearanceTab() {
 
 // ─── Voice & Video tab ────────────────────────────────────────────────────────
 
-const SOUND_KEYS = ['connectSound', 'disconnectSound', 'muteSound', 'unmuteSound', 'deafenSound', 'undeafenSound'] as const
+const SOUND_KEYS = ['connectSound', 'disconnectSound', 'muteSound', 'unmuteSound', 'deafenSound', 'undeafenSound', 'notificationSound'] as const
 const SOUND_LABELS: Record<string, string> = {
   connectSound: 'User connects', disconnectSound: 'User disconnects',
   muteSound: 'Mute', unmuteSound: 'Unmute', deafenSound: 'Deafen', undeafenSound: 'Undeafen',
+  notificationSound: 'New message',
 }
 
 function VoiceTab() {

@@ -1,5 +1,7 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useMatch } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { ServerSidebar } from '../components/ServerSidebar'
 import { ChannelSidebar } from '../components/ChannelSidebar'
@@ -11,7 +13,12 @@ import { VoiceChannelBar } from '../components/VoiceChannelBar'
 import { VoiceCallProvider } from '../contexts/VoiceCallContext'
 import { SettingsPage } from './SettingsPage'
 import { ServerSettingsPage } from './ServerSettingsPage'
+import { QuickSwitcher } from '../components/QuickSwitcher'
+import { KeyboardShortcutsDialog } from '../components/KeyboardShortcutsDialog'
 import { useUnreadDMs } from '../hooks/useUnreadDMs'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { getChannels } from '../api/channels'
+import { getMyServers } from '../api/servers'
 
 /** The active voice session, if any (channelId + channelName). */
 export interface VoiceSession {
@@ -24,6 +31,30 @@ export default function AppShell() {
   const { user } = useAuth()
   const [voiceSession, setVoiceSession] = useState<VoiceSession | null>(null)
   const hasUnreadDMs = useUnreadDMs()
+  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const location = useLocation()
+
+  // Build channel path list for Alt+↑/↓ navigation
+  const channelMatch = useMatch('/channels/:serverId/:channelId')
+  const currentServerId = channelMatch?.params.serverId
+  const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers, staleTime: 60_000 })
+  const { data: channels = [] } = useQuery({
+    queryKey: ['channels', currentServerId],
+    queryFn: () => getChannels(currentServerId!),
+    enabled: !!currentServerId,
+    staleTime: 60_000,
+  })
+  const channelPaths = channels
+    .filter((c) => c.type === 'text')
+    .map((c) => `/channels/${currentServerId}/${c.id}`)
+
+  useKeyboardShortcuts({
+    onOpenQuickSwitcher: () => setShowQuickSwitcher(true),
+    onOpenShortcuts: () => setShowShortcuts(true),
+    channelPaths,
+    currentPath: location.pathname,
+  })
 
   function handleLeaveVoice() {
     setVoiceSession(null)
@@ -31,6 +62,10 @@ export default function AppShell() {
 
   return (
     <div className="flex h-screen bg-discord-bg text-discord-text overflow-hidden">
+      {/* Global overlays */}
+      {showQuickSwitcher && <QuickSwitcher onClose={() => setShowQuickSwitcher(false)} />}
+      {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
+
       <Routes>
         <Route path="settings" element={<SettingsPage />} />
         <Route path=":serverId/settings" element={<ServerSettingsPage />} />

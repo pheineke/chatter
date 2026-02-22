@@ -9,6 +9,7 @@ from models.friend import FriendRequest, FriendRequestStatus
 from models.invite import ServerInvite
 from models.note import UserNote
 from models.refresh_token import RefreshToken
+from models.pinned_message import PinnedMessage
 
 __all__ = [
     "Base",
@@ -35,4 +36,5 @@ __all__ = [
     "ServerInvite",
     "UserNote",
     "RefreshToken",
+    "PinnedMessage",
 ]

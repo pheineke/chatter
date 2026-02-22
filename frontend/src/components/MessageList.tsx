@@ -3,18 +3,18 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { getMessages } from '../api/messages'
 import { MessageBubble } from './MessageBubble'
 import type { Message } from '../api/types'
-import type { TypingUser } from '../hooks/useChannelWS'
 
 const COMPACT_THRESHOLD_MS = 7 * 60 * 1000 // 7 minutes
 const PAGE_SIZE = 50
 
 interface Props {
   channelId: string
-  typingUsers?: TypingUser[]
   /** Called with a msg id so parent can provide scroll-to-message capability */
   onRegisterScrollTo?: (fn: (id: string) => void) => void
   /** Reply initiator passed down from MessagePane */
   onReply?: (msg: Message) => void
+  /** Set of currently pinned message IDs */
+  pinnedIds?: Set<string>
 }
 
 function isSameAuthorAndRecent(a: Message, b: Message): boolean {
@@ -24,7 +24,7 @@ function isSameAuthorAndRecent(a: Message, b: Message): boolean {
   )
 }
 
-export function MessageList({ channelId, typingUsers = [], onRegisterScrollTo, onReply }: Props) {
+export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const topSentinelRef = useRef<HTMLDivElement>(null)
@@ -162,30 +162,12 @@ export function MessageList({ channelId, typingUsers = [], onRegisterScrollTo, o
               compact={compact}
               onReply={onReply}
               onScrollToMessage={scrollToMessage}
+              isPinned={pinnedIds?.has(msg.id)}
             />
           </div>
         )
       })}
       <div ref={bottomRef} />
-
-      {/* Typing indicator */}
-      {typingUsers.length > 0 && (
-        <div className="px-4 py-1 text-xs text-discord-muted flex items-center gap-1 select-none">
-          <span className="flex gap-0.5 items-center">
-            <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:0ms]" />
-            <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:150ms]" />
-            <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:300ms]" />
-          </span>
-          <span>
-            {typingUsers.length === 1
-              ? <><strong>{typingUsers[0].username}</strong> is typing…</>
-              : typingUsers.length === 2
-                ? <><strong>{typingUsers[0].username}</strong> and <strong>{typingUsers[1].username}</strong> are typing…</>
-                : <><strong>Several people</strong> are typing…</>
-            }
-          </span>
-        </div>
-      )}
     </div>
   )
 }

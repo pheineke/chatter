@@ -1,7 +1,7 @@
 import { format, isToday, isYesterday } from 'date-fns'
 import { useState, useEffect, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { editMessage, deleteMessage, addReaction, removeReaction } from '../api/messages'
+import { editMessage, deleteMessage, addReaction, removeReaction, pinMessage, unpinMessage } from '../api/messages'
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
 import { ProfileCard } from './ProfileCard'
@@ -18,6 +18,8 @@ interface Props {
   onReply?: (msg: Message) => void
   /** Called with a message id to scroll to it (provided by MessageList) */
   onScrollToMessage?: (id: string) => void
+  /** Whether the message is currently pinned */
+  isPinned?: boolean
 }
 
 function formatTime(iso: string) {
@@ -44,7 +46,7 @@ function Content({ text }: { text: string }) {
   )
 }
 
-export function MessageBubble({ message: msg, channelId, compact = false, onReply, onScrollToMessage }: Props) {
+export function MessageBubble({ message: msg, channelId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
   const { user } = useAuth()
   const qc = useQueryClient()
   const isOwn = user?.id === msg.author.id
@@ -55,6 +57,11 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
   const closePreview = useCallback(() => setPreviewUrl(null), [])
   const [cardPos, setCardPos] = useState<{ x: number; y: number } | null>(null)
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
+
+  const pinMut = useMutation({
+    mutationFn: () => isPinned ? unpinMessage(channelId, msg.id) : pinMessage(channelId, msg.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pins', channelId] }),
+  })
 
   const handleUserClick = useCallback((e: React.MouseEvent) => {
      e.stopPropagation()
@@ -230,6 +237,13 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
           </ActionBtn>
           <ActionBtn title="Reply" onClick={() => onReply?.(msg)}>
             <Icon name="corner-up-left" size={16} />
+          </ActionBtn>
+          <ActionBtn
+            title={isPinned ? 'Unpin' : 'Pin'}
+            onClick={() => pinMut.mutate()}
+            className={isPinned ? 'text-discord-mention' : ''}
+          >
+            <Icon name="pin" size={16} />
           </ActionBtn>
           {isOwn && <ActionBtn title="Edit" onClick={() => { setEditing(true); setEditText(msg.content) }}><Icon name="edit-2" size={16} /></ActionBtn>}
           {isOwn && <ActionBtn title="Delete" onClick={() => deleteMut.mutate()} className="hover:text-red-400"><Icon name="trash-2" size={16} /></ActionBtn>}

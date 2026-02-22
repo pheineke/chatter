@@ -96,6 +96,16 @@ class MessageReplyRead(BaseModel):
 MessageRead.model_rebuild()
 
 
+class PinnedMessageRead(BaseModel):
+    """A pinned message, including who pinned it and when."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    pinned_at: datetime
+    pinned_by: UserRead
+    message: MessageRead
+
+
 class DMBase(BaseModel):
     content: str
 

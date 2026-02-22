@@ -13,12 +13,13 @@ from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.rate_limiter import rate_limit_messages
 from app.routers.servers import _require_member
-from app.schemas.message import MessageCreate, MessageUpdate, MessageRead
+from app.schemas.message import MessageCreate, MessageUpdate, MessageRead, PinnedMessageRead
 from app.utils.file_validation import verify_attachment_magic
 from app.ws_manager import manager
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
 from models.message import Message, Attachment, Reaction, Mention
+from models.pinned_message import PinnedMessage
 from models.server import Role, ServerMember
 from models.user import User
 
@@ -331,3 +332,95 @@ async def remove_reaction(
             channel_id,
             {"type": "reaction.removed", "data": {"message_id": str(message_id), "user_id": str(current_user.id), "emoji": emoji}},
         )
+
+
+# ---- Pinned Messages --------------------------------------------------------
+
+@router.get("/pins", response_model=List[PinnedMessageRead])
+async def list_pins(
+    channel_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+):
+    channel = await _get_channel_or_404(channel_id, db)
+    await _require_channel_access(channel, current_user.id, db)
+
+    result = await db.execute(
+        select(PinnedMessage)
+        .options(
+            selectinload(PinnedMessage.pinned_by),
+            selectinload(PinnedMessage.message)
+            .selectinload(Message.author),
+            selectinload(PinnedMessage.message)
+            .selectinload(Message.attachments),
+            selectinload(PinnedMessage.message)
+            .selectinload(Message.reactions),
+            selectinload(PinnedMessage.message)
+            .selectinload(Message.mentions),
+        )
+        .where(PinnedMessage.channel_id == channel_id)
+        .order_by(PinnedMessage.pinned_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.put("/messages/{message_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
+async def pin_message(
+    channel_id: uuid.UUID,
+    message_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+):
+    channel = await _get_channel_or_404(channel_id, db)
+    await _require_channel_access(channel, current_user.id, db)
+    msg = await _get_message_or_404(message_id, db)
+    if msg.channel_id != channel_id:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Check if already pinned
+    existing = await db.execute(
+        select(PinnedMessage).where(
+            PinnedMessage.channel_id == channel_id,
+            PinnedMessage.message_id == message_id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        return  # Already pinned — idempotent
+
+    db.add(PinnedMessage(
+        channel_id=channel_id,
+        message_id=message_id,
+        pinned_by_id=current_user.id,
+    ))
+    await db.commit()
+    await manager.broadcast_channel(
+        channel_id,
+        {"type": "message.pinned", "data": {"message_id": str(message_id), "channel_id": str(channel_id)}},
+    )
+
+
+@router.delete("/messages/{message_id}/pin", status_code=status.HTTP_204_NO_CONTENT)
+async def unpin_message(
+    channel_id: uuid.UUID,
+    message_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+):
+    channel = await _get_channel_or_404(channel_id, db)
+    await _require_channel_access(channel, current_user.id, db)
+
+    result = await db.execute(
+        select(PinnedMessage).where(
+            PinnedMessage.channel_id == channel_id,
+            PinnedMessage.message_id == message_id,
+        )
+    )
+    pin = result.scalar_one_or_none()
+    if pin:
+        await db.delete(pin)
+        await db.commit()
+        await manager.broadcast_channel(
+            channel_id,
+            {"type": "message.unpinned", "data": {"message_id": str(message_id), "channel_id": str(channel_id)}},
+        )
+

@@ -547,7 +547,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
 
   // Resolve participant user info from the per-channel presence list.
   // All clients (including non-voice ones) get this from useServerWS + voicePresence query.
-  const participantUsers: { user: User; isSelf: boolean; isSpeaking: boolean }[] = isVoice
+  const participantUsers: { user: User; isSelf: boolean; isSpeaking: boolean; isMuted: boolean; isDeafened: boolean }[] = isVoice
     ? channelPresence.map((p) => {
         const isSelf = p.user_id === localUser?.id
         const m = members.find((m) => m.user_id === p.user_id)
@@ -566,7 +566,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
             pronouns: null,
           }
         }
-        return { user, isSelf, isSpeaking: p.is_speaking ?? false }
+        return { user, isSelf, isSpeaking: p.is_speaking ?? false, isMuted: p.is_muted, isDeafened: p.is_deafened }
       })
     : []
 
@@ -596,7 +596,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
       {/* Voice participants */}
       {participantUsers.length > 0 && (
         <div className="ml-4 mb-1 space-y-0.5">
-          {participantUsers.map(({ user: u, isSelf, isSpeaking }) => (
+          {participantUsers.map(({ user: u, isSelf, isSpeaking, isMuted, isDeafened }) => (
             <div 
               key={u.id} 
               className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-discord-muted hover:bg-discord-input/40 cursor-pointer"
@@ -610,7 +610,13 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
                   <StatusIndicator status={u.status} size={7} />
                 </span>
               </div>
-              <span className={`truncate transition-colors ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>
+              <span className={`truncate flex-1 transition-colors ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>
+              {isMuted && (
+                <Icon name="mic-off" size={11} className="text-red-400 shrink-0" />
+              )}
+              {isDeafened && (
+                <Icon name="headphones-off" size={11} className="text-red-400 shrink-0" />
+              )}
             </div>
           ))}
         </div>

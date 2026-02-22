@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { VoiceParticipant } from '../api/types'
 import { useWebSocket } from './useWebSocket'
+import { useSoundManager } from './useSoundManager'
 
 interface UseVoiceChannelOptions {
   channelId: string | null
@@ -22,6 +23,8 @@ export interface VoiceState {
  *  - Manages WebRTC peer connections for audio/video
  */
 export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
+  const { playSound } = useSoundManager()
+
   const [state, setState] = useState<VoiceState>({
     participants: [],
     isMuted: false,
@@ -90,6 +93,7 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
             const p = msg.data as VoiceParticipant
             if (p.user_id === userId) break
             setState((s) => ({ ...s, participants: [...s.participants, p] }))
+            playSound('connectSound')
             // Only initiate if we are the impolite side
             if (isImpolite(p.user_id)) initiateCall(p.user_id)
             break
@@ -97,6 +101,7 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
           case 'voice.user_left': {
             const { user_id } = msg.data as { user_id: string }
             setState((s) => ({ ...s, participants: s.participants.filter((p) => p.user_id !== user_id) }))
+            playSound('disconnectSound')
             cleanupPeer(user_id)
             break
           }
@@ -428,9 +433,10 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       const next = !s.isMuted
       localStream.current?.getAudioTracks().forEach((t) => { t.enabled = !next })
       send({ type: 'mute', is_muted: next })
+      playSound(next ? 'muteSound' : 'unmuteSound')
       return { ...s, isMuted: next }
     })
-  }, [send])
+  }, [send, playSound])
 
   const toggleDeafen = useCallback(() => {
     setState((s) => {
@@ -440,9 +446,10 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
         (el as HTMLAudioElement).muted = next
       })
       send({ type: 'deafen', is_deafened: next })
+      playSound(next ? 'deafenSound' : 'undeafenSound')
       return { ...s, isDeafened: next }
     })
-  }, [send])
+  }, [send, playSound])
 
   const sendSpeaking = useCallback((isSpeaking: boolean) => {
     send({ type: 'speaking', is_speaking: isSpeaking })

@@ -113,6 +113,13 @@ export interface Message {
   mentions: MentionInfo[]
 }
 
+export interface PinnedMessage {
+  id: string
+  pinned_at: string
+  pinned_by: User
+  message: Message
+}
+
 // ---- DMs -------------------------------------------------------------------
 
 export interface DMConversation {

@@ -1,16 +1,19 @@
 import { useParams } from 'react-router-dom'
-import { useState, useCallback, useRef, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getChannels } from '../api/channels'
+import { getPins } from '../api/messages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { MemberSidebar } from './MemberSidebar'
+import { PinnedMessagesPanel } from './PinnedMessagesPanel'
 import { VoiceGridPane } from './VoiceGridPane'
 import { Icon } from './Icon'
 import type { VoiceSession } from '../pages/AppShell'
 import type { Message } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useChannelWS } from '../hooks/useChannelWS'
+import { useAuth } from '../contexts/AuthContext'
 
 interface Props {
   voiceSession: VoiceSession | null
@@ -21,9 +24,11 @@ interface Props {
 export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) {
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
   const [showMembers, setShowMembers] = useState(true)
+  const [showPins, setShowPins] = useState(false)
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const scrollToMessageRef = useRef<((id: string) => void) | null>(null)
   const { markRead } = useUnreadChannels()
+  const qc = useQueryClient()
 
   // Mark channel as read when navigating to it
   useEffect(() => {
@@ -36,8 +41,31 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
     scrollToMessageRef.current = fn
   }, [])
 
+  const { user } = useAuth()
+
   // Real-time channel events (WS lifted here so sendTyping/typingUsers can be passed to children)
-  const { typingUsers, sendTyping } = useChannelWS(channelId ?? null)
+  const { typingUsers, sendTyping } = useChannelWS(channelId ?? null, user?.id)
+
+  // Pinned messages query + WS event handling
+  const { data: pins = [] } = useQuery({
+    queryKey: ['pins', channelId],
+    queryFn: () => getPins(channelId!),
+    enabled: !!channelId,
+    staleTime: 60_000,
+  })
+  const pinnedIds = useMemo(() => new Set(pins.map((p) => p.message.id)), [pins])
+
+  // Invalidate pins cache on WS pin/unpin events
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { type, channelId: eid } = (e as CustomEvent).detail
+      if ((type === 'message.pinned' || type === 'message.unpinned') && eid === channelId) {
+        qc.invalidateQueries({ queryKey: ['pins', channelId] })
+      }
+    }
+    window.addEventListener('channel-ws-event', handler)
+    return () => window.removeEventListener('channel-ws-event', handler)
+  }, [channelId, qc])
 
   const { data: channels = [], isLoading: channelsLoading } = useQuery({
     queryKey: ['channels', serverId],
@@ -104,6 +132,18 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
           </>
         )}
         <div className="flex-1" />
+        {/* Pins toggle */}
+        <button
+          onClick={() => setShowPins(v => !v)}
+          title={showPins ? 'Close pins' : 'Pinned messages'}
+          className={`p-1.5 rounded transition-colors shrink-0 ${showPins ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+        >
+          <Icon name="pin" size={20} />
+          {pinnedIds.size > 0 && (
+            <span className="ml-0.5 text-xs text-discord-muted">{pinnedIds.size}</span>
+          )}
+        </button>
+        {/* Members toggle */}
         <button
           onClick={() => setShowMembers(v => !v)}
           title="Toggle member list"
@@ -113,7 +153,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
         </button>
       </div>
 
-      {/* Body: messages + optional member sidebar */}
+      {/* Body: messages + optional sidebars */}
       <div className="flex flex-1 min-h-0">
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
           {/* Messages */}
@@ -121,18 +161,47 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
             channelId={channelId}
             onReply={handleReply}
             onRegisterScrollTo={handleRegisterScrollTo}
-            typingUsers={typingUsers}
+            pinnedIds={pinnedIds}
           />
+
+          {/* Typing indicator */}
+          {typingUsers.length > 0 && (
+            <div className="px-4 py-1 text-xs text-discord-muted flex items-center gap-1 select-none shrink-0">
+              <span className="flex gap-0.5 items-center">
+                <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:0ms]" />
+                <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:150ms]" />
+                <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:300ms]" />
+              </span>
+              <span>
+                {typingUsers.length === 1
+                  ? <><strong>{typingUsers[0].username}</strong> is typing…</>
+                  : typingUsers.length === 2
+                    ? <><strong>{typingUsers[0].username}</strong> and <strong>{typingUsers[1].username}</strong> are typing…</>
+                    : <><strong>Several people</strong> are typing…</>
+                }
+              </span>
+            </div>
+          )}
 
           {/* Input */}
           <MessageInput
             channelId={channelId}
+            serverId={serverId}
             placeholder={`Message #${channel?.title ?? channelId}`}
             replyTo={replyTo}
             onCancelReply={handleCancelReply}
             onTyping={sendTyping}
           />
         </div>
+
+        {/* Pinned messages panel */}
+        {showPins && (
+          <PinnedMessagesPanel
+            channelId={channelId}
+            onScrollToMessage={(id) => scrollToMessageRef.current?.(id)}
+            onClose={() => setShowPins(false)}
+          />
+        )}
 
         {showMembers && serverId && <MemberSidebar serverId={serverId} />}
       </div>

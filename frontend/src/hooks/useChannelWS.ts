@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState, useCallback, useRef } from 'react'
 import type { InfiniteData } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
+import { useSoundManager } from './useSoundManager'
 import type { Message } from '../api/types'
 
 type InfMessages = InfiniteData<Message[]>
@@ -11,7 +12,7 @@ export interface TypingUser {
   username: string
 }
 
-const TYPING_EXPIRE_MS = 8_000  // clear indicator after 8 s of silence
+const TYPING_EXPIRE_MS = 4_000  // clear indicator 4 s after last event
 
 /** Map every message across all pages */
 function mapPages(data: InfMessages, fn: (m: Message) => Message): InfMessages {
@@ -31,14 +32,16 @@ function filterPages(data: InfMessages, pred: (m: Message) => boolean): InfMessa
  *  - `typingUsers`: users currently typing in this channel
  *  - `sendTyping`:  call this when the local user is typing
  */
-export function useChannelWS(channelId: string | null) {
+export function useChannelWS(channelId: string | null, currentUserId?: string) {
   const qc = useQueryClient()
+  const { playSound } = useSoundManager()
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const removeTyping = useCallback((userId: string) => {
+    const t = timers.current.get(userId)
+    if (t) { clearTimeout(t); timers.current.delete(userId) }
     setTypingUsers((prev) => prev.filter((u) => u.user_id !== userId))
-    timers.current.delete(userId)
   }, [])
 
   const { send } = useWebSocket(channelId ? `/ws/channels/${channelId}` : '', {
@@ -49,6 +52,12 @@ export function useChannelWS(channelId: string | null) {
       switch (msg.type) {
         case 'message.created': {
           const newMsg = msg.data as Message
+          // Clear typing indicator for the sender immediately
+          removeTyping(newMsg.author.id)
+          // Play notification sound for messages from other users
+          if (currentUserId && newMsg.author.id !== currentUserId) {
+            playSound('notificationSound')
+          }
           qc.setQueryData<InfMessages>(key, (old) => {
             if (!old) return old
             // Append to pages[0] (the latest batch)
@@ -107,6 +116,14 @@ export function useChannelWS(channelId: string | null) {
           const existing = timers.current.get(user_id)
           if (existing) clearTimeout(existing)
           timers.current.set(user_id, setTimeout(() => removeTyping(user_id), TYPING_EXPIRE_MS))
+          break
+        }
+        case 'message.pinned':
+        case 'message.unpinned': {
+          // Bubble up to MessagePane via custom DOM event so it can invalidate pins query
+          window.dispatchEvent(new CustomEvent('channel-ws-event', {
+            detail: { type: msg.type, channelId },
+          }))
           break
         }
       }

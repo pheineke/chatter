@@ -1,21 +1,39 @@
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { sendMessage, uploadAttachment } from '../api/messages'
+import { getMembers } from '../api/servers'
 import { Icon } from './Icon'
 import { EmojiPicker } from './EmojiPicker'
-import type { Message } from '../api/types'
+import { UserAvatar } from './UserAvatar'
+import type { Message, Member } from '../api/types'
 
-const TYPING_THROTTLE_MS = 5_000  // retransmit at most every 5s while typing
+const TYPING_THROTTLE_MS = 8_000  // retransmit at most every 8s while typing (Discord-style)
 
 interface Props {
   channelId: string
+  serverId?: string
   placeholder?: string
   replyTo?: Message | null
   onCancelReply?: () => void
   onTyping?: () => void
 }
 
-export function MessageInput({ channelId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping }: Props) {
+/** Scan backwards from `cursorPos` in `text` to find an active @ trigger.
+ *  Returns { query, triggerStart } if we're inside an @-mention, or null. */
+function findMentionTrigger(text: string, cursorPos: number): { query: string; triggerStart: number } | null {
+  // Search backwards for @ that isn't preceded by a word character
+  let i = cursorPos - 1
+  while (i >= 0 && text[i] !== '@' && text[i] !== ' ' && text[i] !== '\n') i--
+  if (i < 0 || text[i] !== '@') return null
+  // Make sure @ is at start of input or preceded by whitespace
+  if (i > 0 && text[i - 1] !== ' ' && text[i - 1] !== '\n') return null
+  const query = text.slice(i + 1, cursorPos)
+  // Don't trigger autocomplete if query contains spaces
+  if (query.includes(' ')) return null
+  return { query: query.toLowerCase(), triggerStart: i }
+}
+
+export function MessageInput({ channelId, serverId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping }: Props) {
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -23,6 +41,27 @@ export function MessageInput({ channelId, placeholder = 'Send a message…', rep
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const qc = useQueryClient()
   const lastTypingSent = useRef(0)
+
+  // @mention autocomplete state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionTriggerStart, setMentionTriggerStart] = useState(0)
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const mentionListRef = useRef<HTMLDivElement>(null)
+
+  // Load server members (uses cached data if already fetched by MemberSidebar)
+  const { data: members = [] } = useQuery<Member[]>({
+    queryKey: ['members', serverId],
+    queryFn: () => getMembers(serverId!),
+    enabled: !!serverId,
+    staleTime: 60_000,
+  })
+
+  // Filter members by current mention query
+  const mentionCandidates = mentionQuery !== null
+    ? members
+        .filter((m) => m.user.username.toLowerCase().startsWith(mentionQuery))
+        .slice(0, 8)
+    : []
 
   // Throttled typing emit
   const emitTyping = useCallback(() => {
@@ -59,9 +98,51 @@ export function MessageInput({ channelId, placeholder = 'Send a message…', rep
     if (!trimmed) return
     sendMut.mutate(trimmed)
     setText('')
+    setMentionQuery(null)
+  }
+
+  function selectMention(member: Member) {
+    const ta = textareaRef.current
+    const cursorPos = ta?.selectionStart ?? text.length
+    const before = text.slice(0, mentionTriggerStart)
+    const after = text.slice(cursorPos)
+    const inserted = `@${member.user.username} `
+    const next = before + inserted + after
+    setText(next)
+    setMentionQuery(null)
+    setMentionIndex(0)
+    requestAnimationFrame(() => {
+      ta?.focus()
+      const pos = before.length + inserted.length
+      ta?.setSelectionRange(pos, pos)
+    })
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    // Intercept keyboard nav when mention dropdown is open
+    if (mentionQuery !== null && mentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionIndex((i) => (i + 1) % mentionCandidates.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionIndex((i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length)
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        selectMention(mentionCandidates[mentionIndex])
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setMentionQuery(null)
+        return
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -106,7 +187,36 @@ export function MessageInput({ channelId, placeholder = 'Send a message…', rep
   }
 
   return (
-    <div className="px-4 pb-4">
+    <div className="px-4 pb-4 relative">
+      {/* @mention autocomplete dropdown */}
+      {mentionQuery !== null && mentionCandidates.length > 0 && (
+        <div
+          ref={mentionListRef}
+          className="absolute bottom-full mb-1 left-4 right-4 bg-discord-sidebar border border-white/10 rounded-lg shadow-xl overflow-hidden z-50"
+        >
+          <div className="px-3 py-1.5 text-[10px] font-bold uppercase text-discord-muted tracking-wider border-b border-white/5">
+            Members — {mentionQuery ? `matching "@${mentionQuery}"` : 'all'}
+          </div>
+          {mentionCandidates.map((m, idx) => (
+            <button
+              key={m.user_id}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors
+                ${idx === mentionIndex ? 'bg-discord-mention/20 text-discord-text' : 'text-discord-muted hover:bg-white/5 hover:text-discord-text'}`}
+              onMouseEnter={() => setMentionIndex(idx)}
+              onMouseDown={(e) => { e.preventDefault(); selectMention(m) }}
+            >
+              <UserAvatar user={m.user} size={24} />
+              <span className="font-semibold">{m.user.username}</span>
+              {m.roles.length > 0 && (
+                <span className="text-xs text-discord-muted truncate ml-auto">
+                  {m.roles[0].name}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Reply banner */}
       {replyTo && (
         <div className="flex items-center gap-2 bg-discord-input/60 rounded-t-lg px-3 py-1.5 text-xs text-discord-muted border-b border-white/5">
@@ -148,10 +258,22 @@ export function MessageInput({ channelId, placeholder = 'Send a message…', rep
           value={text}
           placeholder={placeholder}
           onChange={(e) => {
-            setText(e.target.value)
+            const newText = e.target.value
+            setText(newText)
             e.target.style.height = 'auto'
             e.target.style.height = `${e.target.scrollHeight}px`
             emitTyping()
+
+            // @mention detection
+            const cursor = e.target.selectionStart ?? newText.length
+            const trigger = findMentionTrigger(newText, cursor)
+            if (trigger && serverId) {
+              setMentionQuery(trigger.query)
+              setMentionTriggerStart(trigger.triggerStart)
+              setMentionIndex(0)
+            } else {
+              setMentionQuery(null)
+            }
           }}
           onKeyDown={handleKeyDown}
         />
@@ -187,4 +309,3 @@ export function MessageInput({ channelId, placeholder = 'Send a message…', rep
     </div>
   )
 }
-
