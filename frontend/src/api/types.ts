@@ -86,6 +86,9 @@ export interface Channel {
   position: number
   category_id: string | null
   slowmode_delay: number  // seconds; 0 = disabled
+  nsfw: boolean
+  user_limit: number | null  // voice: max concurrent users; null = unlimited
+  bitrate: number | null     // voice: audio bitrate in bps; null = server default
 }
 
 export interface Category {

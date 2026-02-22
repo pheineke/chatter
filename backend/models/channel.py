@@ -61,6 +61,9 @@ class Channel(Base):
     type: Mapped[ChannelType] = mapped_column(Enum(ChannelType, name="channel_type"), default=ChannelType.text)
     position: Mapped[int] = mapped_column(Integer, default=0)
     slowmode_delay: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    nsfw: Mapped[bool] = mapped_column(default=False, nullable=False)
+    user_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)   # voice: max concurrent users (None = unlimited)
+    bitrate: Mapped[int | None] = mapped_column(Integer, nullable=True)      # voice: audio bitrate in bps (None = server default)
 
     server: Mapped["Server"] = relationship("Server", back_populates="channels")
     category: Mapped["Category | None"] = relationship("Category", back_populates="channels")

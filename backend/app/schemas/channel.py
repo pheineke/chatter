@@ -44,6 +44,9 @@ class ChannelBase(BaseModel):
     position: int = 0
     category_id: uuid.UUID | None = None
     slowmode_delay: int = 0  # seconds between messages per user; 0 = disabled
+    nsfw: bool = False
+    user_limit: int | None = None  # voice: max concurrent users; None = unlimited
+    bitrate: int | None = None     # voice: audio bitrate in bps; None = server default
 
     @field_validator('title', 'description', mode='before')
     @classmethod
@@ -61,6 +64,9 @@ class ChannelUpdate(BaseModel):
     position: int | None = None
     category_id: uuid.UUID | None = None
     slowmode_delay: int | None = None  # 0 = disable slowmode
+    nsfw: bool | None = None
+    user_limit: int | None = None
+    bitrate: int | None = None
 
 
 class ChannelReorderItem(BaseModel):

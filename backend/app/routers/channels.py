@@ -141,6 +141,9 @@ async def create_channel(
         type=body.type,
         position=body.position,
         category_id=body.category_id,
+        nsfw=body.nsfw,
+        user_limit=body.user_limit,
+        bitrate=body.bitrate,
     )
     db.add(channel)
     await db.commit()
@@ -206,6 +209,12 @@ async def update_channel(
         channel.category_id = body.category_id
     if body.slowmode_delay is not None:
         channel.slowmode_delay = max(0, body.slowmode_delay)
+    if body.nsfw is not None:
+        channel.nsfw = body.nsfw
+    if body.user_limit is not None:
+        channel.user_limit = body.user_limit
+    if body.bitrate is not None:
+        channel.bitrate = max(8000, body.bitrate)  # floor at 8 kbps
     await db.commit()
     await db.refresh(channel)
     return channel

@@ -8,7 +8,7 @@ export async function getChannels(serverId: string): Promise<Channel[]> {
 
 export async function createChannel(
   serverId: string,
-  body: { title: string; type?: 'text' | 'voice'; description?: string; category_id?: string },
+  body: { title: string; type?: 'text' | 'voice'; description?: string; category_id?: string; nsfw?: boolean; user_limit?: number; bitrate?: number },
 ): Promise<Channel> {
   const { data } = await client.post<Channel>(`/servers/${serverId}/channels`, body)
   return data
@@ -17,7 +17,7 @@ export async function createChannel(
 export async function updateChannel(
   serverId: string,
   channelId: string,
-  patch: { title?: string; description?: string | null; slowmode_delay?: number },
+  patch: { title?: string; description?: string | null; slowmode_delay?: number; nsfw?: boolean; user_limit?: number | null; bitrate?: number | null },
 ): Promise<Channel> {
   const { data } = await client.patch<Channel>(`/servers/${serverId}/channels/${channelId}`, patch)
   return data
