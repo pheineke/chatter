@@ -273,12 +273,13 @@ async def edit_message(
     # Re-parse mentions: delete old ones then insert new ones
     await db.execute(delete(Mention).where(Mention.message_id == message_id))
     channel = await _get_channel_or_404(channel_id, db)
-    if channel.server_id:
-        await _parse_and_save_mentions(body.content, message_id, channel.server_id, db)
+    server_id = channel.server_id  # capture before expire_all() clears it
+    if server_id:
+        await _parse_and_save_mentions(body.content, message_id, server_id, db)
     await db.commit()
     db.expire_all()
     updated = await _get_message_or_404(message_id, db)
-    msg_read = await _enrich_message_read(updated, channel.server_id, db)
+    msg_read = await _enrich_message_read(updated, server_id, db)
     await manager.broadcast_channel(
         channel_id,
         {"type": "message.updated", "data": msg_read.model_dump(mode="json")},
@@ -371,11 +372,12 @@ async def upload_attachment(
         width=img_width,
         height=img_height,
     ))
+    server_id = channel.server_id  # capture before expire_all() clears it
     await db.commit()
     db.expire_all()
 
     updated = await _get_message_or_404(message_id, db)
-    upload_read = await _enrich_message_read(updated, channel.server_id, db)
+    upload_read = await _enrich_message_read(updated, server_id, db)
     await manager.broadcast_channel(
         channel_id,
         {"type": "message.updated", "data": upload_read.model_dump(mode="json")},
