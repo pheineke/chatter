@@ -41,6 +41,12 @@ function isSoundEnabled(key: SoundKey): boolean {
   return localStorage.getItem(key) !== 'false'
 }
 
+/** Returns the current sound volume as a 0–1 float (default: 0.5). */
+function getSoundVolume(): number {
+  const stored = localStorage.getItem('soundVolume')
+  return stored !== null ? Math.min(1, Math.max(0, Number(stored) / 100)) : 0.5
+}
+
 export function useSoundManager() {
   // Cache Audio instances to avoid re-creation allocations
   const cache = useRef<Partial<Record<SoundKey, HTMLAudioElement>>>({})
@@ -52,9 +58,10 @@ export function useSoundManager() {
       let audio = cache.current[key]
       if (!audio) {
         audio = new Audio(SOUND_FILES[key])
-        audio.volume = 0.5
         cache.current[key] = audio
       }
+      // Read volume fresh each play so settings changes take effect immediately
+      audio.volume = getSoundVolume()
       // Rewind if already playing so overlapping events still trigger
       audio.currentTime = 0
       audio.play().catch(() => {

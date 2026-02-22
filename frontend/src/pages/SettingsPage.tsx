@@ -7,6 +7,7 @@ import { updateMe, uploadAvatar, uploadBanner } from '../api/users'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { UserStatus } from '../api/types'
 import { COLOR_SWATCHES, loadColorOverrides, applyColorOverrides } from '../utils/colorOverrides'
+import { useSoundManager } from '../hooks/useSoundManager'
 
 type Tab = 'account' | 'appearance' | 'voice'
 
@@ -385,6 +386,7 @@ function VoiceTab() {
   const [cameraId, setCameraId] = useState(() => localStorage.getItem('voiceCameraId') ?? '')
   const [inputVol, setInputVol]   = useState(() => Number(localStorage.getItem('voiceInputVol')  ?? 100))
   const [outputVol, setOutputVol] = useState(() => Number(localStorage.getItem('voiceOutputVol') ?? 100))
+  const [soundVolume, setSoundVolume] = useState(() => Number(localStorage.getItem('soundVolume') ?? 50))
   const [micLevel, setMicLevel] = useState(0)
   const [testing, setTesting] = useState(false)
   const [cameraOn, setCameraOn] = useState(false)
@@ -394,6 +396,7 @@ function VoiceTab() {
   const stopTestRef   = useRef<() => void>(() => {})
   const stopCameraRef = useRef<() => void>(() => {})
   const videoRef = useRef<HTMLVideoElement>(null)
+  const { playSound } = useSoundManager()
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {}).finally(() =>
@@ -519,6 +522,34 @@ function VoiceTab() {
       {/* Sound effects */}
       <div className="bg-discord-sidebar rounded-lg p-4">
         <div className="text-xs font-bold text-discord-muted uppercase mb-3">Sound Effects</div>
+
+        {/* Volume slider */}
+        <div className="px-3 pb-3 border-b border-discord-bg mb-2">
+          <div className="flex justify-between text-xs text-discord-muted mb-1">
+            <span>Volume</span>
+            <span>{soundVolume}%</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Icon name="volume-off" size={14} className="text-discord-muted shrink-0" />
+            <input
+              type="range" min={0} max={100} value={soundVolume}
+              onChange={e => {
+                const v = +e.target.value
+                setSoundVolume(v)
+                localStorage.setItem('soundVolume', String(v))
+              }}
+              className="flex-1 accent-discord-mention"
+            />
+            <Icon name="volume-up" size={14} className="text-discord-muted shrink-0" />
+            <button
+              className="shrink-0 text-xs px-2 py-1 rounded bg-discord-bg hover:bg-discord-input transition-colors"
+              onClick={() => playSound('notificationSound')}
+            >
+              Preview
+            </button>
+          </div>
+        </div>
+
         <div className="space-y-1">
           {SOUND_KEYS.map(k => (
             <label key={k} className="flex items-center justify-between py-2.5 px-3 rounded hover:bg-discord-bg transition-colors cursor-pointer select-none">
