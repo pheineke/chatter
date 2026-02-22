@@ -3,6 +3,7 @@ import { useState, useCallback, useRef } from 'react'
 import type { InfiniteData } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
 import { useSoundManager } from './useSoundManager'
+import { useAuth } from '../contexts/AuthContext'
 import type { Message } from '../api/types'
 
 type InfMessages = InfiniteData<Message[]>
@@ -32,8 +33,9 @@ function filterPages(data: InfMessages, pred: (m: Message) => boolean): InfMessa
  *  - `typingUsers`: users currently typing in this channel
  *  - `sendTyping`:  call this when the local user is typing
  */
-export function useChannelWS(channelId: string | null, currentUserId?: string) {
+export function useChannelWS(channelId: string | null) {
   const qc = useQueryClient()
+  const { user } = useAuth()
   const { playSound } = useSoundManager()
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -55,7 +57,7 @@ export function useChannelWS(channelId: string | null, currentUserId?: string) {
           // Clear typing indicator for the sender immediately
           removeTyping(newMsg.author.id)
           // Play notification sound for messages from other users
-          if (currentUserId && newMsg.author.id !== currentUserId) {
+          if (user?.id && newMsg.author.id !== user.id) {
             playSound('notificationSound')
           }
           qc.setQueryData<InfMessages>(key, (old) => {

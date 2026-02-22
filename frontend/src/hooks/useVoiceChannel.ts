@@ -74,10 +74,19 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
    */
   const isImpolite = useCallback((peerId: string) => userId < peerId, [userId])
 
+  // Play disconnect sound when the local user leaves a voice channel
+  const playSoundRef = useRef(playSound)
+  playSoundRef.current = playSound
+  useEffect(() => {
+    if (!channelId) return
+    return () => { playSoundRef.current('disconnectSound') }
+  }, [channelId])
+
   const { send } = useWebSocket(
     channelId && streamReady ? `/ws/voice/${channelId}` : '',
     {
       enabled: channelId !== null && streamReady,
+      onOpen: () => playSound('connectSound'),
       onMessage: (msg) => {
         switch (msg.type) {
           case 'voice.members': {

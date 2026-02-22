@@ -44,7 +44,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
   const { user } = useAuth()
 
   // Real-time channel events (WS lifted here so sendTyping/typingUsers can be passed to children)
-  const { typingUsers, sendTyping } = useChannelWS(channelId ?? null, user?.id)
+  const { typingUsers, sendTyping } = useChannelWS(channelId ?? null)
 
   // Pinned messages query + WS event handling
   const { data: pins = [] } = useQuery({
