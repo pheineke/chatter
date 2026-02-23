@@ -26,7 +26,7 @@
 - ~~**Edited messages show no `(edited)` marker**~~ ✅ Fixed — `is_edited` and `edited_at` fields added to the `Message` model (Alembic migration applied). `edit_message` sets both on save. `MessageRead` schema exposes them. `MessageBubble` shows a muted `(edited)` label after the message content with a tooltip showing the exact edit timestamp.
 - ~~**Real-time reactions trigger a full refetch instead of a cache patch**~~ ✅ Fixed — `useChannelWS` now uses `setQueryData` for both `reaction.added` and `reaction.removed`: added reactions are appended with a dedup guard; removed reactions are filtered out by `(user_id, emoji)` pair. No network request is made.
 - ~~**DM list has no online status indicator or unread badge**~~ ✅ Fixed — `DMSidebar` now lists all conversations with `UserAvatar` + `StatusIndicator` per contact. An unread white dot appears next to any conversation with messages newer than the stored `dmLastRead` timestamp. A green dot badge also appears on the DM button in `ServerSidebar` (via `useUnreadDMs`) whenever any DM has unread messages, even while on a server.
-- **Typing indicator not shown in DMs** — `DMPane` does not call `useChannelWS`, so the "X is typing…" bar and `typing.start` emission are absent from all DM conversations. Server channels work correctly; DMs need the same `useChannelWS` plumbing wired into `DMPane`.
+- ~~**Typing indicator not shown in DMs**~~ ✅ Fixed — `DMPane` now calls `useChannelWS(dmChannel?.channel_id)`, wiring `typingUsers` into the animated "X is typing…" bar and passing `sendTyping` to `MessageInput` via `onTyping`. The backend `/ws/channels/{channel_id}` endpoint already handled `typing` events for all channel types; no backend changes were needed.
 - **No notification sound for incoming server channel messages when not in DM sidebar** — `channel.message` handler in `useUnreadDMs` fires `playSound`, but only if the active route is not already the matching channel. Verified working.
 
 ## 2. Feature Requests: User Profiles
@@ -154,9 +154,9 @@ See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec
 - Deleted originals show a tombstone: *"Original message was deleted"*.
 - Flat list only — no nested threading.
 
-### 5.3. Typing Indicator
--   **Server channels**: ✅ Done — `useChannelWS` tracks `typing.start` events and exposes `typingUsers`; `MessagePane` renders the "X is typing…" bar and `MessageInput` emits `typing.start` via `sendTyping`.
--   **DMs**: ❌ Not yet done — `DMPane` does not call `useChannelWS`, so the indicator is absent from DM conversations. Needs the same hook wired in with the DM `channel_id`.
+### ~~5.3. Typing Indicator~~ ✅ Implemented
+-   **Server channels**: `useChannelWS` tracks `typing.start` events and exposes `typingUsers`; `MessagePane` renders the "X is typing…" bar and `MessageInput` emits `typing.start` via `sendTyping`.
+-   **DMs**: `DMPane` calls `useChannelWS(dmChannel?.channel_id ?? null)`, giving DM conversations the same animated typing bar and outgoing `typing.start` emission as server channels.
 
 ### ~~5.4. @mention Autocomplete~~ ✅ Implemented
 -   Typing `@` in the message input opens a floating autocomplete list of server members filtered in real-time by the typed prefix.

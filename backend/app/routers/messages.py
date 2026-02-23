@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import time
@@ -13,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.database import AsyncSessionLocal
 from app.dependencies import CurrentUser, DB
 from app.rate_limiter import rate_limit_messages
 from app.routers.servers import _require_member
@@ -234,27 +236,54 @@ async def send_message(
     await db.commit()
     sent = result.scalar_one()
     msg_read = await _enrich_message_read(sent, channel.server_id, db)
-    event = {"type": "message.created", "data": msg_read.model_dump(mode="json")}
-    await manager.broadcast_channel(channel_id, event)
-    # Notify server members about new activity in this channel (for unread indicators)
-    if channel.server_id:
-        notify_event = {"type": "channel.message", "data": {"channel_id": str(channel_id), "server_id": str(channel.server_id)}}
-        await manager.broadcast_server(channel.server_id, notify_event)
-        # Also push to each member's personal /ws/me room so they get notified
-        # regardless of which server they're currently viewing.
-        member_rows = await db.execute(
-            select(ServerMember.user_id).where(
-                ServerMember.server_id == channel.server_id,
-                ServerMember.user_id != current_user.id,
-            )
-        )
-        for uid in member_rows.scalars().all():
-            await manager.broadcast_user(uid, notify_event)
-    # For DM channels also push to each participant's personal room
-    if channel.type == ChannelType.dm:
-        participants = await _get_dm_participants(channel_id, db)
-        for uid in participants:
-            await manager.broadcast_user(uid, event)
+
+    # --- fire-and-forget all WS notifications --------------------------------
+    # Captured before the task to avoid holding a reference to the DB session.
+    _server_id = channel.server_id
+    _channel_type = channel.type
+    _sender_id = current_user.id
+    _event = {"type": "message.created", "data": msg_read.model_dump(mode="json")}
+
+    async def _notify() -> None:
+        # 1. All clients currently viewing this channel get the new message.
+        await manager.broadcast_channel(channel_id, _event)
+
+        if _server_id:
+            # 2. Server-level "channel.message" for sidebar unread indicators
+            #    (hits every client connected to the server WS).
+            notify_event = {
+                "type": "channel.message",
+                "data": {"channel_id": str(channel_id), "server_id": str(_server_id)},
+            }
+            await manager.broadcast_server(_server_id, notify_event)
+
+            # 3. Push the same notification to each member's personal /ws/me
+            #    room so users on a different server or in DMs still see the badge.
+            #    Use a fresh session — the request session may be closed by now.
+            async with AsyncSessionLocal() as new_db:
+                member_rows = await new_db.execute(
+                    select(ServerMember.user_id).where(
+                        ServerMember.server_id == _server_id,
+                        ServerMember.user_id != _sender_id,
+                    )
+                )
+                member_ids = member_rows.scalars().all()
+            await manager.broadcast_to_users(member_ids, notify_event)
+
+        if _channel_type == ChannelType.dm:
+            # Push the full message event to both participants' personal rooms
+            # so their DM sidebar unread indicator updates instantly.
+            async with AsyncSessionLocal() as new_db:
+                dmc_row = await new_db.execute(
+                    select(DMChannel).where(DMChannel.channel_id == channel_id)
+                )
+                dmc = dmc_row.scalar_one_or_none()
+            if dmc:
+                await manager.broadcast_to_users(
+                    [dmc.user_a_id, dmc.user_b_id], _event
+                )
+
+    asyncio.create_task(_notify())
     return msg_read
 
 

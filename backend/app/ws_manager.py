@@ -100,6 +100,27 @@ class ConnectionManager:
     async def broadcast_user(self, user_id: uuid.UUID, event: dict[str, Any]) -> None:
         await self.broadcast(self.user_room(user_id), event)
 
+    async def broadcast_to_users(
+        self, user_ids: list[uuid.UUID], event: dict[str, Any]
+    ) -> None:
+        """Broadcast *event* to a list of user personal rooms.
+
+        Serialises the payload exactly once and fans out to every connected
+        socket across all supplied user rooms, avoiding the O(N) json.dumps
+        overhead of calling broadcast_user() in a loop.
+        """
+        payload = json.dumps(event, default=str)
+        dead: list[tuple[str, WebSocket]] = []
+        for uid in user_ids:
+            room = self.user_room(uid)
+            for ws in list(self._rooms.get(room, [])):
+                try:
+                    await ws.send_text(payload)
+                except Exception:
+                    dead.append((room, ws))
+        for room, ws in dead:
+            await self.disconnect(room, ws)
+
 
 # Singleton used throughout the application
 manager = ConnectionManager()
