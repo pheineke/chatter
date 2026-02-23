@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
-export const client = axios.create({ baseURL: BASE_URL })
+export const client = axios.create({ baseURL: BASE_URL, timeout: 15_000 })
 
 // Attach JWT to every request when present
 client.interceptors.request.use((config) => {
