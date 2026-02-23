@@ -71,6 +71,15 @@ export async function createCategory(serverId: string, title: string): Promise<C
   return data
 }
 
+export async function updateCategory(serverId: string, categoryId: string, title: string): Promise<Category> {
+  const { data } = await client.patch<Category>(`/servers/${serverId}/categories/${categoryId}`, { title })
+  return data
+}
+
+export async function deleteCategory(serverId: string, categoryId: string): Promise<void> {
+  await client.delete(`/servers/${serverId}/categories/${categoryId}`)
+}
+
 /** Returns a map of channelId → participants for all active voice channels in the server. */
 export async function getServerVoicePresence(serverId: string): Promise<Record<string, VoiceParticipant[]>> {
   const { data } = await client.get<Record<string, VoiceParticipant[]>>(`/servers/${serverId}/voice-presence`)

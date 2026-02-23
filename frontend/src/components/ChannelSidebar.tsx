@@ -1,7 +1,7 @@
 import { useNavigate, useParams, useMatch } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useCallback, type ReactNode } from 'react'
-import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory } from '../api/channels'
+import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory, updateCategory, deleteCategory } from '../api/channels'
 import { getMembers, getServer } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
 import { StatusIndicator } from './StatusIndicator'
@@ -86,6 +86,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [editChannelName, setEditChannelName] = useState('')
   const [editChannelDesc, setEditChannelDesc] = useState('')
   const [editSlowmode, setEditSlowmode] = useState(0)
+  const [editCategory, setEditCategory] = useState<{ id: string; title: string } | null>(null)
+  const [editCategoryName, setEditCategoryName] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -166,6 +168,33 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     })
   }
 
+  function openCategoryContextMenu(e: React.MouseEvent, cat: { id: string; title: string }) {
+    if (!isAdmin) return
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Edit Category',
+          icon: 'edit-2',
+          onClick: () => { setEditCategory(cat); setEditCategoryName(cat.title) },
+        },
+        {
+          label: 'Delete Category',
+          icon: 'trash-2',
+          danger: true,
+          onClick: async () => {
+            if (!serverId) return
+            await deleteCategory(serverId, cat.id)
+            qc.invalidateQueries({ queryKey: ['categories', serverId] })
+          },
+        },
+      ],
+    })
+  }
+
   async function handleSaveEditChannel() {
     if (!serverId || !editChannel || !editChannelName.trim()) return
     await updateChannel(serverId, editChannel.id, {
@@ -175,6 +204,13 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     })
     qc.invalidateQueries({ queryKey: ['channels', serverId] })
     setEditChannel(null)
+  }
+
+  async function handleSaveEditCategory() {
+    if (!serverId || !editCategory || !editCategoryName.trim()) return
+    await updateCategory(serverId, editCategory.id, editCategoryName.trim())
+    qc.invalidateQueries({ queryKey: ['categories', serverId] })
+    setEditCategory(null)
   }
 
   // Build sorted flat list: [cat:A, ch:1, ch:2, cat:B, ch:3, ch:4, ...]
@@ -297,7 +333,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                 if (itemId.startsWith('cat:')) {
                   const cat = categories.find(c => c.id === itemId.replace('cat:', ''))
                   if (!cat) return null
-                  return <SortableCatHeader key={itemId} id={itemId} title={cat.title} collapsed={collapsedCats.has(cat.id)} onToggle={() => toggleCat(cat.id)} />
+                  return <SortableCatHeader key={itemId} id={itemId} title={cat.title} collapsed={collapsedCats.has(cat.id)} onToggle={() => toggleCat(cat.id)} onContextMenu={e => openCategoryContextMenu(e, cat)} />
                 }
                 const ch = channels.find(c => c.id === itemId.replace('ch:', ''))
                 if (!ch) return null
@@ -358,6 +394,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   <button
                     key={itemId}
                     onClick={() => toggleCat(cat.id)}
+                    onContextMenu={e => openCategoryContextMenu(e, cat)}
                     className="w-full flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider hover:text-discord-text transition-colors select-none"
                   >
                     <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
@@ -442,6 +479,31 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
           </span>
         )}
       </div>
+
+      {/* Edit category modal */}
+      {editCategory && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditCategory(null)}>
+          <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4">Edit Category</h2>
+            <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Category Name</label>
+            <input
+              autoFocus
+              className="input w-full mb-4"
+              value={editCategoryName}
+              onChange={(e) => setEditCategoryName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditCategory() }}
+            />
+            <div className="flex gap-2">
+              <button className="btn flex-1" onClick={handleSaveEditCategory} disabled={!editCategoryName.trim()}>
+                Save
+              </button>
+              <button className="btn flex-1 bg-discord-input hover:bg-discord-input/70" onClick={() => setEditCategory(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add category modal */}
       {showAddCategory && (
@@ -704,7 +766,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
 
 // ---- Drag-and-drop wrappers (used only in admin mode) ----------------------
 
-function SortableCatHeader({ id, title, collapsed, onToggle }: { id: string; title: string; collapsed?: boolean; onToggle?: () => void }) {
+function SortableCatHeader({ id, title, collapsed, onToggle, onContextMenu }: { id: string; title: string; collapsed?: boolean; onToggle?: () => void; onContextMenu?: (e: React.MouseEvent) => void }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id })
   return (
     <div
@@ -712,6 +774,7 @@ function SortableCatHeader({ id, title, collapsed, onToggle }: { id: string; tit
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`group flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider select-none cursor-pointer hover:text-discord-text transition-colors ${isDragging ? 'opacity-0' : ''}`}
       onClick={onToggle}
+      onContextMenu={onContextMenu}
       {...attributes}
     >
       <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
