@@ -126,7 +126,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
 
   if (channel?.type === 'voice') {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 text-discord-muted">
+      <div className="h-full flex flex-col items-center justify-center gap-4 text-discord-muted">
         <div className="text-5xl">🔊</div>
         <h2 className="text-xl font-bold text-discord-text">{channel.title}</h2>
         <p className="text-sm">Voice Channel</p>

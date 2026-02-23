@@ -1012,9 +1012,6 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
         {hasUnread && !active && (
           <span className="ml-auto w-2 h-2 rounded-full bg-white shrink-0" aria-label="Unread messages" />
         )}
-        {inThisVoice && (
-          <span className="ml-auto text-discord-online text-xs">● Live</span>
-        )}
       </button>
 
       {/* Voice participants */}
