@@ -21,9 +21,11 @@ interface Props {
   voiceSession: VoiceSession | null
   onJoinVoice: (s: VoiceSession) => void
   onLeaveVoice: () => void
+  /** Called when the mobile hamburger button is tapped */
+  onOpenNav?: () => void
 }
 
-export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) {
+export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav }: Props) {
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
   const navigate = useNavigate()
   const [showMembers, setShowMembers] = useState(true)
@@ -142,6 +144,16 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
     <div className="flex flex-col h-full">
       {/* Channel header */}
       <div className="flex items-center gap-2 px-4 border-b border-black/20 shadow-sm shrink-0 h-12 min-w-0">
+        {/* Mobile: open left-panel drawer */}
+        {onOpenNav && (
+          <button
+            className="md:hidden p-1 -ml-1 mr-1 text-discord-muted hover:text-discord-text shrink-0"
+            onClick={onOpenNav}
+            aria-label="Open navigation"
+          >
+            <Icon name="menu" size={22} />
+          </button>
+        )}
         <span className="text-discord-muted font-semibold shrink-0">#</span>
         <span className="font-bold shrink-0">{channel?.title ?? channelId}</span>
         {channel?.description && (
@@ -175,11 +187,11 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
         >
           <Icon name="search" size={20} />
         </button>
-        {/* Members toggle */}
+        {/* Members toggle — hidden on mobile (member list has no space) */}
         <button
           onClick={() => setShowMembers(v => !v)}
           title="Toggle member list"
-          className={`p-1.5 rounded transition-colors shrink-0 ${showMembers ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+          className={`hidden md:block p-1.5 rounded transition-colors shrink-0 ${showMembers ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
         >
           <Icon name="people" size={20} />
         </button>

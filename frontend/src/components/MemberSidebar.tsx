@@ -80,7 +80,7 @@ export function MemberSidebar({ serverId }: Props) {
   const offlineSorted = [...offline].sort((a, b) => a.user.username.localeCompare(b.user.username))
 
   return (
-    <div className="w-60 shrink-0 bg-discord-sidebar flex flex-col h-full overflow-y-auto border-l border-black/20">
+    <div className="hidden md:flex flex-col w-60 shrink-0 bg-discord-sidebar h-full overflow-y-auto border-l border-black/20">
       <div className="px-3 flex items-center h-12 shrink-0 border-b border-black/20 shadow-sm">
         <span className="text-xs font-bold uppercase text-discord-muted tracking-wider">
           Members — {members.length}

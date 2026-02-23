@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useMatch } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -38,7 +38,11 @@ export default function AppShell() {
   useTabBadge(unreadChannels.size + (hasUnreadDMs ? 1 : 0), user?.status === 'dnd')
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showLeftDrawer, setShowLeftDrawer] = useState(false)
   const location = useLocation()
+
+  // Auto-close the mobile left-panel drawer whenever the user navigates
+  useEffect(() => { setShowLeftDrawer(false) }, [location.pathname])
 
   // Build channel path list for Alt+↑/↓ navigation
   const channelMatch = useMatch('/channels/:serverId/:channelId')
@@ -78,33 +82,46 @@ export default function AppShell() {
         <Route path=":serverId/settings" element={<ServerSettingsPage />} />
         <Route path="*" element={
           <VoiceCallProvider session={voiceSession} userId={user?.id ?? ''}>
-            {/* Far-left: server icons */}
-            <ServerSidebar hasUnreadDMs={hasUnreadDMs} />
+            {/* Mobile backdrop — tap outside drawer to close */}
+            {showLeftDrawer && (
+              <div
+                className="md:hidden fixed inset-0 z-30 bg-black/60"
+                onClick={() => setShowLeftDrawer(false)}
+              />
+            )}
 
-            {/* Second column: channel/DM list */}
-            <div className="flex flex-col w-60 shrink-0 bg-discord-sidebar overflow-hidden">
-              <Routes>
-                <Route path="@me/*" element={<DMSidebar />} />
-                <Route
-                  path=":serverId/*"
-                  element={
-                    <ChannelSidebar
-                      voiceSession={voiceSession}
-                      onJoinVoice={setVoiceSession}
-                      onLeaveVoice={handleLeaveVoice}
-                    />
-                  }
-                />
-              </Routes>
+            {/* ── Left panel: server icons + channel/DM list ──────────────
+                Mobile (<md): fixed off-screen, slides in from left.
+                Desktop (md+): static in-flow columns, always visible.   */}
+            <div className={`flex fixed inset-y-0 left-0 z-40 transition-transform duration-200 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
+              {/* Far-left: server icons */}
+              <ServerSidebar hasUnreadDMs={hasUnreadDMs} />
+
+              {/* Second column: channel/DM list */}
+              <div className="flex flex-col w-60 shrink-0 bg-discord-sidebar overflow-hidden">
+                <Routes>
+                  <Route path="@me/*" element={<DMSidebar />} />
+                  <Route
+                    path=":serverId/*"
+                    element={
+                      <ChannelSidebar
+                        voiceSession={voiceSession}
+                        onJoinVoice={setVoiceSession}
+                        onLeaveVoice={handleLeaveVoice}
+                      />
+                    }
+                  />
+                </Routes>
+              </div>
             </div>
 
-            {/* Main area */}
+            {/* Main area — always full-width on mobile */}
             <div className="flex flex-col flex-1 min-w-0">
               <div className="flex-1 min-h-0 overflow-hidden">
                 <Routes>
                   <Route index element={<Navigate to="@me" replace />} />
-                  <Route path="@me" element={<FriendsPane />} />
-                  <Route path="@me/:dmUserId" element={<DMPane />} />
+                  <Route path="@me" element={<FriendsPane onOpenNav={() => setShowLeftDrawer(true)} />} />
+                  <Route path="@me/:dmUserId" element={<DMPane onOpenNav={() => setShowLeftDrawer(true)} />} />
                   <Route path=":serverId" element={
                     <div className="h-full flex items-center justify-center text-discord-muted">
                       Select a channel to start chatting.
@@ -112,7 +129,7 @@ export default function AppShell() {
                   } />
                   <Route
                     path=":serverId/:channelId"
-                    element={<MessagePane voiceSession={voiceSession} onJoinVoice={setVoiceSession} onLeaveVoice={handleLeaveVoice} />}
+                    element={<MessagePane voiceSession={voiceSession} onJoinVoice={setVoiceSession} onLeaveVoice={handleLeaveVoice} onOpenNav={() => setShowLeftDrawer(true)} />}
                   />
                 </Routes>
               </div>

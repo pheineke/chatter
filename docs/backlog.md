@@ -275,15 +275,13 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 
 ## 10. UI & Responsiveness
 
-### 10.1. Mobile / Responsive Layout
--   The app is currently desktop-only — sidebars are fixed-width and overflow on narrow viewports.
--   **Target breakpoints**: ≥1024 px (desktop, current layout), 768–1023 px (tablet, hide member list by default), <768 px (mobile, show only one pane at a time with swipe/back navigation).
--   Mobile changes:
-    -   Server sidebar collapses to a bottom tab bar or a swipeable drawer.
-    -   Channel sidebar slides in over the main pane (hamburger icon in channel header to open).
-    -   Member list is hidden by default; accessible via a toolbar icon.
-    -   Message input uses `type="text"` with appropriate `inputmode` for mobile keyboards.
--   No native shell required — responsive CSS + React state is sufficient for a PWA-style experience.
+### ~~10.1. Mobile / Responsive Layout~~ ✅ Implemented
+-   **≥ 768 px (tablet/desktop)**: sidebars are static in-flow columns — layout unchanged.
+-   **< 768 px (mobile)**: server icons column + channel/DM list column collapse into a single compound left-panel **slide-in drawer** (z-40, `translate-x` driven).
+    -   A hamburger ☰ button (`md:hidden`) appears at the left of every main-pane header (channels, DMs, Friends) to open the drawer.
+    -   Tapping the backdrop (semi-transparent overlay, z-30) or navigating to any route auto-closes the drawer via a `useEffect([location.pathname])` in `AppShell`.
+    -   Member list sidebar and its toggle button are hidden on mobile (`hidden md:flex` / `hidden md:block`) — no member panel cramping the message area.
+-   No native shell required — pure Tailwind responsive classes + React state in `AppShell`.
 
 ### ~~9.1. Per-Channel & Per-Server Notification Settings~~ ✅ Implemented
 -   Three levels: **All Messages**, **Mentions Only**, **Mute**. Stored in `user_channel_notification_settings` and `user_server_notification_settings` tables (migration `l4m5n6o7p8q9`).

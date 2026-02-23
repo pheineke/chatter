@@ -9,9 +9,10 @@ import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { Icon } from './Icon'
 import type { Message } from '../api/types'
 
-export function DMPane() {
+export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
   const { dmUserId } = useParams<{ dmUserId: string }>()
   const { user } = useAuth()
   const [replyTo, setReplyTo] = useState<Message | null>(null)
@@ -46,6 +47,15 @@ export function DMPane() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-black/20 shadow-sm shrink-0">
+        {onOpenNav && (
+          <button
+            className="md:hidden p-1 -ml-1 text-discord-muted hover:text-discord-text shrink-0"
+            onClick={onOpenNav}
+            aria-label="Open navigation"
+          >
+            <Icon name="menu" size={22} />
+          </button>
+        )}
         <div className="relative">
           <UserAvatar user={otherUser ?? null} size={32} />
           {otherUser && (

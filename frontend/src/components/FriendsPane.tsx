@@ -14,7 +14,7 @@ import { StatusIndicator } from './StatusIndicator'
 
 type Tab = 'online' | 'all' | 'pending' | 'add'
 
-export function FriendsPane() {
+export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { user: currentUser } = useAuth()
@@ -78,6 +78,15 @@ export function FriendsPane() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-0 px-4 py-3 border-b border-black/20 shadow-sm shrink-0 space-x-1">
+        {onOpenNav && (
+          <button
+            className="md:hidden p-1 -ml-1 mr-3 text-discord-muted hover:text-discord-text shrink-0"
+            onClick={onOpenNav}
+            aria-label="Open navigation"
+          >
+            <Icon name="menu" size={22} />
+          </button>
+        )}
         <span className="font-bold mr-4">Friends</span>
         {(['online', 'all', 'pending', 'add'] as Tab[]).map((t) => (
           <button
