@@ -7,6 +7,7 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { MemberSidebar } from './MemberSidebar'
 import { PinnedMessagesPanel } from './PinnedMessagesPanel'
+import { SearchPanel } from './SearchPanel'
 import { VoiceGridPane } from './VoiceGridPane'
 import { Icon } from './Icon'
 import type { VoiceSession } from '../pages/AppShell'
@@ -26,6 +27,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
   const [showMembers, setShowMembers] = useState(true)
   const [showPins, setShowPins] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const scrollToMessageRef = useRef<((id: string) => void) | null>(null)
   const { markRead, markServerRead } = useUnreadChannels()
@@ -36,6 +38,18 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
     if (channelId) markRead(channelId)
     if (serverId) markServerRead(serverId)
   }, [channelId, serverId, markRead, markServerRead])
+
+  // Ctrl+F / Cmd+F  →  toggle search panel
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        setShowSearch(v => !v)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
 
   const handleReply = useCallback((msg: Message) => setReplyTo(msg), [])
   const handleCancelReply = useCallback(() => setReplyTo(null), [])
@@ -145,6 +159,14 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
             <span className="ml-0.5 text-xs text-discord-muted">{pinnedIds.size}</span>
           )}
         </button>
+        {/* Search toggle */}
+        <button
+          onClick={() => setShowSearch(v => !v)}
+          title={showSearch ? 'Close search' : 'Search messages (Ctrl+F)'}
+          className={`p-1.5 rounded transition-colors shrink-0 ${showSearch ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+        >
+          <Icon name="search" size={20} />
+        </button>
         {/* Members toggle */}
         <button
           onClick={() => setShowMembers(v => !v)}
@@ -203,6 +225,15 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
             channelId={channelId}
             onScrollToMessage={(id) => scrollToMessageRef.current?.(id)}
             onClose={() => setShowPins(false)}
+          />
+        )}
+
+        {/* Search panel */}
+        {showSearch && (
+          <SearchPanel
+            channelId={channelId}
+            onJump={(id) => scrollToMessageRef.current?.(id)}
+            onClose={() => setShowSearch(false)}
           />
         )}
 

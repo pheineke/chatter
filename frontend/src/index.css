@@ -62,6 +62,59 @@ body {
   display: none;
 }
 
+/* ── Discord-flavoured markdown ─────────────────────────────────────────── */
+.discord-markdown {
+  @apply text-sm text-discord-text break-words leading-relaxed;
+}
+.discord-markdown p {
+  @apply m-0;
+}
+.discord-markdown p + p {
+  @apply mt-1;
+}
+.discord-markdown strong, .discord-markdown b {
+  @apply font-bold text-white;
+}
+.discord-markdown em, .discord-markdown i {
+  @apply italic;
+}
+.discord-markdown del, .discord-markdown s {
+  @apply line-through;
+}
+.discord-markdown code {
+  @apply bg-black/40 text-discord-text rounded px-1 py-0.5 text-[13px] font-mono;
+}
+.discord-markdown pre {
+  @apply bg-black/40 rounded p-3 my-1 overflow-x-auto;
+}
+.discord-markdown pre code {
+  @apply bg-transparent p-0;
+}
+.discord-markdown blockquote {
+  @apply border-l-4 border-discord-muted/50 pl-3 my-1 text-discord-muted;
+}
+.discord-markdown ul {
+  @apply list-disc pl-5 my-1;
+}
+.discord-markdown ol {
+  @apply list-decimal pl-5 my-1;
+}
+.discord-markdown li {
+  @apply my-0.5;
+}
+/* External link */
+.md-link {
+  @apply text-discord-mention underline hover:text-indigo-300 transition-colors;
+}
+/* Spoiler */
+.spoiler {
+  @apply bg-discord-muted/30 text-transparent rounded cursor-pointer select-none px-0.5
+         transition-colors;
+}
+.spoiler.revealed {
+  @apply bg-discord-muted/20 text-discord-text;
+}
+
 /* Reply jump highlight */
 @keyframes highlight-flash {
   0%   { background-color: rgba(88, 101, 242, 0.25); }

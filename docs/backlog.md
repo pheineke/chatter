@@ -163,10 +163,10 @@ See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec
 -   Keyboard navigation: ↑/↓ to move, Enter/Tab to select, Escape to dismiss.
 -   The selected member's `@username` is inserted at the cursor position; the picker respects the `serverId` prop (DMs have no server members so no autocomplete is shown there).
 
-### 5.5. Message Search
--   A search bar (Ctrl+F or toolbar icon) allows searching messages within the current channel or across the entire server.
--   Results appear in a side panel with author, timestamp, and a "Jump" link to the message.
--   Backend: `GET /channels/{id}/messages?q=<query>` using SQLite `LIKE` or FTS5.
+### ~~5.5. Message Search~~ ✅ Implemented
+-   A search icon button (and Ctrl+F shortcut) in the channel header opens a `SearchPanel` sidebar.
+-   Debounced text input (300 ms); results rendered as cards with author avatar, username, timestamp, and truncated content; clicking a result jumps to the message and closes the panel.
+-   Backend: `GET /channels/{id}/messages?q=<query>` using SQLite `LIKE` full-text scan; cursor pagination is disabled in search mode.
 
 ### ~~5.6. Pinned Messages~~ ✅ Implemented
 -   Any member can pin a message via the hover action bar or right-click context menu; admins can unpin from the same menu or from the pins panel.
@@ -178,20 +178,11 @@ See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec
 -   Intersection observer fires `fetchNextPage` when the top sentinel scrolls into view; scroll position is preserved during prepend via `useLayoutEffect`.
 -   "You've reached the beginning of this channel" indicator shown when no more pages exist.
 
-### 5.8. Markdown Rendering in Messages
--   Message content is currently rendered as plain text — `**bold**`, `*italic*`, `` `code` ``, ` ```code blocks``` `, `> blockquote`, `~~strikethrough~~`, and `||spoiler||` all display as raw characters.
--   Implement Discord-flavoured markdown parsing and render the result as safe HTML:
-    -   **Bold** `**text**` / `__text__`
-    -   **Italic** `*text*` / `_text_`
-    -   **Underline** `__text__` (Discord overloads this)
-    -   **Strikethrough** `~~text~~`
-    -   **Inline code** `` `code` ``
-    -   **Code block** ` ```lang\ncode\n``` ` with optional syntax highlighting
-    -   **Blockquote** `> text`
-    -   **Spoiler** `||text||` — hidden by default, revealed on click
-    -   **@mention** and **URL** linkification must continue to work within parsed markdown
--   Use a lightweight parser (e.g. `marked` or a custom regex pipeline) — do **not** use a full CommonMark renderer that would allow arbitrary HTML injection.
--   All rendered HTML must pass through DOMPurify before being inserted into the DOM.
+### ~~5.8. Markdown Rendering in Messages~~ ✅ Implemented
+-   `marked` v17 + DOMPurify pipeline in `utils/markdown.ts`; `renderMarkdown(text)` parses Discord-flavoured markdown and sanitises through a strict tag/attr allowlist.
+-   Supported: **bold**, *italic*, ~~strikethrough~~, inline code, fenced code blocks, blockquotes, lists, external links (new tab), `@mention` spans, `||spoiler||` (click to reveal).
+-   `MarkdownContent.tsx` renders via `dangerouslySetInnerHTML`; spoiler reveal uses React event delegation (no `onclick` attrs — DOMPurify strips those).
+-   CSS in `index.css`: `.discord-markdown`, `.spoiler`, `.spoiler.revealed`, `.md-link`.
 
 ### 5.9. Inline Image / URL Embeds
 -   When a message contains a bare image URL (`.png`, `.jpg`, `.gif`, `.webp`) that is the only content or is on its own line, render an inline image preview below the message text.
@@ -220,20 +211,20 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 
 ## 8. Feature Requests: Security & Privacy
 
-### 8.1. DM Restrictions
--   Users can restrict who may send them direct messages: **everyone**, **friends only**, or **server members only** (users sharing at least one server).
--   Attempts from disallowed users return a clear error rather than silently failing.
--   Configurable in user account settings under a "Privacy" tab.
+### ~~8.1. DM Restrictions~~ ✅ Implemented
+-   `DMPermission` enum (`everyone` / `friends_only` / `server_members_only`) stored on `User`.
+-   `GET /dms/{user_id}/channel` enforces the target's preference: checks accepted friendship or shared server membership before creating/returning the DM channel; block check runs first.
+-   Settings → Privacy & Safety tab exposes three radio options that `PATCH /me` immediately.
 
-### 8.2. Block User
--   A user can block another user from their profile card or message context menu.
--   Effects: blocked user cannot send DMs; their messages in shared servers are hidden/collapsed with an expandable "Blocked message" placeholder.
--   Block list is manageable from account settings.
+### ~~8.2. Block User~~ ✅ Implemented
+-   Block/unblock buttons in `ProfileCard` via `useBlocks` hook (`POST /users/{id}/block`, `DELETE /users/{id}/block`).
+-   Blocked users' messages are hidden with a "Blocked message" placeholder and a "Show message" toggle; blocked users cannot open a DM with the blocker.
+-   Block list accessible from account settings.
 
-### 8.3. Input Sanitization & XSS Protection
--   All user-supplied content rendered in the frontend (messages, display names, server names, bios, etc.) must be sanitized before insertion into the DOM.
--   Use a well-maintained library (e.g. DOMPurify) for any HTML rendering path.
--   Backend should also strip or reject payloads containing dangerous HTML/script tags.
+### ~~8.3. Input Sanitization & XSS Protection~~ ✅ Implemented
+-   All message HTML is rendered via `renderMarkdown()` which passes output through `DOMPurify.sanitize()` with a strict ALLOWED_TAGS/ALLOWED_ATTR allowlist before `dangerouslySetInnerHTML` insertion.
+-   Display names, server names, channel descriptions, and bios are rendered as React text nodes — inherently XSS-safe.
+-   `onclick` attrs are stripped by DOMPurify; spoiler interactivity uses React event delegation instead.
 
 ### 8.4. Auth Token Rotation & Invalidation
 -   JWT access tokens are short-lived; refresh tokens are issued alongside and rotated on every use.
@@ -261,20 +252,15 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   **Fallback**: If the recipient's public key is unavailable (e.g. new account, cleared storage), display a clear warning instead of sending plaintext.
 -   Implement using the [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) or a well-audited library such as `libsodium.js`.
 
-### 8.8. Profile Update Rate Limiting
--   Users are limited in how frequently they can update their profile (avatar, display name, bio, banner, etc.) to prevent abuse (e.g. rapid avatar cycling to evade bans or spam notifications).
--   **Default limits** (configurable via `.env`):
-    -   Avatar / banner image: max **2 updates per 10 minutes** per user.
-    -   Display name / bio / pronouns: max **5 updates per 10 minutes** per user.
--   Enforced on the backend; exceeding the limit returns HTTP `429 Too Many Requests` with a `Retry-After` header indicating when the next update is allowed.
--   The frontend should surface a clear message such as "You're updating your profile too quickly. Please wait X seconds."
+### ~~8.8. Profile Update Rate Limiting~~ ✅ Implemented
+-   `app/utils/rate_limiter.py` — sliding-window `RateLimiter`; two shared instances: `image_limiter` (2 / 10 min) and `profile_limiter` (5 / 10 min).
+-   `POST /me/avatar` and `POST /me/banner` check `image_limiter`; `PATCH /me` checks `profile_limiter` when description or pronouns are being updated.
+-   All three return HTTP `429` with `Retry-After` header on breach; frontend surfaces the detail string in the profile error banner.
 
-### 8.9. Change Password
--   Users should be able to change their password from account settings without logging out.
--   Form: current password (verification), new password, confirm new password fields.
--   Backend: `POST /me/change-password` — verify current password hash, validate new password strength (min 8 chars), hash and store.
--   Frontend: Settings → Account → "Change Password" section with a save button and clear error/success feedback.
--   On success, existing JWT tokens remain valid (no forced re-login), but the session continues as normal.
+### ~~8.9. Change Password~~ ✅ Implemented
+-   `POST /users/me/change-password` — verifies current password hash, enforces ≥ 8 char minimum, hashes and stores the new password; returns 204.
+-   `changePassword(currentPassword, newPassword)` API helper in `users.ts`.
+-   Settings → My Account → **Change Password** section: current / new / confirm inputs, client-side validation, loading state, inline error and 4-second success toast. Existing sessions remain valid after the change.
 
 ## 10. UI & Responsiveness
 
@@ -288,16 +274,12 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
     -   Message input uses `type="text"` with appropriate `inputmode` for mobile keyboards.
 -   No native shell required — responsive CSS + React state is sufficient for a PWA-style experience.
 
-### 9.1. Per-Channel & Per-Server Notification Settings
--   Users can configure notification level independently for each server and each channel:
-    -   **All Messages** — every message triggers an unread indicator and sound.
-    -   **@Mentions Only** — only messages that `@mention` the user (or `@everyone` / `@here`) produce an unread indicator and sound.
-    -   **Nothing (Mute)** — no unread badge, no sound, no badge on the server icon.
--   Server-level setting acts as the default for all its channels; a channel-level setting overrides the server default.
--   Stored per-user per-server/channel in new `user_server_notification_settings` and `user_channel_notification_settings` tables (columns: `user_id`, `server_id`/`channel_id`, `level ENUM('all','mentions','mute')`).
--   REST endpoints: `PUT /me/notification-settings/servers/{id}` and `PUT /me/notification-settings/channels/{id}`.
--   UI entry point: right-clicking a server icon or channel name opens a "Notification Settings" sub-menu with the three options radio-selected.
--   "Muted" channels and servers display a crossed-out bell icon (🔕) in the sidebar so the state is always discoverable.
+### ~~9.1. Per-Channel & Per-Server Notification Settings~~ ✅ Implemented
+-   Three levels: **All Messages**, **Mentions Only**, **Mute**. Stored in `user_channel_notification_settings` and `user_server_notification_settings` tables (migration `l4m5n6o7p8q9`).
+-   REST: `GET /me/notification-settings`, `PUT /me/notification-settings/channels/{id}`, `PUT /me/notification-settings/servers/{id}`.
+-   `useNotificationSettings` hook wraps TanStack Query with optimistic updates and 60-second stale time.
+-   Right-clicking any channel (admin or member) shows a notification sub-menu with check-mark on current level; muted channels display 🔕 in the sidebar.
+-   `useServerWS` and `useUnreadDMs` skip sound/unread notifications when `channelLevel(id) === 'mute'`.
 
 ### 9.2. Browser / Desktop Push Notifications
 -   When the browser tab is in the background or minimised, qualifying messages (per the user's per-channel settings) trigger a native browser `Notification` via the [Web Notifications API](https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API).

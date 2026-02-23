@@ -10,7 +10,7 @@ import { ContextMenu } from './ContextMenu'
 import type { Message } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useBlocks } from '../hooks/useBlocks'
-import { Linkified } from '../utils/linkify'
+import { MarkdownContent } from './MarkdownContent'
 
 interface Props {
   message: Message
@@ -36,11 +36,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-/** Render plain text content, turning @mentions blue and URLs into links. */
-function Content({ text }: { text: string }) {
-  return <Linkified text={text} />
 }
 
 export function MessageBubble({ message: msg, channelId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
@@ -188,12 +183,12 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
             </div>
           </div>
         ) : (
-          <p className="text-sm text-discord-text break-words whitespace-pre-wrap leading-relaxed">
-            {msg.content && <Content text={msg.content} />}
-            {msg.is_edited && (
-              <span className="text-[11px] text-discord-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
-            )}
-          </p>
+          <div className="text-sm text-discord-text break-words leading-relaxed">
+            {msg.content && <MarkdownContent text={msg.content} />}
+          </div>
+        )}
+        {msg.is_edited && (
+          <span className="text-[11px] text-discord-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
         )}
 
         {/* Attachments */}

@@ -20,6 +20,7 @@ import type { Channel, VoiceParticipant, Member, User } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import type { VoiceSession } from '../pages/AppShell'
 import { ProfileCard } from './ProfileCard'
+import { useNotificationSettings } from '../hooks/useNotificationSettings'
 
 interface Props {
   voiceSession: VoiceSession | null
@@ -37,6 +38,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
   useServerWS(serverId ?? null, channelId)
   const { unreadChannels } = useUnreadChannels()
+  const { channelLevel, setChannelLevel } = useNotificationSettings()
 
   const { data: server } = useQuery({
     queryKey: ['server', serverId],
@@ -142,29 +144,47 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   }
 
   function openChannelContextMenu(e: React.MouseEvent, ch: Channel) {
-    if (!isAdmin) return
     e.preventDefault()
     e.stopPropagation()
+    const currentLevel = channelLevel(ch.id)
+    const notifItems: ContextMenuItem[] = [
+      {
+        label: currentLevel === 'all' ? '✓ All Messages' : 'All Messages',
+        icon: 'bell',
+        onClick: () => setChannelLevel(ch.id, 'all'),
+      },
+      {
+        label: currentLevel === 'mentions' ? '✓ Mentions Only' : 'Mentions Only',
+        icon: 'at-sign',
+        onClick: () => setChannelLevel(ch.id, 'mentions'),
+      },
+      {
+        label: currentLevel === 'mute' ? '✓ Mute Channel' : 'Mute Channel',
+        icon: 'bell-off',
+        onClick: () => setChannelLevel(ch.id, currentLevel === 'mute' ? 'all' : 'mute'),
+      },
+    ]
+    const adminItems: ContextMenuItem[] = isAdmin ? [
+      {
+        label: 'Edit Channel',
+        icon: 'edit-2',
+        onClick: () => { setEditChannel(ch); setEditChannelName(ch.title); setEditChannelDesc(ch.description ?? ''); setEditSlowmode(ch.slowmode_delay ?? 0) },
+      },
+      {
+        label: 'Delete Channel',
+        icon: 'trash-2',
+        danger: true,
+        onClick: async () => {
+          if (!serverId) return
+          await deleteChannel(serverId, ch.id)
+          qc.invalidateQueries({ queryKey: ['channels', serverId] })
+        },
+      },
+    ] : []
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
-      items: [
-        {
-          label: 'Edit Channel',
-          icon: 'edit-2',
-          onClick: () => { setEditChannel(ch); setEditChannelName(ch.title); setEditChannelDesc(ch.description ?? ''); setEditSlowmode(ch.slowmode_delay ?? 0) },
-        },
-        {
-          label: 'Delete Channel',
-          icon: 'trash-2',
-          danger: true,
-          onClick: async () => {
-            if (!serverId) return
-            await deleteChannel(serverId, ch.id)
-            qc.invalidateQueries({ queryKey: ['channels', serverId] })
-          },
-        },
-      ],
+      items: [...notifItems, ...adminItems],
     })
   }
 
@@ -646,6 +666,8 @@ interface RowProps {
 function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {
   const isVoice = channel.type === 'voice'
   const inThisVoice = voiceSession?.channelId === channel.id
+  const { channelLevel } = useNotificationSettings()
+  const isMuted = channelLevel(channel.id) === 'mute'
   const [activeProfile, setActiveProfile] = useState<{ id: string; pos: { x: number; y: number } } | null>(null)
 
   function handleClick() {
@@ -710,6 +732,9 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
       >
         <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
         <span className="truncate">{channel.title}</span>
+        {isMuted && (
+          <span className="ml-1 text-discord-muted" title="Notifications muted">🔕</span>
+        )}
         {hasUnread && !active && (
           <span className="ml-auto w-2 h-2 rounded-full bg-white shrink-0" aria-label="Unread messages" />
         )}

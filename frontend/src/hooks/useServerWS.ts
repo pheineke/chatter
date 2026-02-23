@@ -4,6 +4,7 @@ import { useWebSocket } from './useWebSocket'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useSoundManager } from './useSoundManager'
 import { activeServerIds } from './serverRegistry'
+import { useNotificationSettings } from './useNotificationSettings'
 import type { Channel, Category, Member, VoiceParticipant } from '../api/types'
 
 /** Voice presence query key for a given server. */
@@ -17,6 +18,7 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
   const qc = useQueryClient()
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
+  const { channelLevel } = useNotificationSettings()
 
   // Register/unregister so useUnreadDMs knows not to double-notify for this server.
   useEffect(() => {
@@ -101,7 +103,7 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           // Only notify if the user isn't already viewing this channel.
           // This fires for ALL server members via broadcast_server — including the sender.
           // The sender is in `currentChannelId`, so the check correctly skips them.
-          if (channel_id !== currentChannelId) {
+          if (channel_id !== currentChannelId && channelLevel(channel_id) !== 'mute') {
             notifyMessage(channel_id)
             if (serverId) notifyServer(serverId)
             playSound('notificationSound')

@@ -10,6 +10,11 @@ from models.note import UserNote
 from models.refresh_token import RefreshToken
 from models.pinned_message import PinnedMessage
 from models.block import UserBlock
+from models.notification import (
+    UserChannelNotificationSettings,
+    UserServerNotificationSettings,
+    NotificationLevel,
+)
 
 __all__ = [
     "Base",
@@ -37,4 +42,7 @@ __all__ = [
     "RefreshToken",
     "PinnedMessage",
     "UserBlock",
+    "UserChannelNotificationSettings",
+    "UserServerNotificationSettings",
+    "NotificationLevel",
 ]

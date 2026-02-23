@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useSoundManager } from './useSoundManager'
 import { activeServerIds } from './serverRegistry'
+import { useNotificationSettings } from './useNotificationSettings'
 import { getConversations } from '../api/dms'
 import type { DMConversation, Friend, Message, UserStatus } from '../api/types'
 
@@ -26,6 +27,7 @@ export function useUnreadDMs(): boolean {
   const { user, updateUser } = useAuth()
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
+  const { channelLevel } = useNotificationSettings()
   const match = useMatch('/channels/@me/:dmUserId')
   const channelMatch = useMatch('/channels/:serverId/:channelId')
   const activeDmUserId = match?.params.dmUserId ?? null
@@ -89,6 +91,7 @@ export function useUnreadDMs(): boolean {
         // Fallback for users not currently subscribed to the server WS
         // (e.g. viewing a different server or the DM page).
         if (channel_id === activeChannelId) return
+        if (channelLevel(channel_id) === 'mute') return
         notifyMessage(channel_id)
         notifyServer(server_id)
         playSound('notificationSound')

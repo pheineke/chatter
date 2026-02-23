@@ -150,6 +150,7 @@ async def list_messages(
     db: DB,
     before: uuid.UUID | None = Query(None, description="Cursor: return messages before this ID"),
     limit: int = Query(50, ge=1, le=100),
+    q: str | None = Query(None, description="Full-text search query"),
 ):
     channel = await _get_channel_or_404(channel_id, db)
     await _require_channel_access(channel, current_user.id, db)
@@ -161,7 +162,10 @@ async def list_messages(
         .order_by(Message.created_at.desc())
         .limit(limit)
     )
-    if before:
+    if q:
+        # Search mode: ignore cursor, filter by content (case-insensitive)
+        query = query.where(Message.content.ilike(f'%{q}%'))
+    elif before:
         before_msg = await db.execute(select(Message).where(Message.id == before))
         bm = before_msg.scalar_one_or_none()
         if bm:

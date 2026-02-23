@@ -13,6 +13,7 @@ from app.routers import auth, users, servers, channels, messages, dms, friends, 
 from app.routers import blocks as blocks_router
 from app.routers import ws as ws_router
 from app.routers import voice as voice_router
+from app.routers import notifications as notifications_router
 
 app = FastAPI(
     title="Chat API",
@@ -34,6 +35,7 @@ app.include_router(dms.router)
 app.include_router(friends.router)
 app.include_router(invites.router)
 app.include_router(blocks_router.router)
+app.include_router(notifications_router.router)
 app.include_router(ws_router.router)
 app.include_router(voice_router.router)
 
