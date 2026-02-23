@@ -28,7 +28,7 @@ export function useUnreadDMs(): boolean {
   const { user, updateUser } = useAuth()
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
-  const { channelLevel } = useNotificationSettings()
+  const { channelLevel, serverLevel } = useNotificationSettings()
   const { notify } = useDesktopNotificationsContext()
   const match = useMatch('/channels/@me/:dmUserId')
   const channelMatch = useMatch('/channels/:serverId/:channelId')
@@ -94,6 +94,7 @@ export function useUnreadDMs(): boolean {
         // (e.g. viewing a different server or the DM page).
         if (channel_id === activeChannelId) return
         if (channelLevel(channel_id) === 'mute') return
+        if (serverLevel(server_id) === 'mute') return
         notifyMessage(channel_id)
         notifyServer(server_id)
         playSound('notificationSound')

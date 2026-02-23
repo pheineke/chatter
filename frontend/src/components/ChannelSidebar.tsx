@@ -1003,7 +1003,9 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
         <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
         <span className="truncate">{channel.title}</span>
         {isMuted && (
-          <span className="ml-1 text-discord-muted" title="Notifications muted">🔕</span>
+          <span className="ml-1 text-discord-muted" title="Notifications muted">
+            <Icon name="bell-off" size={14} />
+          </span>
         )}
         {hasUnread && !active && (
           <span className="ml-auto w-2 h-2 rounded-full bg-white shrink-0" aria-label="Unread messages" />

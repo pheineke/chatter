@@ -9,8 +9,9 @@ import { ContextMenu } from './ContextMenu'
 import { InviteModal } from './InviteModal'
 import type { Server } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
+import { useNotificationSettings } from '../hooks/useNotificationSettings'
 
-function ServerIcon({ server, active, hasUnread, onContextMenu }: { server: Server; active: boolean; hasUnread: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
+function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { server: Server; active: boolean; hasUnread: boolean; isMuted: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
   const navigate = useNavigate()
   const initials = server.title
     .split(/\s+/)
@@ -40,6 +41,11 @@ function ServerIcon({ server, active, hasUnread, onContextMenu }: { server: Serv
       {hasUnread && !active && (
         <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-white border-2 border-discord-servers pointer-events-none" />
       )}
+      {isMuted && (
+        <span className="absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full bg-discord-servers flex items-center justify-center pointer-events-none">
+          <Icon name="bell-off" size={10} className="text-discord-muted" />
+        </span>
+      )}
     </div>
   )
 }
@@ -61,6 +67,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
 
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers })
   const { unreadServers } = useUnreadChannels()
+  const { serverLevel, setServerLevel } = useNotificationSettings()
 
   const handleCreateInvite = (sId: string) => {
     setInviteModalServerId(sId)
@@ -114,6 +121,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
           server={s}
           active={s.id === serverId}
           hasUnread={unreadServers.has(s.id)}
+          isMuted={serverLevel(s.id) === 'mute'}
           onContextMenu={(e) => {
             e.preventDefault()
             setContextMenu({ x: e.clientX, y: e.clientY, serverId: s.id })
@@ -148,6 +156,15 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
               label: 'Invite to Server',
               icon: 'person-add',
               onClick: () => handleCreateInvite(contextMenu.serverId),
+            },
+            { separator: true },
+            {
+              label: serverLevel(contextMenu.serverId) === 'mute' ? 'Unmute Server' : 'Mute Server',
+              icon: serverLevel(contextMenu.serverId) === 'mute' ? 'bell' : 'bell-off',
+              onClick: () => setServerLevel(
+                contextMenu.serverId,
+                serverLevel(contextMenu.serverId) === 'mute' ? 'all' : 'mute',
+              ),
             },
           ]}
         />

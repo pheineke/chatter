@@ -18,7 +18,7 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
   const qc = useQueryClient()
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
-  const { channelLevel } = useNotificationSettings()
+  const { channelLevel, serverLevel } = useNotificationSettings()
 
   // Register/unregister so useUnreadDMs knows not to double-notify for this server.
   useEffect(() => {
@@ -112,7 +112,7 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           // Only notify if the user isn't already viewing this channel.
           // This fires for ALL server members via broadcast_server — including the sender.
           // The sender is in `currentChannelId`, so the check correctly skips them.
-          if (channel_id !== currentChannelId && channelLevel(channel_id) !== 'mute') {
+          if (channel_id !== currentChannelId && channelLevel(channel_id) !== 'mute' && serverLevel(serverId ?? '') !== 'mute') {
             notifyMessage(channel_id)
             if (serverId) notifyServer(serverId)
             playSound('notificationSound')
