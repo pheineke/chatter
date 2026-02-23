@@ -4,7 +4,7 @@ import uuid
 import aiofiles
 from fastapi import APIRouter, HTTPException, Response, UploadFile, File, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.auth import hash_password, verify_password
 from app.config import settings
@@ -141,7 +141,6 @@ async def search_user_by_username(
     current_user: CurrentUser,
 ):
     """Look up a user by exact username (case-insensitive)."""
-    from sqlalchemy import func
     result = await db.execute(select(User).where(func.lower(User.username) == username.lower().strip()))
     user = result.scalar_one_or_none()
     if not user:

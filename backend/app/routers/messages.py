@@ -1,5 +1,6 @@
 import asyncio
 import fnmatch
+import io
 import os
 import re
 import time
@@ -9,6 +10,7 @@ from datetime import datetime, timezone
 from typing import List, Dict
 
 import aiofiles
+import filetype
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
 from sqlalchemy import select, delete, or_
 from sqlalchemy.exc import IntegrityError
@@ -18,7 +20,7 @@ from app.config import settings
 from app.database import AsyncSessionLocal
 from app.dependencies import CurrentUser, DB
 from app.rate_limiter import rate_limit_messages
-from app.routers.servers import _require_member
+from app.routers.servers import _require_member, _require_admin, _get_server_or_404
 from app.schemas.message import MessageCreate, MessageUpdate, MessageRead, PinnedMessageRead
 from app.utils.file_validation import verify_attachment_magic
 from app.ws_manager import manager
@@ -104,9 +106,8 @@ async def _apply_word_filters(
 
             await db.commit()
 
-            from app.ws_manager import manager as _mgr
-            _event_type = "server.member_kicked" if action == "kick" else "server.member_kicked"
-            await _mgr.broadcast_server(
+            _event_type = "server.member_kicked" if action == "kick" else "server.member_banned"
+            await manager.broadcast_server(
                 server_id,
                 {"type": _event_type, "data": {"server_id": str(server_id), "user_id": str(author_id)}},
             )
@@ -427,7 +428,6 @@ async def delete_message(
     if msg.author_id != current_user.id:
         if channel.type == ChannelType.dm:
             raise HTTPException(status_code=403, detail="Cannot delete another user's message")
-        from app.routers.servers import _require_admin, _get_server_or_404
         server = await _get_server_or_404(channel.server_id, db)
         await _require_admin(server, current_user.id, db)
 
@@ -464,9 +464,7 @@ async def upload_attachment(
     # Validate magic bytes (ignores spoofed Content-Type headers)
     content = await verify_attachment_magic(file)
 
-    import filetype as _ft
-    import io as _io
-    kind = _ft.guess(content)
+    kind = filetype.guess(content)
     if kind is not None:
         file_type = kind.mime.split("/")[0]  # "image", "audio", "video", "application"
     else:
@@ -483,7 +481,7 @@ async def upload_attachment(
     if file_type == "image":
         try:
             from PIL import Image as _Image
-            with _Image.open(_io.BytesIO(content)) as _img:
+            with _Image.open(io.BytesIO(content)) as _img:
                 img_width, img_height = _img.size
         except Exception:
             pass

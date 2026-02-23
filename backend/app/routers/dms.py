@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB
@@ -30,16 +30,34 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
     )
     channels = result.scalars().all()
 
+    if not channels:
+        return []
+
+    # Bulk-load the last message per channel in a single query (avoids N+1)
+    channel_ids = [ch.channel_id for ch in channels]
+    last_sq = (
+        select(Message.channel_id, func.max(Message.created_at).label("max_at"))
+        .where(Message.channel_id.in_(channel_ids), Message.is_deleted == False)
+        .group_by(Message.channel_id)
+        .subquery()
+    )
+    last_msgs_result = await db.execute(
+        select(Message).join(
+            last_sq,
+            and_(
+                Message.channel_id == last_sq.c.channel_id,
+                Message.created_at == last_sq.c.max_at,
+            ),
+        )
+    )
+    last_msg_map: dict[uuid.UUID, Message] = {
+        m.channel_id: m for m in last_msgs_result.scalars().all()
+    }
+
     convs: list[DMConversationRead] = []
     for ch in channels:
         other = ch.user_b if ch.user_a_id == current_user.id else ch.user_a
-        msg_result = await db.execute(
-            select(Message)
-            .where(Message.channel_id == ch.channel_id, Message.is_deleted == False)
-            .order_by(Message.created_at.desc())
-            .limit(1)
-        )
-        last_msg = msg_result.scalar_one_or_none()
+        last_msg = last_msg_map.get(ch.channel_id)
         convs.append(DMConversationRead(
             channel_id=ch.channel_id,
             other_user=UserRead.model_validate(other),

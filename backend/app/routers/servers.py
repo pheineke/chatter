@@ -1,5 +1,6 @@
 import os
 import uuid
+from collections import defaultdict
 
 import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile, File, status
@@ -8,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.dependencies import CurrentUser, DB
+from app.utils.file_validation import verify_image_magic_with_dims, SERVER_IMAGE_MAX
 from app.schemas.server import (
     ServerCreate,
     ServerUpdate,
@@ -123,7 +125,6 @@ async def delete_server(server_id: uuid.UUID, current_user: CurrentUser, db: DB)
 
 async def _upload_server_image(server_id: uuid.UUID, file: UploadFile, field: str, db) -> Server:
     # Validate magic bytes and enforce maximum dimensions
-    from app.utils.file_validation import verify_image_magic_with_dims, SERVER_IMAGE_MAX
     content, ext = await verify_image_magic_with_dims(file, SERVER_IMAGE_MAX, label="Server image")
     filename = f"servers/{server_id}/{field}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
@@ -173,17 +174,16 @@ async def list_members(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
         return []
 
     # Load role assignments for all members in one query, filter to this server
-    from collections import defaultdict
     user_ids = [m.user_id for m in members]
     roles_result = await db.execute(
         select(UserRole)
+        .join(Role, UserRole.role_id == Role.id)
         .options(selectinload(UserRole.role))
-        .where(UserRole.user_id.in_(user_ids))
+        .where(UserRole.user_id.in_(user_ids), Role.server_id == server_id)
     )
     user_role_map: dict[uuid.UUID, list[RoleRead]] = defaultdict(list)
     for ur in roles_result.scalars().all():
-        if ur.role.server_id == server_id:
-            user_role_map[ur.user_id].append(RoleRead.model_validate(ur.role))
+        user_role_map[ur.user_id].append(RoleRead.model_validate(ur.role))
 
     return [
         MemberRead(
@@ -476,7 +476,7 @@ async def ban_member(server_id: uuid.UUID, user_id: uuid.UUID, current_user: Cur
     await db.commit()
     await manager.broadcast_server(
         server_id,
-        {"type": "server.member_kicked", "data": {"server_id": str(server_id), "user_id": str(user_id)}},
+        {"type": "server.member_banned", "data": {"server_id": str(server_id), "user_id": str(user_id)}},
     )
 
 

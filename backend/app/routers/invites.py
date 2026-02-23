@@ -1,10 +1,19 @@
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
+from typing import Optional
 
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
-def _now_utc() -> datetime:
-    """Return current UTC time as a naive datetime for SQLite-safe comparisons."""
-    return datetime.utcnow()
+from app.dependencies import CurrentUser, DB
+from app.routers.servers import _get_server_or_404, _require_member, _require_admin, _check_not_banned
+from app.ws_manager import manager
+from models.invite import ServerInvite
+from models.server import Server, ServerMember
+
+router = APIRouter(tags=["invites"])
 
 
 def _is_expired(expires_at: datetime | None) -> bool:
@@ -14,20 +23,6 @@ def _is_expired(expires_at: datetime | None) -> bool:
     naive_now = datetime.utcnow()
     naive_exp = expires_at.replace(tzinfo=None) if expires_at.tzinfo else expires_at
     return naive_exp < naive_now
-from typing import Optional
-
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from pydantic import BaseModel, field_validator
-
-from app.dependencies import CurrentUser, DB
-from app.routers.servers import _get_server_or_404, _require_member, _require_admin
-from app.ws_manager import manager
-from models.invite import ServerInvite
-from models.server import Server, ServerMember
-
-router = APIRouter(tags=["invites"])
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
@@ -144,7 +139,6 @@ async def join_via_invite(code: str, current_user: CurrentUser, db: DB):
         raise HTTPException(status_code=410, detail="Invite has reached max uses")
 
     # Check ban
-    from app.routers.servers import _check_not_banned
     await _check_not_banned(invite.server_id, current_user.id, db)
 
     # Check already a member

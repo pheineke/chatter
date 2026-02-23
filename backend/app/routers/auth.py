@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -165,9 +166,8 @@ async def list_sessions(current_user: CurrentUser, db: DB):
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_session(session_id: str, current_user: CurrentUser, db: DB):
     """Revoke a specific session owned by the current user."""
-    import uuid as _uuid
     try:
-        sid = _uuid.UUID(session_id)
+        sid = uuid.UUID(session_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Session not found")
 

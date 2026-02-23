@@ -5,6 +5,7 @@ Fetches a URL and returns { title, description, image, url, site_name }.
 All fields may be None if not found.
 """
 import re
+from urllib.parse import urlparse
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, HttpUrl
@@ -99,7 +100,6 @@ async def get_meta(url: str = Query(..., description="URL to fetch OG data for")
     image = _og(html, "image")
     # Resolve relative image URLs
     if image and image.startswith("/"):
-        from urllib.parse import urlparse
         parsed = urlparse(url)
         image = f"{parsed.scheme}://{parsed.netloc}{image}"
 
