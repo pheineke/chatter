@@ -7,8 +7,9 @@ import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useSoundManager } from './useSoundManager'
 import { activeServerIds } from './serverRegistry'
 import { useNotificationSettings } from './useNotificationSettings'
+import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
 import { getConversations } from '../api/dms'
-import type { DMConversation, Friend, Message, UserStatus } from '../api/types'
+import type { Channel, DMConversation, Friend, Message, UserStatus } from '../api/types'
 
 const LAST_READ_KEY = 'dmLastRead'
 
@@ -28,6 +29,7 @@ export function useUnreadDMs(): boolean {
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
   const { channelLevel } = useNotificationSettings()
+  const { notify } = useDesktopNotificationsContext()
   const match = useMatch('/channels/@me/:dmUserId')
   const channelMatch = useMatch('/channels/:serverId/:channelId')
   const activeDmUserId = match?.params.dmUserId ?? null
@@ -95,6 +97,15 @@ export function useUnreadDMs(): boolean {
         notifyMessage(channel_id)
         notifyServer(server_id)
         playSound('notificationSound')
+        // Desktop notification: look up channel name from cache
+        const channels = qc.getQueryData<Channel[]>(['channels', server_id]) ?? []
+        const ch = channels.find(c => c.id === channel_id)
+        notify({
+          title: ch ? `#${ch.title}` : 'New message',
+          body: 'You have a new message',
+          channelId: channel_id,
+          channelPath: `/channels/${server_id}/${channel_id}`,
+        })
         return
       }
 
@@ -105,6 +116,15 @@ export function useUnreadDMs(): boolean {
       const activeDmChannelId = conversations.find(c => c.other_user.id === activeDmUserId)?.channel_id
       if (data.author.id !== user?.id && data.channel_id !== activeDmChannelId) {
         playSound('notificationSound')
+        // Desktop notification for DMs
+        const truncated = data.content ? (data.content.length > 100 ? data.content.slice(0, 100) + '\u2026' : data.content) : 'Sent an attachment'
+        notify({
+          title: data.author.username,
+          body: truncated,
+          icon: data.author.avatar ? `/api/static/${data.author.avatar}` : undefined,
+          channelId: data.channel_id,
+          channelPath: `/channels/@me/${data.author.id}`,
+        })
       }
 
       qc.setQueryData<DMConversation[]>(['dmConversations'], old => {

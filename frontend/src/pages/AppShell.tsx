@@ -21,6 +21,7 @@ import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getChannels } from '../api/channels'
 import { getMyServers } from '../api/servers'
+import { DesktopNotificationsProvider, useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
 
 /** The active voice session, if any (channelId + channelName). */
 export interface VoiceSession {
@@ -65,7 +66,10 @@ export default function AppShell() {
   }
 
   return (
-    <div className="flex h-screen bg-discord-bg text-discord-text overflow-hidden">
+    <DesktopNotificationsProvider>
+    <div className="flex flex-col h-screen bg-discord-bg text-discord-text overflow-hidden">
+      <DesktopNotificationBanner />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Global overlays */}
       {showQuickSwitcher && <QuickSwitcher onClose={() => setShowQuickSwitcher(false)} />}
       {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
@@ -125,6 +129,28 @@ export default function AppShell() {
           </VoiceCallProvider>
         } />
       </Routes>
+    </div>
+    </div>
+    </DesktopNotificationsProvider>
+  )
+}
+
+/** Banner shown when desktop notifications are enabled but browser permission was denied. */
+function DesktopNotificationBanner() {
+  const { isEnabled, permission, deniedDismissed, dismissDenied } = useDesktopNotificationsContext()
+  if (!isEnabled || permission !== 'denied' || deniedDismissed) return null
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-2 bg-red-500/20 border-b border-red-500/30 text-sm text-red-300 shrink-0">
+      <span>
+        Desktop notifications are blocked by the browser. To enable them, update the permission in your browser&apos;s site settings then reload.
+      </span>
+      <button
+        onClick={dismissDenied}
+        className="shrink-0 text-red-300 hover:text-white transition-colors"
+        title="Dismiss"
+      >
+        ✕
+      </button>
     </div>
   )
 }

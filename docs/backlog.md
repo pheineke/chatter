@@ -289,13 +289,15 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   Right-clicking any channel (admin or member) shows a notification sub-menu with check-mark on current level; muted channels display 🔕 in the sidebar.
 -   `useServerWS` and `useUnreadDMs` skip sound/unread notifications when `channelLevel(id) === 'mute'`.
 
-### 9.2. Browser / Desktop Push Notifications
+### ~~9.2. Browser / Desktop Push Notifications~~ ✅ Implemented
 -   When the browser tab is in the background or minimised, qualifying messages (per the user's per-channel settings) trigger a native browser `Notification` via the [Web Notifications API](https://developer.mozilla.org/en-US/docs/Web/API/Notifications_API).
 -   **Permission flow**: On first notification-worthy event after login, the app requests `Notification.requestPermission()`. If denied, a dismissible banner explains how to re-enable it in the browser.
 -   Notification content: sender avatar (via `icon`), sender display name + channel/server context as title, truncated message body.
 -   Clicking the notification focuses the tab and navigates to the relevant channel.
--   Controlled by a toggle in Settings → Notifications: "Enable desktop notifications".
+-   Controlled by a toggle in **Settings → Notifications**: "Enable desktop notifications".
 -   No notification is shown if the tab is already focused and the user is in the relevant channel.
+-   Respects DND: notifications suppressed when user status is `dnd`.
+-   Implemented via `useDesktopNotifications` hook + `DesktopNotificationsContext`; `notify()` called from `useUnreadDMs` alongside `playSound`.
 
 ### ~~9.3. Do Not Disturb (DND) Mode Integration~~ ✅ Implemented
 -   When a user's status is set to **Do Not Disturb**, notification sounds (`notificationSound`, `callSound`) are suppressed in `useSoundManager.playSound()`.

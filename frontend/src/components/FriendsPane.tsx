@@ -67,7 +67,7 @@ export function FriendsPane() {
   })
 
   const displayed = tab === 'online'
-    ? friends.filter((f) => f.user.status === 'online' || f.user.status === 'idle' || f.user.status === 'dnd')
+    ? friends.filter((f) => f.user.status === 'online' || f.user.status === 'away' || f.user.status === 'dnd')
     : friends
 
   const pending = requests.filter((r) => r.status === 'pending')
@@ -174,7 +174,7 @@ export function FriendsPane() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm">{f.user.username}</p>
                   <p className="text-xs text-discord-muted capitalize">{
-                    f.user.status === 'idle' ? 'Away' :
+                    f.user.status === 'away' ? 'Away' :
                     f.user.status === 'dnd' ? 'Do Not Disturb' :
                     f.user.status === 'online' ? 'Online' : 'Offline'
                   }</p>

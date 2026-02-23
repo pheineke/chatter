@@ -9,8 +9,9 @@ import type { UserStatus, DMPermission } from '../api/types'
 import { COLOR_SWATCHES, loadColorOverrides, applyColorOverrides } from '../utils/colorOverrides'
 import { useSoundManager } from '../hooks/useSoundManager'
 import { useBlocks } from '../hooks/useBlocks'
+import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
 
-type Tab = 'account' | 'appearance' | 'voice' | 'privacy'
+type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications'
 
 // ─── Sidebar nav ─────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[
     items: [
       { id: 'appearance', label: 'Appearance', icon: 'color-palette' },
       { id: 'voice', label: 'Voice & Video', icon: 'mic' },
+      { id: 'notifications', label: 'Notifications', icon: 'notifications' },
     ],
   },
 ]
@@ -740,6 +742,78 @@ function PrivacyTab() {
   )
 }
 
+// ─── Notifications tab ────────────────────────────────────────────────────────
+
+function NotificationsTab() {
+  const { isEnabled, isActive, permission, enable, disable } = useDesktopNotificationsContext()
+
+  const handleToggle = async () => {
+    if (isEnabled) {
+      disable()
+    } else {
+      await enable()
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-1">Notifications</h2>
+      <p className="text-discord-muted text-sm mb-6">Control how you receive desktop push notifications.</p>
+
+      {/* Enable toggle */}
+      <div className="bg-discord-sidebar rounded-lg p-4 mb-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="font-semibold text-sm mb-0.5">Enable Desktop Notifications</div>
+            <div className="text-xs text-discord-muted">
+              Show a system notification when you receive a message while away.
+            </div>
+          </div>
+          <button
+            role="switch"
+            aria-checked={isEnabled}
+            onClick={handleToggle}
+            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${isEnabled ? 'bg-green-500' : 'bg-discord-input'}`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Permission status */}
+      {permission === 'unsupported' && (
+        <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-4 py-3 text-sm text-yellow-300">
+          Your browser does not support desktop notifications.
+        </div>
+      )}
+
+      {permission === 'denied' && (
+        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-300">
+          <p className="font-semibold mb-1">Notifications blocked by browser</p>
+          <p>You have denied notification permission. To re-enable, go to your browser&apos;s site settings for this page, allow notifications, then reload.</p>
+        </div>
+      )}
+
+      {permission === 'default' && isEnabled && (
+        <div className="rounded-lg bg-discord-sidebar border border-white/10 px-4 py-3 text-sm text-discord-muted">
+          <p className="mb-2">Browser permission is required before notifications can be shown.</p>
+          <button onClick={enable} className="btn py-1 px-4 text-sm">
+            Request Permission
+          </button>
+        </div>
+      )}
+
+      {isActive && (
+        <div className="rounded-lg bg-green-500/10 border border-green-500/30 px-4 py-3 text-sm text-green-300">
+          Desktop notifications are active and will appear when you receive a message while the tab is not focused.
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Shared EditableField ─────────────────────────────────────────────────────
 
 function EditableField({ label, value, placeholder, readOnly, multiline, isEditing, editValue, setEditValue, onEdit, onSave, onCancel, disabled }: any) {
@@ -820,10 +894,11 @@ export function SettingsPage() {
       <div className="flex flex-1 min-w-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-8">
           <div className="max-w-2xl mx-auto">
-            {tab === 'account'    && <AccountTab />}
-            {tab === 'privacy'    && <PrivacyTab />}
-            {tab === 'appearance' && <AppearanceTab />}
-            {tab === 'voice'      && <VoiceTab />}
+            {tab === 'account'       && <AccountTab />}
+            {tab === 'privacy'       && <PrivacyTab />}
+            {tab === 'appearance'    && <AppearanceTab />}
+            {tab === 'voice'         && <VoiceTab />}
+            {tab === 'notifications' && <NotificationsTab />}
           </div>
         </div>
         {/* Close button */}
