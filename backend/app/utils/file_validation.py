@@ -19,6 +19,34 @@ _ATTACHMENT_MIMES: Set[str] = _IMAGE_MIMES | {
     "audio/ogg",
     "audio/x-wav",
     "audio/wav",
+    "audio/mp4",
+    "video/mp4",
+    "video/webm",
+    "application/pdf",
+    "application/zip",
+    "application/x-zip-compressed",
+    "application/x-7z-compressed",
+    "application/x-rar-compressed",
+    "application/vnd.rar",
+    "application/x-tar",
+}
+
+# MIME types that have no reliable magic bytes but are safe to allow by
+# Content-Type header + extension check (plain text, various document formats)
+_FALLBACK_MIMES: Set[str] = {
+    "text/plain",
+    "text/csv",
+    "text/html",
+    "text/markdown",
+    "application/json",
+    "application/xml",
+    "text/xml",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
 
 # Maximum allowed dimensions per image purpose
@@ -90,13 +118,27 @@ async def verify_image_magic_with_dims(
 async def verify_attachment_magic(file: UploadFile) -> bytes:
     """Read the entire upload, check its magic bytes, and return the raw bytes.
 
-    Raises HTTP 400 if the file's real MIME type is not an allowed attachment type.
+    For files with recognised magic bytes: must be in _ATTACHMENT_MIMES.
+    For files without magic bytes (e.g. plain text): falls back to the
+    browser-supplied Content-Type header if it is in _FALLBACK_MIMES.
+    Raises HTTP 400 if the type is not allowed.
     """
     content = await file.read()
     kind = filetype.guess(content)
-    if kind is None or kind.mime not in _ATTACHMENT_MIMES:
-        raise HTTPException(
-            status_code=400,
-            detail="File content does not match an allowed attachment type (image or audio).",
-        )
-    return content
+    if kind is not None:
+        if kind.mime not in _ATTACHMENT_MIMES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type '{kind.mime}' is not allowed as an attachment.",
+            )
+        return content
+
+    # No magic bytes detected — fall back to the Content-Type header
+    ct = (file.content_type or "").lower().split(";")[0].strip()
+    if ct in _FALLBACK_MIMES or ct.startswith("text/"):
+        return content
+
+    raise HTTPException(
+        status_code=400,
+        detail="File type is not allowed as an attachment. Supported: images, audio, video, PDF, text, Office documents, and archives.",
+    )

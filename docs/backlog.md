@@ -190,11 +190,13 @@ See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec
 -   `MarkdownContent.tsx` renders via `dangerouslySetInnerHTML`; spoiler reveal uses React event delegation (no `onclick` attrs — DOMPurify strips those).
 -   CSS in `index.css`: `.discord-markdown`, `.spoiler`, `.spoiler.revealed`, `.md-link`.
 
-### 5.9. Inline Image / URL Embeds
--   When a message contains a bare image URL (`.png`, `.jpg`, `.gif`, `.webp`) that is the only content or is on its own line, render an inline image preview below the message text.
--   For non-image URLs, show an **Open Graph embed card** (title, description, thumbnail) fetched via a server-side proxy endpoint (`GET /meta?url=<url>`) to avoid CORS issues and prevent IP leaking.
--   Embeds are dismissible per-message (stored in `localStorage`).
--   Cap image previews at 400 px wide / 300 px tall; clicking opens the full image in a lightbox.
+### ~~5.9. Inline Image / URL Embeds~~ ✅ Implemented
+-   Bare image URLs (`.png`, `.jpg`, `.gif`, `.webp`, `.svg`) in message content render as inline image previews (capped 400×300 px) below the text; clicking opens a lightbox.
+-   Other URLs are fetched server-side by `GET /meta?url=<url>` (httpx + OG tag regex) and rendered as an embed card: coloured left border, site name, title, description, thumbnail.
+-   `extractURLs()` in `utils/embeds.ts` detects all URLs and classifies them as image or non-image.
+-   Embeds are dismissible per-URL per-message via an ✕ button (persisted in `localStorage`).
+-   TanStack Query caches OG metadata for 10 minutes; bad URLs / non-HTML responses silently render nothing.
+-   Backend `app/routers/meta.py` — streams max 512 KB, fakes a Chrome UA, resolves relative image URLs.
 
 ### 6.1. Personal API Tokens & Bot Support
 See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)

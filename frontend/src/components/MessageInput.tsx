@@ -48,6 +48,8 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
   // Cooldown state: timestamp (ms) when the user is allowed to send again
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
   const [cooldownSecs, setCooldownSecs] = useState(0)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const messageSentRef = useRef(false)
 
   // Tick the countdown every second
   useEffect(() => {
@@ -123,11 +125,35 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
   })
 
   const uploadMut = useMutation({
-    mutationFn: async (file: File) => {
-      const msg = await sendMessage(channelId, null)
+    mutationFn: async ({ file, content }: { file: File; content: string | null }) => {
+      messageSentRef.current = false
+      const msg = await sendMessage(channelId, content, replyTo?.id)
+      messageSentRef.current = true
       return uploadAttachment(channelId, msg.id, file)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', channelId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['messages', channelId] })
+      setText('')
+      onCancelReply?.()
+      setUploadError(null)
+      if (slowmodeDelay > 0) {
+        setCooldownUntil(Date.now() + slowmodeDelay * 1000)
+      }
+    },
+    onError: (err) => {
+      if (messageSentRef.current) {
+        // sendMessage succeeded but uploadAttachment failed — message text is visible in chat
+        setText('')
+        onCancelReply?.()
+        const detail = axios.isAxiosError(err) ? (err.response?.data?.detail ?? err.message) : String(err)
+        setUploadError(`Attachment failed: ${detail}`)
+        qc.invalidateQueries({ queryKey: ['messages', channelId] })
+      } else {
+        // sendMessage itself failed
+        const detail = axios.isAxiosError(err) ? (err.response?.data?.detail ?? err.message) : String(err)
+        setUploadError(`Failed to send: ${detail}`)
+      }
+    },
   })
 
   function handleSend() {
@@ -192,7 +218,10 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) uploadMut.mutate(file)
+    if (file) {
+      const content = text.trim() || null
+      uploadMut.mutate({ file, content })
+    }
     e.target.value = ''
   }
 
@@ -260,6 +289,15 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
         <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-1.5 mb-1.5 text-xs text-yellow-300">
           <Icon name="clock" size={13} className="shrink-0" />
           <span>Slowmode — you can send another message in <strong>{cooldownSecs}s</strong></span>
+        </div>
+      )}
+
+      {/* Upload error banner */}
+      {uploadError && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 mb-1.5 text-xs text-red-400">
+          <Icon name="alert-circle" size={13} className="shrink-0" />
+          <span className="flex-1">{uploadError}</span>
+          <button onClick={() => setUploadError(null)} className="ml-auto text-red-400/60 hover:text-red-400"><Icon name="x" size={12} /></button>
         </div>
       )}
 

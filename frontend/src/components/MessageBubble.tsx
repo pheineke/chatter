@@ -11,6 +11,8 @@ import type { Message } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useBlocks } from '../hooks/useBlocks'
 import { MarkdownContent } from './MarkdownContent'
+import { LinkEmbed } from './LinkEmbed'
+import { extractURLs, getDismissed } from '../utils/embeds'
 
 interface Props {
   message: Message
@@ -49,6 +51,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
   const [hovered, setHovered] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const closePreview = useCallback(() => setPreviewUrl(null), [])
+  const [dismissed, setDismissed] = useState<Set<string>>(() => getDismissed(msg.id))
   const [cardPos, setCardPos] = useState<{ x: number; y: number } | null>(null)
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
@@ -144,7 +147,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
                 <span className="truncate italic opacity-70">
                   {msg.reply_to.content
                     ? (msg.reply_to.content.length > 80 ? msg.reply_to.content.slice(0, 80) + '…' : msg.reply_to.content)
-                    : '📎 Attachment'}
+                    : 'Attachment'}
                 </span>
               </>
             ) : (
@@ -191,6 +194,26 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
           <span className="text-[11px] text-discord-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
         )}
 
+        {/* URL / image embeds */}
+        {!editing && msg.content && (() => {
+          const urls = extractURLs(msg.content)
+          if (urls.length === 0) return null
+          return (
+            <div className="flex flex-col items-start gap-1">
+              {urls.map(({ url, isImage }) => (
+                <LinkEmbed
+                  key={url}
+                  url={url}
+                  isImage={isImage}
+                  messageId={msg.id}
+                  dismissed={dismissed}
+                  onDismiss={(u) => setDismissed(prev => new Set([...prev, u]))}
+                />
+              ))}
+            </div>
+          )
+        })()}
+
         {/* Attachments */}
         {msg.attachments?.map((att) => {
           const displayName = att.filename ?? att.file_path.split('/').pop() ?? att.file_path
@@ -215,7 +238,7 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
                   download={displayName}
                   className="inline-flex items-center gap-2 bg-discord-sidebar rounded px-3 py-2 text-sm hover:bg-white/10 transition"
                 >
-                  <span className="text-discord-muted text-lg">📎</span>
+                  <Icon name="file" size={18} className="text-discord-muted shrink-0" />
                   <span className="text-discord-mention underline truncate max-w-[200px]">{displayName}</span>
                   {att.file_size != null && (
                     <span className="text-discord-muted text-xs shrink-0">{formatFileSize(att.file_size)}</span>

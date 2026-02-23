@@ -467,7 +467,14 @@ async def upload_attachment(
     import filetype as _ft
     import io as _io
     kind = _ft.guess(content)
-    file_type = kind.mime.split("/")[0] if kind else "image"  # "image" or "audio"
+    if kind is not None:
+        file_type = kind.mime.split("/")[0]  # "image", "audio", "video", "application"
+    else:
+        # No magic bytes (e.g. plain text) — derive from Content-Type header
+        ct = (file.content_type or "").lower().split(";")[0].strip()
+        file_type = ct.split("/")[0] if ct else "file"
+        if file_type not in ("image", "audio", "video", "text"):
+            file_type = "file"
     file_size = len(content)
 
     # Extract pixel dimensions for image attachments
