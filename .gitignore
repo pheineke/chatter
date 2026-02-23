@@ -50,6 +50,7 @@ junit*.xml
 # ── Node / Frontend ──────────────────────────────────────────────────────────
 node_modules/
 frontend/dist/
+frontend/dev-dist/
 frontend/.vite/
 *.tsbuildinfo
 
