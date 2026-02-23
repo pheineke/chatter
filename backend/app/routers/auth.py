@@ -105,7 +105,10 @@ async def refresh_token(request: Request, body: RefreshRequest, db: DB):
             await db.commit()
         raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
 
-    if token_row.expires_at < datetime.now(timezone.utc):
+    expires_at = token_row.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
         token_row.revoked = True
         await db.commit()
         raise HTTPException(status_code=401, detail="Refresh token has expired")
