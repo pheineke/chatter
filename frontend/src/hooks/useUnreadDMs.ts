@@ -115,6 +115,7 @@ export function useUnreadDMs(): boolean {
       // Play notification sound if the user isn't currently viewing this DM conversation
       const activeDmChannelId = conversations.find(c => c.other_user.id === activeDmUserId)?.channel_id
       if (data.author.id !== user?.id && data.channel_id !== activeDmChannelId) {
+        if (channelLevel(data.channel_id) === 'mute') return
         playSound('notificationSound')
         // Desktop notification for DMs
         const truncated = data.content ? (data.content.length > 100 ? data.content.slice(0, 100) + '\u2026' : data.content) : 'Sent an attachment'

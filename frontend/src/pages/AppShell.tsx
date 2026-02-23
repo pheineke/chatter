@@ -21,7 +21,7 @@ import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { getChannels } from '../api/channels'
 import { getMyServers } from '../api/servers'
-import { DesktopNotificationsProvider, useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
+import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
 
 /** The active voice session, if any (channelId + channelName). */
 export interface VoiceSession {
@@ -66,7 +66,6 @@ export default function AppShell() {
   }
 
   return (
-    <DesktopNotificationsProvider>
     <div className="flex flex-col h-screen bg-discord-bg text-discord-text overflow-hidden">
       <DesktopNotificationBanner />
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -131,7 +130,6 @@ export default function AppShell() {
       </Routes>
     </div>
     </div>
-    </DesktopNotificationsProvider>
   )
 }
 

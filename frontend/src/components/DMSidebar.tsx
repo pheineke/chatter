@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useMatch } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import type { MouseEvent } from 'react'
 import { getConversations } from '../api/dms'
 import { updateMe } from '../api/users'
 import { useAuth } from '../contexts/AuthContext'
+import { useNotificationSettings } from '../hooks/useNotificationSettings'
 import { UserAvatar } from './UserAvatar'
 import { StatusIndicator } from './StatusIndicator'
 import { Icon } from './Icon'
@@ -30,6 +32,7 @@ export function DMSidebar() {
   const activeDmUserId = match?.params.dmUserId ?? null
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
   const [lastRead, setLastRead] = useState<Record<string, string>>(loadLastRead)
+  const { channelLevel, setChannelLevel } = useNotificationSettings()
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['dmConversations'],
@@ -66,11 +69,29 @@ export function DMSidebar() {
           // Show unread badge if there are messages after the last read time (and not currently viewing)
           const hasUnread =
             !!conv.last_message_at && (!lr || conv.last_message_at > lr) && !isActive
+          const isMuted = channelLevel(conv.channel_id) === 'mute'
+
+          function openConvContextMenu(e: MouseEvent<HTMLButtonElement>) {
+            e.preventDefault()
+            e.stopPropagation()
+            setContextMenu({
+              x: e.clientX,
+              y: e.clientY,
+              items: [
+                {
+                  label: isMuted ? 'Unmute Conversation' : 'Mute Conversation',
+                  icon: isMuted ? 'bell' : 'bell-off',
+                  onClick: () => setChannelLevel(conv.channel_id, isMuted ? 'all' : 'mute'),
+                },
+              ],
+            })
+          }
 
           return (
             <button
               key={conv.channel_id}
               onClick={() => navigate(`/channels/@me/${conv.other_user.id}`)}
+              onContextMenu={openConvContextMenu}
               className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm transition-colors
                 ${isActive
                   ? 'bg-discord-input text-white'
@@ -85,7 +106,12 @@ export function DMSidebar() {
               <span className={`flex-1 text-left truncate ${hasUnread ? 'text-white font-medium' : ''}`}>
                 {conv.other_user.username}
               </span>
-              {hasUnread && (
+              {isMuted && (
+                <span className="text-discord-muted" title="Notifications muted">
+                  <Icon name="bell-off" size={14} />
+                </span>
+              )}
+              {hasUnread && !isMuted && (
                 <span className="w-2 h-2 rounded-full bg-white shrink-0" aria-label="Unread messages" />
               )}
             </button>
