@@ -71,24 +71,24 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
   const editMut = useMutation({
     mutationFn: () => editMessage(channelId, msg.id, editText),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['messages', channelId] })
+      // message.updated arrives via channel WS and updates the cache in real time
       setEditing(false)
     },
   })
 
   const deleteMut = useMutation({
     mutationFn: () => deleteMessage(channelId, msg.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', channelId] }),
+    // message.deleted arrives via channel WS and removes the message from cache
   })
 
   const reactMut = useMutation({
     mutationFn: (emoji: string) => addReaction(channelId, msg.id, emoji),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', channelId] }),
+    // reaction.added arrives via channel WS
   })
 
   const unreactMut = useMutation({
     mutationFn: (emoji: string) => removeReaction(channelId, msg.id, emoji),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['messages', channelId] }),
+    // reaction.removed arrives via channel WS
   })
 
   // Blocked-user early return (all hooks already called above)

@@ -1,17 +1,21 @@
 import client from './client'
-import type { Token, User } from './types'
+import type { User } from './types'
 
 export async function register(username: string, password: string): Promise<User> {
   const { data } = await client.post<User>('/auth/register', { username, password })
   return data
 }
 
-export async function login(username: string, password: string): Promise<Token> {
+export async function login(username: string, password: string): Promise<{ access_token: string; refresh_token: string }> {
   const form = new URLSearchParams({ username, password })
-  const { data } = await client.post<Token>('/auth/login', form, {
+  const { data } = await client.post<{ access_token: string; refresh_token: string }>('/auth/login', form, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   })
   return data
+}
+
+export async function logout(refreshToken: string): Promise<void> {
+  await client.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {})
 }
 
 export async function getMe(): Promise<User> {

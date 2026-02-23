@@ -1,10 +1,12 @@
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useSoundManager } from './useSoundManager'
 import { activeServerIds } from './serverRegistry'
 import { useNotificationSettings } from './useNotificationSettings'
+import { useAuth } from '../contexts/AuthContext'
 import type { Channel, Category, Member, VoiceParticipant } from '../api/types'
 
 /** Voice presence query key for a given server. */
@@ -16,6 +18,8 @@ const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
  */
 export function useServerWS(serverId: string | null, currentChannelId?: string) {
   const qc = useQueryClient()
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
   const { channelLevel, serverLevel } = useNotificationSettings()
@@ -141,10 +145,21 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
         case 'server.member_joined':
         case 'server.member_left':
         case 'server.member_kicked':
+        case 'server.member_banned':
         case 'server.member_updated':
         case 'role.assigned':
         case 'role.removed':
           qc.invalidateQueries({ queryKey: ['members', serverId] })
+          if (msg.type === 'server.member_kicked' || msg.type === 'server.member_banned') {
+            const { user_id } = msg.data as { user_id: string }
+            if (user_id === user?.id) {
+              // Current user was removed — evict from server list and navigate away
+              qc.setQueryData<{ id: string }[]>(['servers'], (old = []) =>
+                old.filter((s) => s.id !== serverId),
+              )
+              navigate('/channels/@me', { replace: true })
+            }
+          }
           if (msg.type === 'server.member_joined') {
             // A join increments an invite's uses counter
             qc.invalidateQueries({ queryKey: ['invites', serverId] })

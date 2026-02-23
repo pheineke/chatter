@@ -127,7 +127,7 @@ export function ServerSettingsPage() {
       <div className="flex flex-1 min-w-0">
         <div className="flex-1 overflow-y-auto px-10 py-8 max-w-3xl">
           {tab === 'overview'      && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
-          {tab === 'members'       && <MembersTab  serverId={serverId} members={members} roles={[]} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
+          {tab === 'members'       && <MembersTab  serverId={serverId} members={members} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
           {tab === 'roles'         && <RolesTab    serverId={serverId} />}
           {tab === 'invites'       && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
           {tab === 'word-filters'  && <WordFiltersTab serverId={serverId} />}
@@ -291,7 +291,6 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
 function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
   serverId: string
   members: Member[]
-  roles: Role[]
   ownerId: string
   currentUserId: string
   onChanged: () => void
