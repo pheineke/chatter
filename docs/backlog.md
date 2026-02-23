@@ -198,7 +198,7 @@ See full spec: [`docs/specs/message_replies_spec.md`](specs/message_replies_spec
 -   TanStack Query caches OG metadata for 10 minutes; bad URLs / non-HTML responses silently render nothing.
 -   Backend `app/routers/meta.py` — streams max 512 KB, fakes a Chrome UA, resolves relative image URLs.
 
-### 6.1. Personal API Tokens & Bot Support
+### ~~6.1. Personal API Tokens & Bot Support~~ ✅ Implemented
 See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 
 - Users can generate **named personal API tokens** (max 5) in account settings.
@@ -314,3 +314,77 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   Badge and title clear when all unreads are dismissed.
 -   Respects DND: no badge update while the user's status is Do Not Disturb.
 -   `useTabBadge(count, isDND)` hook called from `AppShell` using `unreadChannels.size + (hasUnreadDMs ? 1 : 0)` as the count.
+
+### ~~10.2. PWA — Installability & Offline Shell~~ ✅ Implemented
+
+Make the client installable as a desktop/mobile app with a cached static shell and a graceful offline page. API and WebSocket traffic remains network-only — no data caching at this stage.
+
+**Implementation plan:**
+
+1. **Install `vite-plugin-pwa`** (`npm i -D vite-plugin-pwa`) and add `VitePWA()` to `vite.config.ts` with `registerType: 'prompt'` so updates are user-triggered rather than silent.
+
+2. **Web App Manifest** (auto-injected into `index.html` by the plugin):
+   - `name`: "Chat", `short_name`: "Chat"
+   - `display`: `standalone` (no browser chrome when installed)
+   - `theme_color` / `background_color`: match the discord-dark palette (`#313338` / `#1e1f22`)
+   - `start_url`: `/`
+   - `scope`: `/`
+   - Icon set: 192×192, 512×512 PNG (maskable variants for Android adaptive icons), 180×180 `apple-touch-icon`
+
+3. **App icons** — generate a simple SVG speech-bubble logo, then use `sharp` or an online tool to export the required PNG sizes. Place in `public/pwa-*.png`.
+
+4. **Workbox service worker** — `generateSW` strategy (simpler than `injectManifest`):
+   - **Precache**: all Vite build output (JS/CSS chunks, HTML shell, fonts)
+   - **Runtime cache**: `public/icons/**`, `public/sounds/**` (cache-first, long TTL)
+   - **Network-only routes**: `/api/**`, `/ws/**`, `/static/**` (avatars, attachments) — never serve stale API responses
+   - **Offline fallback**: if a navigation request fails (no network), serve the cached `index.html` shell; the app's existing `useServerWS`/reconnect logic will show its own "reconnecting…" state
+
+5. **SW update toast** — `useRegisterSW` hook from `vite-plugin-pwa/react`:
+   - When `needRefresh` is true, show a small toast at the bottom of the screen: "A new version is available." with a **Reload** button and a **Dismiss** button
+   - `ReloadPrompt` component added to `App.tsx`
+
+6. **`index.html` meta tags**:
+   - `<meta name="theme-color" content="#1e1f22">`
+   - `<meta name="apple-mobile-web-app-capable" content="yes">`
+   - `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`
+   - `<link rel="apple-touch-icon" href="/pwa-180.png">`
+
+7. **Dev mode**: `devOptions: { enabled: true }` in the plugin config so the SW registers during `vite dev` (using the `mkcert` HTTPS that's already in place).
+
+**Files touched:** `vite.config.ts`, `index.html`, `src/App.tsx`, new `src/components/ReloadPrompt.tsx`, `public/pwa-192.png`, `public/pwa-512.png`, `public/pwa-180.png`, `public/site.webmanifest` (auto-generated).
+
+---
+
+### 10.3. DM Offline Cache (Hybrid)
+
+Cache DM conversation history in IndexedDB so the user can read recent DMs and compose messages while offline. Server channels remain network-only. Depends on 10.2 (PWA service worker must be in place).
+
+**Implementation plan:**
+
+1. **Install `dexie`** (`npm i dexie`) — typed IndexedDB wrapper with a clean async API.
+
+2. **IndexedDB schema** (`src/db.ts`) — `Dexie` subclass with two tables:
+   - `dmMessages`: `[channelId+id], channelId, created_at` — stores `MessageRead` objects
+   - `dmConversations`: `id` — stores `DMChannel` objects (partner info, last message preview)
+   - Cap per conversation: keep last 200 messages; on write, prune oldest when count exceeds 200
+
+3. **Write-through on WS events** — in `useChannelWS`, when a `message.created` event fires for a DM channel (`channelId` in the user's DM list), also write to `db.dmMessages`. Same for `message.updated` and `message.deleted` (upsert / delete by `[channelId, id]`).
+
+4. **Seed on first open** — when `DMPane` mounts for a conversation, if IndexedDB has no entries for that `channelId`, seed from the first page of the existing `useMessages` infinite query result.
+
+5. **Offline read path** — `useDMMessages(channelId)` hook:
+   - Online: behaves exactly like today (TanStack Query → network), but also mirrors fetched pages into IndexedDB
+   - Offline (`navigator.onLine === false` or network error): reads from `db.dmMessages` ordered by `created_at`, returns as a flat list; shows a banner "You're offline — showing cached messages" and disables the message input's send button (unless composing for the queue — see below)
+
+6. **Outgoing message queue** — `db.outboxMessages` table (`channelId, localId, content, created_at`):
+   - When offline and the user submits a message, write to the outbox and show it in the message list as a pending bubble (greyed, no timestamp)
+   - On reconnect (`online` event + WS reconnect), flush the outbox in order: `POST /channels/{id}/messages` for each entry, remove from outbox on success
+   - Dedup guard: include a `localId` (UUID) in the request body; the backend ignores unknown extra fields, so no changes needed there; the frontend matches the server response back to the pending bubble by `localId` before removing it
+
+7. **Sync on reconnect** — after the WS reconnects, for each DM channel with cached messages, call `GET /channels/{id}/messages?after=<last_cached_id>&limit=50` and merge results into IndexedDB (upsert by id). This fills the gap for messages received while offline.
+
+8. **DM conversation list offline** — `useDMList` hook reads from `db.dmConversations` when offline, so the sidebar still shows all conversations.
+
+9. **Settings** — add a "Clear DM cache" button in Settings → Privacy that calls `db.dmMessages.clear()` and `db.dmConversations.clear()`.
+
+**Files touched:** `src/db.ts` (new), `src/hooks/useDMMessages.ts` (new or refactor of existing DM query logic), `src/hooks/useChannelWS.ts` (write-through), `src/components/DMPane.tsx` (offline banner, pending bubbles), `src/components/DMSidebar.tsx` (offline read), `src/pages/SettingsPage.tsx` (cache clear button).

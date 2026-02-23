@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { UnreadChannelsProvider } from './contexts/UnreadChannelsContext'
 import { DesktopNotificationsProvider } from './contexts/DesktopNotificationsContext'
 import { RequireAuth } from './components/RequireAuth'
+import { ReloadPrompt } from './components/ReloadPrompt'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import AppShell from './pages/AppShell'
@@ -31,6 +32,7 @@ export default function App() {
         </BrowserRouter>
         </DesktopNotificationsProvider>
       </UnreadChannelsProvider>
+      <ReloadPrompt />
     </AuthProvider>
   )
 }

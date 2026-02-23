@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#5865f2"/>
+  <!-- Speech bubble body -->
+  <path d="M96 144 C96 118 118 96 144 96 L368 96 C394 96 416 118 416 144 L416 304 C416 330 394 352 368 352 L208 352 L144 416 L144 352 C118 352 96 330 96 304 Z" fill="white"/>
+  <!-- Message lines -->
+  <rect x="160" y="176" width="192" height="24" rx="12" fill="#5865f2"/>
+  <rect x="160" y="224" width="140" height="24" rx="12" fill="#5865f2"/>
+</svg>
