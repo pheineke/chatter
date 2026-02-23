@@ -1,4 +1,5 @@
 import asyncio
+import fnmatch
 import os
 import re
 import time
@@ -27,10 +28,98 @@ from models.message import Message, Attachment, Reaction, Mention
 from models.pinned_message import PinnedMessage
 from models.server import Role, ServerMember
 from models.user import User
+from models.word_filter import WordFilter, ServerBan
 
 router = APIRouter(prefix="/channels/{channel_id}", tags=["messages"])
 
 _MENTION_RE = re.compile(r"@(\w+)")
+
+
+def _pattern_matches(content: str, pattern: str) -> bool:
+    """Case-insensitive match: wildcard (fnmatch) per word, or substring for plain phrases."""
+    content_lower = content.lower()
+    pattern_lower = pattern.lower()
+    if '*' in pattern_lower or '?' in pattern_lower:
+        return any(fnmatch.fnmatch(word, pattern_lower) for word in content_lower.split())
+    return pattern_lower in content_lower
+
+
+async def _apply_word_filters(
+    content: str, server_id: uuid.UUID, author_id: uuid.UUID, db
+) -> None:
+    """Check message content against server word filters and raise HTTPException if matched."""
+    result = await db.execute(
+        select(WordFilter).where(WordFilter.server_id == server_id)
+    )
+    filters = result.scalars().all()
+    if not filters:
+        return
+
+    for wf in filters:
+        if not _pattern_matches(content, wf.pattern):
+            continue
+
+        action = wf.action
+
+        if action == "delete":
+            raise HTTPException(
+                status_code=400,
+                detail="Your message contains content that is not allowed in this server.",
+            )
+
+        if action == "warn":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Your message was blocked: it matched the server's content filter "
+                    f"(pattern: {wf.pattern!r}). Please review the server rules."
+                ),
+            )
+
+        if action in ("kick", "ban"):
+            # Remove from server
+            member_row = await db.execute(
+                select(ServerMember).where(
+                    ServerMember.server_id == server_id,
+                    ServerMember.user_id == author_id,
+                )
+            )
+            member = member_row.scalar_one_or_none()
+            if member:
+                await db.delete(member)
+
+            if action == "ban":
+                existing_ban = await db.execute(
+                    select(ServerBan).where(
+                        ServerBan.server_id == server_id,
+                        ServerBan.user_id == author_id,
+                    )
+                )
+                if not existing_ban.scalar_one_or_none():
+                    db.add(ServerBan(
+                        server_id=server_id,
+                        user_id=author_id,
+                        reason=f"Auto-ban: message matched word filter pattern {wf.pattern!r}",
+                    ))
+
+            await db.commit()
+
+            from app.ws_manager import manager as _mgr
+            _event_type = "server.member_kicked" if action == "kick" else "server.member_kicked"
+            await _mgr.broadcast_server(
+                server_id,
+                {"type": _event_type, "data": {"server_id": str(server_id), "user_id": str(author_id)}},
+            )
+
+            detail = (
+                "You have been kicked from the server for violating content rules."
+                if action == "kick"
+                else "You have been banned from the server for violating content rules."
+            )
+            raise HTTPException(status_code=403, detail=detail)
+
+        # Unknown action — fall through silently
+        break
 
 # Per-channel per-user slowmode tracker: channel_id_str -> user_id_str -> last_send_time
 _slowmode_last: Dict[str, Dict[str, float]] = defaultdict(dict)
@@ -219,6 +308,10 @@ async def send_message(
                 headers={"Retry-After": str(retry_after)},
             )
         _slowmode_last[ch_key][user_key] = now
+
+    # Enforce per-server word filters (server channels only)
+    if channel.server_id and body.content:
+        await _apply_word_filters(body.content, channel.server_id, current_user.id, db)
 
     msg = Message(
         channel_id=channel_id,

@@ -1,8 +1,8 @@
 import { useNavigate, useParams, useMatch } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, useRef, useCallback, type ReactNode } from 'react'
-import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory, updateCategory, deleteCategory } from '../api/channels'
-import { getMembers, getServer } from '../api/servers'
+import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
+import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory, updateCategory, deleteCategory, getPermissions, setPermission } from '../api/channels'
+import { getMembers, getServer, getRoles } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
 import { StatusIndicator } from './StatusIndicator'
 import { UserAvatar } from './UserAvatar'
@@ -16,7 +16,8 @@ import { updateMe } from '../api/users'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import { InviteModal } from './InviteModal'
-import type { Channel, VoiceParticipant, Member, User } from '../api/types'
+import { ChannelPerm } from '../api/types'
+import type { Channel, VoiceParticipant, Member, User, ChannelPermission } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import type { VoiceSession } from '../pages/AppShell'
 import { ProfileCard } from './ProfileCard'
@@ -88,8 +89,16 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [editChannelName, setEditChannelName] = useState('')
   const [editChannelDesc, setEditChannelDesc] = useState('')
   const [editSlowmode, setEditSlowmode] = useState(0)
+  const [editChannelTab, setEditChannelTab] = useState<'overview' | 'permissions'>('overview')
+  // roleId → {allow_bits, deny_bits} — local draft for the Permissions tab
+  const [permDraft, setPermDraft] = useState<Record<string, { allow_bits: number; deny_bits: number }>>({})
   const [editCategory, setEditCategory] = useState<{ id: string; title: string } | null>(null)
   const [editCategoryName, setEditCategoryName] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<
+    | { kind: 'channel'; id: string; name: string }
+    | { kind: 'category'; id: string; name: string }
+    | null
+  >(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -168,17 +177,13 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {
         label: 'Edit Channel',
         icon: 'edit-2',
-        onClick: () => { setEditChannel(ch); setEditChannelName(ch.title); setEditChannelDesc(ch.description ?? ''); setEditSlowmode(ch.slowmode_delay ?? 0) },
+        onClick: () => { setEditChannel(ch); setEditChannelName(ch.title); setEditChannelDesc(ch.description ?? ''); setEditSlowmode(ch.slowmode_delay ?? 0); setEditChannelTab('overview'); setPermDraft({}) },
       },
       {
         label: 'Delete Channel',
         icon: 'trash-2',
         danger: true,
-        onClick: async () => {
-          if (!serverId) return
-          await deleteChannel(serverId, ch.id)
-          qc.invalidateQueries({ queryKey: ['channels', serverId] })
-        },
+        onClick: () => setConfirmDelete({ kind: 'channel', id: ch.id, name: ch.title }),
       },
     ] : []
     setContextMenu({
@@ -205,11 +210,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
           label: 'Delete Category',
           icon: 'trash-2',
           danger: true,
-          onClick: async () => {
-            if (!serverId) return
-            await deleteCategory(serverId, cat.id)
-            qc.invalidateQueries({ queryKey: ['categories', serverId] })
-          },
+          onClick: () => setConfirmDelete({ kind: 'category', id: cat.id, name: cat.title }),
         },
       ],
     })
@@ -594,56 +595,321 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
           onClose={() => setInviteModalOpen(false)}
         />
       )}
-      {/* Edit channel modal */}
-      {editChannel && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditChannel(null)}>
-          <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold mb-4">Edit Channel</h2>
-            <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Channel Name</label>
-            <input
-              className="input w-full mb-3"
-              value={editChannelName}
-              onChange={(e) => setEditChannelName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditChannel() }}
-              autoFocus
-            />
-            <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Channel Topic <span className="normal-case font-normal">(optional)</span></label>
-            <textarea
-              className="input w-full mb-4 resize-none text-sm"
-              rows={3}
-              placeholder="Add a topic…"
-              value={editChannelDesc}
-              onChange={(e) => setEditChannelDesc(e.target.value)}
-              maxLength={1024}
-            />
-            <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Slowmode</label>
-            <select
-              className="input w-full mb-4 text-sm"
-              value={editSlowmode}
-              onChange={(e) => setEditSlowmode(Number(e.target.value))}
-            >
-              <option value={0}>Off</option>
-              <option value={5}>5 seconds</option>
-              <option value={10}>10 seconds</option>
-              <option value={15}>15 seconds</option>
-              <option value={30}>30 seconds</option>
-              <option value={60}>1 minute</option>
-              <option value={120}>2 minutes</option>
-              <option value={300}>5 minutes</option>
-              <option value={600}>10 minutes</option>
-              <option value={3600}>1 hour</option>
-            </select>
-            <div className="flex gap-2">
-              <button className="btn flex-1" onClick={handleSaveEditChannel} disabled={!editChannelName.trim()}>
-                Save
-              </button>
-              <button className="btn flex-1 bg-discord-input hover:bg-discord-input/70" onClick={() => setEditChannel(null)}>
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setConfirmDelete(null)}>
+          <div className="bg-discord-sidebar rounded-lg p-6 w-96 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-2">
+              Delete {confirmDelete.kind === 'channel' ? 'Channel' : 'Category'}
+            </h2>
+            <p className="text-discord-muted text-sm mb-1">
+              Are you sure you want to delete{' '}
+              <span className="font-semibold text-discord-text">
+                {confirmDelete.kind === 'channel' ? '# ' : ''}{confirmDelete.name}
+              </span>?
+            </p>
+            {confirmDelete.kind === 'category' && (
+              <p className="text-yellow-400 text-xs mt-1 mb-4">
+                Channels inside this category will <strong>not</strong> be deleted — they will become uncategorised.
+              </p>
+            )}
+            {confirmDelete.kind === 'channel' && (
+              <p className="text-red-400 text-xs mt-1 mb-4">This action cannot be undone.</p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                className="px-4 py-2 rounded text-sm text-discord-muted hover:text-discord-text bg-discord-input hover:bg-discord-input/70 transition-colors"
+                onClick={() => setConfirmDelete(null)}
+              >
                 Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded text-sm font-semibold text-white bg-red-600 hover:bg-red-500 transition-colors"
+                onClick={async () => {
+                  if (!serverId) return
+                  const target = confirmDelete
+                  setConfirmDelete(null)
+                  if (target.kind === 'channel') {
+                    await deleteChannel(serverId, target.id)
+                    qc.invalidateQueries({ queryKey: ['channels', serverId] })
+                    if (target.id === channelId) navigate(`/channels/${serverId}`, { replace: true })
+                  } else {
+                    await deleteCategory(serverId, target.id)
+                    qc.invalidateQueries({ queryKey: ['categories', serverId] })
+                    qc.invalidateQueries({ queryKey: ['channels', serverId] })
+                  }
+                }}
+              >
+                Delete
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Edit channel modal */}
+      {editChannel && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditChannel(null)}>
+          <div className="bg-discord-sidebar rounded-lg w-[560px] max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-6 pt-6 pb-0 shrink-0">
+              <h2 className="text-lg font-bold mb-4">Edit Channel — <span className="text-discord-muted font-normal"># {editChannel.title}</span></h2>
+              {/* Tabs */}
+              <div className="flex gap-1 border-b border-black/20">
+                {(['overview', 'permissions'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setEditChannelTab(t)}
+                    className={`px-4 py-2 text-sm font-semibold capitalize border-b-2 -mb-px transition-colors
+                      ${editChannelTab === t
+                        ? 'border-white text-white'
+                        : 'border-transparent text-discord-muted hover:text-discord-text'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tab content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {editChannelTab === 'overview' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Channel Name</label>
+                    <input
+                      className="input w-full"
+                      value={editChannelName}
+                      onChange={(e) => setEditChannelName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditChannel() }}
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Channel Topic <span className="normal-case font-normal">(optional)</span></label>
+                    <textarea
+                      className="input w-full resize-none text-sm"
+                      rows={3}
+                      placeholder="Add a topic…"
+                      value={editChannelDesc}
+                      onChange={(e) => setEditChannelDesc(e.target.value)}
+                      maxLength={1024}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Slowmode</label>
+                    <select
+                      className="input w-full text-sm"
+                      value={editSlowmode}
+                      onChange={(e) => setEditSlowmode(Number(e.target.value))}
+                    >
+                      <option value={0}>Off</option>
+                      <option value={5}>5 seconds</option>
+                      <option value={10}>10 seconds</option>
+                      <option value={15}>15 seconds</option>
+                      <option value={30}>30 seconds</option>
+                      <option value={60}>1 minute</option>
+                      <option value={120}>2 minutes</option>
+                      <option value={300}>5 minutes</option>
+                      <option value={600}>10 minutes</option>
+                      <option value={3600}>1 hour</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+              {editChannelTab === 'permissions' && serverId && (
+                <ChannelPermTab serverId={serverId} channelId={editChannel.id} />
+              )}
+            </div>
+
+            {/* Footer buttons — only for Overview tab */}
+            {editChannelTab === 'overview' && (
+              <div className="px-6 py-4 flex gap-2 border-t border-black/20 shrink-0">
+                <button className="btn flex-1" onClick={handleSaveEditChannel} disabled={!editChannelName.trim()}>
+                  Save
+                </button>
+                <button className="btn flex-1 bg-discord-input hover:bg-discord-input/70" onClick={() => setEditChannel(null)}>
+                  Cancel
+                </button>
+              </div>
+            )}
+            {editChannelTab === 'permissions' && (
+              <div className="px-6 py-4 border-t border-black/20 shrink-0">
+                <button className="btn bg-discord-input hover:bg-discord-input/70" onClick={() => setEditChannel(null)}>
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Channel Permissions Tab ──────────────────────────────────────────────────
+
+const PERM_COLUMNS: { key: keyof typeof ChannelPerm; label: string }[] = [
+  { key: 'VIEW_CHANNEL',     label: 'View' },
+  { key: 'SEND_MESSAGES',    label: 'Send' },
+  { key: 'MANAGE_MESSAGES',  label: 'Manage' },
+  { key: 'ATTACH_FILES',     label: 'Attach' },
+  { key: 'ADD_REACTIONS',    label: 'React' },
+  { key: 'MENTION_EVERYONE', label: '@all' },
+]
+
+type PermState = 'inherit' | 'allow' | 'deny'
+
+function getPermState(allow: number, deny: number, bit: number): PermState {
+  if (deny & bit) return 'deny'
+  if (allow & bit) return 'allow'
+  return 'inherit'
+}
+
+function cyclePermState(current: PermState): PermState {
+  if (current === 'inherit') return 'allow'
+  if (current === 'allow') return 'deny'
+  return 'inherit'
+}
+
+function applyPermState(allow: number, deny: number, bit: number, next: PermState) {
+  let a = allow, d = deny
+  // clear bit from both
+  a &= ~bit; d &= ~bit
+  if (next === 'allow') a |= bit
+  if (next === 'deny')  d |= bit
+  return { allow_bits: a, deny_bits: d }
+}
+
+function ChannelPermTab({ serverId, channelId }: { serverId: string; channelId: string }) {
+  const qc = useQueryClient()
+  const [draft, setDraft] = useState<Record<string, { allow_bits: number; deny_bits: number }> | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles', serverId],
+    queryFn: () => getRoles(serverId),
+  })
+
+  const { data: existingPerms = [], isSuccess: permsLoaded } = useQuery<ChannelPermission[]>({
+    queryKey: ['channelPerms', channelId],
+    queryFn: () => getPermissions(serverId, channelId),
+  })
+
+  // Initialise draft once both roles and permissions have loaded
+  useEffect(() => {
+    if (!permsLoaded || roles.length === 0) return
+    const init: Record<string, { allow_bits: number; deny_bits: number }> = {}
+    for (const p of existingPerms) {
+      init[p.role_id] = { allow_bits: p.allow_bits, deny_bits: p.deny_bits }
+    }
+    for (const r of roles) {
+      if (!init[r.id]) init[r.id] = { allow_bits: 0, deny_bits: 0 }
+    }
+    setDraft(init)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permsLoaded, channelId])
+
+  function toggle(roleId: string, bit: number) {
+    setDraft(prev => {
+      if (!prev) return prev
+      const cur = prev[roleId] ?? { allow_bits: 0, deny_bits: 0 }
+      const current = getPermState(cur.allow_bits, cur.deny_bits, bit)
+      const next = cyclePermState(current)
+      return {
+        ...prev,
+        [roleId]: applyPermState(cur.allow_bits, cur.deny_bits, bit, next),
+      }
+    })
+  }
+
+  async function handleSave() {
+    if (!draft) return
+    setSaving(true)
+    try {
+      await Promise.all(
+        Object.entries(draft).map(([roleId, bits]) =>
+          setPermission(serverId, channelId, roleId, bits)
+        )
+      )
+      qc.invalidateQueries({ queryKey: ['channelPerms', channelId] })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 1500)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!permsLoaded || !draft) {
+    return <div className="py-8 text-center text-discord-muted text-sm">Loading permissions…</div>
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-discord-muted">
+        Control what each role can do in this channel. Overrides take precedence over server-wide role permissions.<br />
+        <span className="inline-flex items-center gap-3 mt-1">
+          <span className="text-green-400 font-semibold">✓ Allow</span>
+          <span className="text-red-400 font-semibold">✗ Deny</span>
+          <span className="text-discord-muted font-semibold">— Inherit</span>
+        </span>
+      </p>
+
+      <div className="overflow-x-auto rounded-lg border border-black/20">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-discord-input/40">
+              <th className="px-3 py-2 text-left text-xs font-bold uppercase text-discord-muted tracking-wider min-w-[140px]">Role</th>
+              {PERM_COLUMNS.map(col => (
+                <th key={col.key} className="px-2 py-2 text-center text-xs font-bold uppercase text-discord-muted tracking-wider whitespace-nowrap">{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {roles.map((role, i) => {
+              const bits = draft[role.id] ?? { allow_bits: 0, deny_bits: 0 }
+              return (
+                <tr key={role.id} className={i % 2 === 0 ? 'bg-discord-sidebar' : 'bg-discord-input/10'}>
+                  <td className="px-3 py-2 font-medium text-sm" style={{ color: role.color ?? undefined }}>
+                    {role.name}
+                    {role.is_admin && <span className="ml-1.5 text-[10px] text-yellow-400 opacity-80">ADMIN</span>}
+                  </td>
+                  {PERM_COLUMNS.map(col => {
+                    const bit = ChannelPerm[col.key]
+                    const state = getPermState(bits.allow_bits, bits.deny_bits, bit)
+                    return (
+                      <td key={col.key} className="px-2 py-2 text-center">
+                        <button
+                          onClick={() => toggle(role.id, bit)}
+                          title={`${col.label}: ${state}`}
+                          className={`w-7 h-7 rounded flex items-center justify-center mx-auto text-sm font-bold transition-colors
+                            ${state === 'allow' ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                              : state === 'deny' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                              : 'bg-discord-input/60 text-discord-muted hover:bg-discord-input'}`}
+                        >
+                          {state === 'allow' ? '✓' : state === 'deny' ? '✗' : '—'}
+                        </button>
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-discord-mention text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-discord-mention/80 transition-colors disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save Permissions'}
+        </button>
+        {saved && <span className="text-green-400 text-sm">Saved!</span>}
+      </div>
     </div>
   )
 }
@@ -711,9 +977,11 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
             created_at: '',
             banner: null,
             pronouns: null,
+            dm_permission: 'everyone' as const,
+            hide_status: false,
           }
         }
-        return { user, isSelf, isSpeaking: p.is_speaking ?? false, isMuted: p.is_muted, isDeafened: p.is_deafened, isSharingScreen: p.is_sharing_screen ?? false }
+        return { user: user as User, isSelf, isSpeaking: p.is_speaking ?? false, isMuted: p.is_muted, isDeafened: p.is_deafened, isSharingScreen: p.is_sharing_screen ?? false }
       })
     : []
 

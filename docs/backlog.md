@@ -99,16 +99,22 @@ Two-level protection prevents message flooding:
 -   `ChannelSidebar` edit modal includes a Slowmode dropdown (admins only).
 -   `MessageInput` shows a yellow countdown banner + disabled textarea/send button for the duration of the cooldown; client-side countdown starts immediately on success (no round-trip needed), and a server `429` also triggers the cooldown via the `Retry-After` header.
 
-### 4.5. Per-Server Word / Phrase Blocklist
--   Server admins can maintain a list of blocked words or phrases in server settings.
--   Each entry has a configurable action: **delete** (silently remove the message), **warn** (DM the user), **kick**, or **ban**.
--   Matching is case-insensitive; support simple wildcard patterns (e.g. `bad*`).
--   Changes take effect immediately without restarting the server.
+### ~~4.5. Per-Server Word / Phrase Blocklist~~ ✅ Implemented
+-   Server admins manage a blocklist in **Server Settings → Word Filters**.
+-   Each entry has a **pattern** (plain phrase or wildcard, e.g. `bad*`) and an **action**: **delete** (reject with a generic error), **warn** (reject with an explanatory message), **kick** (reject + kick the sender), or **ban** (reject + kick + record a permanent ban).
+-   Matching is case-insensitive; wildcards use `fnmatch` (`*` / `?`) checked per-word; plain phrases are substring-searched.
+-   Enforcement runs in `send_message` before the message is persisted — the message is never stored.
+-   New **Bans** tab in server settings lists all banned users with an **Unban** button; admins can also manually ban via `POST /servers/{id}/bans/{user_id}`.
+-   Ban check added to both `join_server` and `join_via_invite` so banned users cannot rejoin.
+-   DB: `word_filters` table (`id`, `server_id`, `pattern`, `action`, `created_at`) + `server_bans` table (`server_id`, `user_id`, `reason`, `banned_at`). Migration `m5n6o7p8q9r0`.
 
-### 4.6. Per-Channel Permission Overrides per Role
--   In addition to server-wide role permissions, admins should be able to override specific permissions (read, write, manage messages, etc.) for a given role on a per-channel basis.
--   Overrides are additive or restrictive and take precedence over the server-wide role value.
--   Displayed in channel settings under a "Permissions" tab showing each role with allow/deny/inherit toggles per permission.
+### ~~4.6. Per-Channel Permission Overrides per Role~~ ✅ Implemented
+-   Admins open **Edit Channel → Permissions** tab (new tab in the channel edit modal).
+-   Each server role is shown as a row; the 6 most relevant permissions (View, Send, Manage, Attach, React, @all) are columns.
+-   Each cell is a **tri-state toggle** — click to cycle: **— Inherit** (grey) → **✓ Allow** (green) → **✗ Deny** (red).
+-   **Save Permissions** button sends `PUT /servers/{id}/channels/{ch}/permissions/{role}` for every role in one batch; a green "Saved!" confirmation appears for 1.5 s.
+-   Deny takes precedence over Allow when both bits are set. Setting both to 0 reverts the role to server-wide defaults.
+-   Backend was already complete: `channel_permissions` table (`channel_id`, `role_id`, `allow_bits BIGINT`, `deny_bits BIGINT`), `GET` and `PUT` endpoints, and `ChannelPerm` bitfield constants (`VIEW_CHANNEL=1`, `SEND_MESSAGES=2`, … `MANAGE_ROLES=256`). Only the frontend UI was missing.
 
 ### ~~4.7. Invite Link Controls~~ ✅ Implemented
 -   New `InviteModal` component replaces the old "24 hour invite" inline modals in `ChannelSidebar` and `ServerSidebar`.

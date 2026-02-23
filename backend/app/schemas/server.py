@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -92,3 +93,38 @@ class MemberNickUpdate(BaseModel):
         if len(cleaned) > 32:
             raise ValueError('Nickname cannot exceed 32 characters')
         return cleaned or None
+
+
+# ---- Word Filters -----------------------------------------------------------
+
+class WordFilterAction(str, Enum):
+    delete = "delete"
+    warn = "warn"
+    kick = "kick"
+    ban = "ban"
+
+
+class WordFilterCreate(BaseModel):
+    pattern: str = Field(min_length=1, max_length=100)
+    action: WordFilterAction = WordFilterAction.delete
+
+
+class WordFilterRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    server_id: uuid.UUID
+    pattern: str
+    action: str
+    created_at: datetime
+
+
+# ---- Server Bans ------------------------------------------------------------
+
+class ServerBanRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    server_id: uuid.UUID
+    user_id: uuid.UUID
+    reason: str | None
+    banned_at: datetime

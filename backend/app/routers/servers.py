@@ -17,11 +17,15 @@ from app.schemas.server import (
     RoleRead,
     MemberRead,
     MemberNickUpdate,
+    WordFilterCreate,
+    WordFilterRead,
+    ServerBanRead,
 )
 from app.schemas.user import UserRead
 from app.ws_manager import manager
 from models.server import Server, ServerMember, Role, UserRole
 from models.user import User, UserStatus
+from models.word_filter import WordFilter, ServerBan
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -200,6 +204,7 @@ async def list_members(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
 @router.post("/{server_id}/join", response_model=MemberRead)
 async def join_server(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
     await _get_server_or_404(server_id, db)
+    await _check_not_banned(server_id, current_user.id, db)
     existing = await db.execute(
         select(ServerMember).where(
             ServerMember.server_id == server_id, ServerMember.user_id == current_user.id
@@ -399,3 +404,100 @@ async def remove_role(
             server_id,
             {"type": "role.removed", "data": {"server_id": str(server_id), "user_id": str(user_id), "role_id": str(role_id)}},
         )
+
+
+# ---- Word Filters -----------------------------------------------------------
+
+@router.get("/{server_id}/word-filters", response_model=list[WordFilterRead])
+async def list_word_filters(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    result = await db.execute(
+        select(WordFilter).where(WordFilter.server_id == server_id).order_by(WordFilter.created_at)
+    )
+    return result.scalars().all()
+
+
+@router.post("/{server_id}/word-filters", response_model=WordFilterRead, status_code=status.HTTP_201_CREATED)
+async def create_word_filter(server_id: uuid.UUID, body: WordFilterCreate, current_user: CurrentUser, db: DB):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    wf = WordFilter(server_id=server_id, pattern=body.pattern.strip(), action=body.action.value)
+    db.add(wf)
+    await db.commit()
+    await db.refresh(wf)
+    return wf
+
+
+@router.delete("/{server_id}/word-filters/{filter_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_word_filter(server_id: uuid.UUID, filter_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    result = await db.execute(
+        select(WordFilter).where(WordFilter.id == filter_id, WordFilter.server_id == server_id)
+    )
+    wf = result.scalar_one_or_none()
+    if not wf:
+        raise HTTPException(status_code=404, detail="Word filter not found")
+    await db.delete(wf)
+    await db.commit()
+
+
+# ---- Bans -------------------------------------------------------------------
+
+@router.get("/{server_id}/bans", response_model=list[ServerBanRead])
+async def list_bans(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    result = await db.execute(select(ServerBan).where(ServerBan.server_id == server_id))
+    return result.scalars().all()
+
+
+@router.post("/{server_id}/bans/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def ban_member(server_id: uuid.UUID, user_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    """Manually ban a user from the server (admin only). Also kicks them if still a member."""
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    if user_id == server.owner_id:
+        raise HTTPException(status_code=400, detail="Cannot ban the server owner")
+    # Record ban
+    existing = await db.execute(
+        select(ServerBan).where(ServerBan.server_id == server_id, ServerBan.user_id == user_id)
+    )
+    if not existing.scalar_one_or_none():
+        db.add(ServerBan(server_id=server_id, user_id=user_id))
+    # Kick if still a member
+    member_row = await db.execute(
+        select(ServerMember).where(ServerMember.server_id == server_id, ServerMember.user_id == user_id)
+    )
+    member = member_row.scalar_one_or_none()
+    if member:
+        await db.delete(member)
+    await db.commit()
+    await manager.broadcast_server(
+        server_id,
+        {"type": "server.member_kicked", "data": {"server_id": str(server_id), "user_id": str(user_id)}},
+    )
+
+
+@router.delete("/{server_id}/bans/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def unban_member(server_id: uuid.UUID, user_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    result = await db.execute(
+        select(ServerBan).where(ServerBan.server_id == server_id, ServerBan.user_id == user_id)
+    )
+    ban = result.scalar_one_or_none()
+    if not ban:
+        raise HTTPException(status_code=404, detail="Ban not found")
+    await db.delete(ban)
+    await db.commit()
+
+
+async def _check_not_banned(server_id: uuid.UUID, user_id: uuid.UUID, db) -> None:
+    """Raise 403 if the user is banned from the server."""
+    result = await db.execute(
+        select(ServerBan).where(ServerBan.server_id == server_id, ServerBan.user_id == user_id)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="You are banned from this server")

@@ -5,6 +5,9 @@ import {
   getServer, updateServer, deleteServer, leaveServer,
   getMembers, kickMember, getRoles, createRole, updateRole, deleteRole,
   uploadServerIcon, uploadServerBanner, assignRole, removeRole,
+  getWordFilters, createWordFilter, deleteWordFilter,
+  getBans, unbanMember,
+  type WordFilter, type WordFilterAction, type ServerBan,
 } from '../api/servers'
 import { listInvites, revokeInvite } from '../api/invites'
 import { UserAvatar } from '../components/UserAvatar'
@@ -14,15 +17,17 @@ import { useAuth } from '../contexts/AuthContext'
 import type { Member, Role } from '../api/types'
 import type { ServerInvite } from '../api/invites'
 
-type Tab = 'overview' | 'members' | 'roles' | 'invites'
+type Tab = 'overview' | 'members' | 'roles' | 'invites' | 'word-filters' | 'bans'
 
 // ─── Nav sidebar ─────────────────────────────────────────────────────────────
 
 const NAV: { tab: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
-  { tab: 'overview',  label: 'Overview',  icon: 'settings-2' },
-  { tab: 'members',   label: 'Members',   icon: 'people',     adminOnly: true },
-  { tab: 'roles',     label: 'Roles',     icon: 'shield',     adminOnly: true },
-  { tab: 'invites',   label: 'Invites',   icon: 'link-2',     adminOnly: true },
+  { tab: 'overview',      label: 'Overview',      icon: 'settings-2' },
+  { tab: 'members',       label: 'Members',       icon: 'people',      adminOnly: true },
+  { tab: 'roles',         label: 'Roles',         icon: 'shield',      adminOnly: true },
+  { tab: 'invites',       label: 'Invites',       icon: 'link-2',      adminOnly: true },
+  { tab: 'word-filters',  label: 'Word Filters',  icon: 'funnel',      adminOnly: true },
+  { tab: 'bans',          label: 'Bans',          icon: 'slash',       adminOnly: true },
 ]
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -121,10 +126,12 @@ export function ServerSettingsPage() {
       {/* Content */}
       <div className="flex flex-1 min-w-0">
         <div className="flex-1 overflow-y-auto px-10 py-8 max-w-3xl">
-          {tab === 'overview'  && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
-          {tab === 'members'   && <MembersTab  serverId={serverId} members={members} roles={[]} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
-          {tab === 'roles'     && <RolesTab    serverId={serverId} />}
-          {tab === 'invites'   && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
+          {tab === 'overview'      && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
+          {tab === 'members'       && <MembersTab  serverId={serverId} members={members} roles={[]} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
+          {tab === 'roles'         && <RolesTab    serverId={serverId} />}
+          {tab === 'invites'       && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
+          {tab === 'word-filters'  && <WordFiltersTab serverId={serverId} />}
+          {tab === 'bans'          && <BansTab serverId={serverId} />}
         </div>
 
         {/* Close button */}
@@ -673,6 +680,205 @@ function InvitesTab({ serverId, serverTitle }: { serverId: string; serverTitle: 
                       className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded transition-colors"
                     >
                       Revoke
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Word Filters Tab ─────────────────────────────────────────────────────────
+
+const ACTION_LABELS: Record<WordFilterAction, string> = {
+  delete: 'Delete',
+  warn:   'Warn',
+  kick:   'Kick',
+  ban:    'Ban',
+}
+
+const ACTION_COLORS: Record<WordFilterAction, string> = {
+  delete: 'text-discord-muted',
+  warn:   'text-yellow-400',
+  kick:   'text-orange-400',
+  ban:    'text-red-400',
+}
+
+function WordFiltersTab({ serverId }: { serverId: string }) {
+  const qc = useQueryClient()
+  const [pattern, setPattern] = useState('')
+  const [action, setAction] = useState<WordFilterAction>('delete')
+  const [adding, setAdding] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const { data: filters = [] } = useQuery<WordFilter[]>({
+    queryKey: ['word-filters', serverId],
+    queryFn: () => getWordFilters(serverId),
+  })
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = pattern.trim()
+    if (!trimmed) return
+    setAdding(true)
+    setError(null)
+    try {
+      await createWordFilter(serverId, trimmed, action)
+      setPattern('')
+      qc.invalidateQueries({ queryKey: ['word-filters', serverId] })
+    } catch {
+      setError('Failed to add filter.')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function handleDelete(filterId: string) {
+    await deleteWordFilter(serverId, filterId)
+    qc.invalidateQueries({ queryKey: ['word-filters', serverId] })
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold">Word Filters</h2>
+        <p className="text-discord-muted text-sm mt-1">
+          Block words or phrases from being sent in this server. Use <code className="bg-discord-input px-1 rounded text-xs">*</code> as a wildcard (e.g. <code className="bg-discord-input px-1 rounded text-xs">bad*</code>). Matching is case-insensitive.
+        </p>
+      </div>
+
+      {/* Add filter form */}
+      <form onSubmit={handleAdd} className="bg-discord-sidebar rounded-lg p-4 space-y-3">
+        <h3 className="text-sm font-bold text-discord-text">Add Filter</h3>
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="block text-xs font-bold uppercase text-discord-muted mb-1.5">Pattern</label>
+            <input
+              className="input w-full"
+              placeholder="e.g. badword or bad*"
+              value={pattern}
+              onChange={e => setPattern(e.target.value)}
+              maxLength={100}
+            />
+          </div>
+          <div className="w-36">
+            <label className="block text-xs font-bold uppercase text-discord-muted mb-1.5">Action</label>
+            <select
+              className="input w-full"
+              value={action}
+              onChange={e => setAction(e.target.value as WordFilterAction)}
+            >
+              <option value="delete">Delete</option>
+              <option value="warn">Warn</option>
+              <option value="kick">Kick</option>
+              <option value="ban">Ban</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={adding || !pattern.trim()}
+            className="bg-discord-mention text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-discord-mention/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {adding ? 'Adding…' : 'Add Filter'}
+          </button>
+        </div>
+        {error && <p className="text-red-400 text-sm">{error}</p>}
+      </form>
+
+      {/* Filter list */}
+      {filters.length === 0 ? (
+        <div className="text-discord-muted text-center py-10">No word filters configured.</div>
+      ) : (
+        <div className="bg-discord-sidebar rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-black/20 text-discord-muted text-xs uppercase">
+                <th className="px-4 py-2.5 text-left font-bold tracking-wider">Pattern</th>
+                <th className="px-4 py-2.5 text-left font-bold tracking-wider">Action</th>
+                <th className="px-4 py-2.5 text-left font-bold tracking-wider">Added</th>
+                <th className="px-4 py-2.5 text-right font-bold tracking-wider"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filters.map(f => (
+                <tr key={f.id} className="border-b border-black/10 hover:bg-discord-input/20 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-xs text-discord-text">{f.pattern}</td>
+                  <td className={`px-4 py-2.5 font-semibold text-xs ${ACTION_COLORS[f.action as WordFilterAction]}`}>
+                    {ACTION_LABELS[f.action as WordFilterAction] ?? f.action}
+                  </td>
+                  <td className="px-4 py-2.5 text-discord-muted text-xs">
+                    {new Date(f.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button
+                      onClick={() => handleDelete(f.id)}
+                      className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Bans Tab ─────────────────────────────────────────────────────────────────
+
+function BansTab({ serverId }: { serverId: string }) {
+  const qc = useQueryClient()
+
+  const { data: bans = [] } = useQuery<ServerBan[]>({
+    queryKey: ['bans', serverId],
+    queryFn: () => getBans(serverId),
+  })
+
+  async function handleUnban(userId: string) {
+    await unbanMember(serverId, userId)
+    qc.invalidateQueries({ queryKey: ['bans', serverId] })
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Bans</h2>
+
+      {bans.length === 0 ? (
+        <div className="text-discord-muted text-center py-10">No banned members.</div>
+      ) : (
+        <div className="bg-discord-sidebar rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-black/20 text-discord-muted text-xs uppercase">
+                <th className="px-4 py-2.5 text-left font-bold tracking-wider">User ID</th>
+                <th className="px-4 py-2.5 text-left font-bold tracking-wider">Reason</th>
+                <th className="px-4 py-2.5 text-left font-bold tracking-wider">Banned</th>
+                <th className="px-4 py-2.5 text-right font-bold tracking-wider"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {bans.map(b => (
+                <tr key={b.user_id} className="border-b border-black/10 hover:bg-discord-input/20 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-xs text-discord-text">{b.user_id}</td>
+                  <td className="px-4 py-2.5 text-discord-muted text-xs max-w-xs truncate">
+                    {b.reason ?? <span className="italic">No reason given</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-discord-muted text-xs">
+                    {new Date(b.banned_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button
+                      onClick={() => handleUnban(b.user_id)}
+                      className="text-xs text-green-400 hover:text-green-300 hover:bg-green-500/10 px-2 py-1 rounded transition-colors"
+                    >
+                      Unban
                     </button>
                   </td>
                 </tr>

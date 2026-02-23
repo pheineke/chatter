@@ -115,6 +115,10 @@ async def delete_category(
         raise HTTPException(status_code=404, detail="Category not found")
     await db.delete(cat)
     await db.commit()
+    await manager.broadcast_server(
+        server_id,
+        {"type": "category.deleted", "data": {"category_id": str(category_id), "server_id": str(server_id)}},
+    )
 
 
 # ---- Channels ---------------------------------------------------------------
@@ -234,6 +238,10 @@ async def delete_channel(
         raise HTTPException(status_code=404, detail="Channel not found")
     await db.delete(channel)
     await db.commit()
+    await manager.broadcast_server(
+        server_id,
+        {"type": "channel.deleted", "data": {"channel_id": str(channel_id), "server_id": str(server_id)}},
+    )
 
 
 # ---- Channel Permissions ----------------------------------------------------

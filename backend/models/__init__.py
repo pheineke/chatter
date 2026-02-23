@@ -15,6 +15,7 @@ from models.notification import (
     UserServerNotificationSettings,
     NotificationLevel,
 )
+from models.word_filter import WordFilter, ServerBan, WordFilterAction
 
 __all__ = [
     "Base",
@@ -45,4 +46,7 @@ __all__ = [
     "UserChannelNotificationSettings",
     "UserServerNotificationSettings",
     "NotificationLevel",
+    "WordFilter",
+    "ServerBan",
+    "WordFilterAction",
 ]

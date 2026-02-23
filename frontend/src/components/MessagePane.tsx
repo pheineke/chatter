@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getChannels } from '../api/channels'
@@ -25,6 +25,7 @@ interface Props {
 
 export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) {
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
+  const navigate = useNavigate()
   const [showMembers, setShowMembers] = useState(true)
   const [showPins, setShowPins] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -83,13 +84,20 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
     return () => window.removeEventListener('channel-ws-event', handler)
   }, [channelId, qc])
 
-  const { data: channels = [], isLoading: channelsLoading } = useQuery({
+  const { data: channels = [], isLoading: channelsLoading, isSuccess: channelsLoaded } = useQuery({
     queryKey: ['channels', serverId],
     queryFn: () => getChannels(serverId!),
     enabled: !!serverId,
   })
 
   const channel = channels.find((c) => c.id === channelId)
+
+  // If the channel list has loaded and the active channel no longer exists, navigate back to the server root.
+  useEffect(() => {
+    if (channelsLoaded && channelId && !channel && !voiceSession) {
+      navigate(`/channels/${serverId}`, { replace: true })
+    }
+  }, [channelsLoaded, channelId, channel, voiceSession, serverId, navigate])
 
   if (!channelId) {
     return (

@@ -143,6 +143,10 @@ async def join_via_invite(code: str, current_user: CurrentUser, db: DB):
     if invite.max_uses and invite.uses >= invite.max_uses:
         raise HTTPException(status_code=410, detail="Invite has reached max uses")
 
+    # Check ban
+    from app.routers.servers import _check_not_banned
+    await _check_not_banned(invite.server_id, current_user.id, db)
+
     # Check already a member
     existing = await db.execute(
         select(ServerMember).where(

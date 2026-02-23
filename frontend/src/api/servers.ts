@@ -87,3 +87,51 @@ export async function uploadServerBanner(serverId: string, file: File): Promise<
   const { data } = await client.post<Server>(`/servers/${serverId}/banner`, form)
   return data
 }
+
+// ── Word Filters ─────────────────────────────────────────────────────────────
+
+export type WordFilterAction = 'delete' | 'warn' | 'kick' | 'ban'
+
+export interface WordFilter {
+  id: string
+  server_id: string
+  pattern: string
+  action: WordFilterAction
+  created_at: string
+}
+
+export async function getWordFilters(serverId: string): Promise<WordFilter[]> {
+  const { data } = await client.get<WordFilter[]>(`/servers/${serverId}/word-filters`)
+  return data
+}
+
+export async function createWordFilter(serverId: string, pattern: string, action: WordFilterAction): Promise<WordFilter> {
+  const { data } = await client.post<WordFilter>(`/servers/${serverId}/word-filters`, { pattern, action })
+  return data
+}
+
+export async function deleteWordFilter(serverId: string, filterId: string): Promise<void> {
+  await client.delete(`/servers/${serverId}/word-filters/${filterId}`)
+}
+
+// ── Bans ─────────────────────────────────────────────────────────────────────
+
+export interface ServerBan {
+  server_id: string
+  user_id: string
+  reason: string | null
+  banned_at: string
+}
+
+export async function getBans(serverId: string): Promise<ServerBan[]> {
+  const { data } = await client.get<ServerBan[]>(`/servers/${serverId}/bans`)
+  return data
+}
+
+export async function banMember(serverId: string, userId: string): Promise<void> {
+  await client.post(`/servers/${serverId}/bans/${userId}`)
+}
+
+export async function unbanMember(serverId: string, userId: string): Promise<void> {
+  await client.delete(`/servers/${serverId}/bans/${userId}`)
+}

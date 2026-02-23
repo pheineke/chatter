@@ -327,6 +327,8 @@ export function VoiceGridPane({ session, onLeave }: Props) {
       created_at: '',
       banner: null,
       pronouns: null,
+      dm_permission: 'everyone' as const,
+      hide_status: false,
     }
     tiles.push({
       kind: 'participant',

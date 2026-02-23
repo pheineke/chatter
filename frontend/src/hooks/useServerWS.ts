@@ -54,6 +54,15 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           )
           break
         }
+        case 'category.deleted': {
+          const { category_id } = msg.data as { category_id: string }
+          qc.setQueryData<Category[]>(['categories', serverId], (old = []) =>
+            old.filter((c) => c.id !== category_id),
+          )
+          // Channels with this category_id now have it cleared — invalidate to re-fetch
+          qc.invalidateQueries({ queryKey: ['channels', serverId] })
+          break
+        }
         case 'voice.user_joined': {
           const channelId = msg.channel_id as string
           const participant = msg.data as VoiceParticipant

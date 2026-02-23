@@ -34,6 +34,12 @@ class Server(Base):
     channels: Mapped[list["Channel"]] = relationship(
         "Channel", back_populates="server", cascade="all, delete-orphan"
     )
+    word_filters: Mapped[list["WordFilter"]] = relationship(
+        "WordFilter", back_populates="server", cascade="all, delete-orphan"
+    )
+    bans: Mapped[list["ServerBan"]] = relationship(
+        "ServerBan", back_populates="server", cascade="all, delete-orphan"
+    )
 
 
 class ServerMember(Base):
