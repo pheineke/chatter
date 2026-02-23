@@ -22,6 +22,7 @@ import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import type { VoiceSession } from '../pages/AppShell'
 import { ProfileCard } from './ProfileCard'
 import { useNotificationSettings } from '../hooks/useNotificationSettings'
+import { setLastChannel } from '../utils/lastChannel'
 
 interface Props {
   voiceSession: VoiceSession | null
@@ -937,6 +938,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
   const [activeProfile, setActiveProfile] = useState<{ id: string; pos: { x: number; y: number } } | null>(null)
 
   function handleClick() {
+    setLastChannel(serverId, channel.id)
     if (isVoice) {
       if (inThisVoice) {
         // Already connected → just navigate to the voice grid

@@ -103,7 +103,7 @@ export default function AppShell() {
                   <Route path="@me" element={<FriendsPane />} />
                   <Route path="@me/:dmUserId" element={<DMPane />} />
                   <Route path=":serverId" element={
-                    <div className="flex-1 flex items-center justify-center text-discord-muted">
+                    <div className="h-full flex items-center justify-center text-discord-muted">
                       Select a channel to start chatting.
                     </div>
                   } />

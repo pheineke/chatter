@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
+import { getLastChannel } from '../utils/lastChannel'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { getMyServers, createServer } from '../api/servers'
@@ -22,7 +23,10 @@ function ServerIcon({ server, active, hasUnread, onContextMenu }: { server: Serv
     <div className="relative">
       <button
         title={server.title}
-        onClick={() => navigate(`/channels/${server.id}`)}
+        onClick={() => {
+          const last = getLastChannel(server.id)
+          navigate(last ? `/channels/${server.id}/${last}` : `/channels/${server.id}`)
+        }}
         onContextMenu={onContextMenu}
         className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-150 select-none
           ${active ? 'rounded-2xl bg-discord-mention text-white' : 'bg-discord-input text-discord-text hover:rounded-2xl hover:bg-discord-mention hover:text-white'}`}

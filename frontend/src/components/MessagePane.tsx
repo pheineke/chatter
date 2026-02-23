@@ -101,7 +101,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
 
   if (!channelId) {
     return (
-      <div className="flex-1 flex items-center justify-center text-discord-muted">
+      <div className="h-full flex items-center justify-center text-discord-muted">
         Select a channel to start chatting.
       </div>
     )
@@ -116,7 +116,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice }: Props) 
   // Still loading channel list — don't render a text-channel layout for a voice channel
   if (channelsLoading && !channel) {
     return (
-      <div className="flex-1 flex items-center justify-center text-discord-muted">
+      <div className="h-full flex items-center justify-center text-discord-muted">
         <Icon name="loader" size={24} className="animate-spin" />
       </div>
     )
