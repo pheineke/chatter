@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import mkcert from 'vite-plugin-mkcert'
@@ -57,6 +58,17 @@ export default defineConfig({
       },
     }),
   ],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    css: false,
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/test/**', 'src/main.tsx', 'src/vite-env.d.ts'],
+    },
+  },
   server: {
     host: true,
     port: 5173,
