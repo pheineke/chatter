@@ -566,10 +566,12 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               ))}
             </div>
             <input
+              autoFocus
               className="input w-full mb-3"
               placeholder="channel-name"
               value={newChannelName}
               onChange={(e) => setNewChannelName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateChannel() }}
             />
             <button className="btn w-full" onClick={handleCreateChannel} disabled={!newChannelName.trim()}>
               Create Channel

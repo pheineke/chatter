@@ -183,11 +183,13 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
       {showCreate && (
         <Modal title="Create Server" onClose={() => setShowCreate(false)}>
           <input
+            autoFocus
             className="input w-full mb-3"
             placeholder="Server name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={50}
+            onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) createMut.mutate() }}
           />
           <div className="flex gap-2">
             <button className="btn flex-1" onClick={() => createMut.mutate()} disabled={!name.trim() || createMut.isPending}>
@@ -205,6 +207,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
         <Modal title="Join Server" onClose={() => setShowJoin(false)}>
           <p className="text-sm text-discord-muted mb-3">Paste an invite link or code below.</p>
           <input
+            autoFocus
             className="input w-full mb-2"
             placeholder="https://…/invite/abc123  or  abc123"
             value={inviteCode}

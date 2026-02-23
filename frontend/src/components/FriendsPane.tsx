@@ -112,6 +112,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
             <p className="text-sm text-discord-muted mb-3">You can add friends with their username or user ID.</p>
             <div className="flex gap-2">
               <input
+                autoFocus
                 className="input flex-1"
                 placeholder="Enter a username or user ID"
                 value={addUsername}
