@@ -11,8 +11,9 @@ import { useSoundManager } from '../hooks/useSoundManager'
 import { useBlocks } from '../hooks/useBlocks'
 import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
 import { getSessions, revokeSession, revokeAllOtherSessions, type Session } from '../api/sessions'
+import { getTokens, createToken, revokeToken, type ApiToken, type ApiTokenCreated } from '../api/tokens'
 
-type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications'
+type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications' | 'tokens'
 
 // ─── Sidebar nav ─────────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[
     items: [
       { id: 'account', label: 'My Account', icon: 'person' },
       { id: 'privacy', label: 'Privacy & Safety', icon: 'lock-closed' },
+      { id: 'tokens', label: 'API Tokens', icon: 'key' },
     ],
   },
   {
@@ -961,6 +963,190 @@ function EditableField({ label, value, placeholder, readOnly, multiline, isEditi
   )
 }
 
+// ─── API Tokens tab ───────────────────────────────────────────────────────────
+
+const MAX_TOKENS = 5
+
+function TokensTab() {
+  const qc = useQueryClient()
+  const [showCreate, setShowCreate] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [revealed, setRevealed] = useState<ApiTokenCreated | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [revokeId, setRevokeId] = useState<string | null>(null)
+
+  const { data: tokens = [], isLoading } = useQuery<ApiToken[]>({
+    queryKey: ['api-tokens'],
+    queryFn: getTokens,
+  })
+
+  const createMut = useMutation({
+    mutationFn: (name: string) => createToken(name),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['api-tokens'] })
+      setShowCreate(false)
+      setNewName('')
+      setRevealed(created)
+    },
+  })
+
+  const revokeMut = useMutation({
+    mutationFn: (id: string) => revokeToken(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['api-tokens'] })
+      setRevokeId(null)
+    },
+  })
+
+  function handleCopy() {
+    if (!revealed) return
+    navigator.clipboard.writeText(revealed.token).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  function fmtDate(iso: string | null) {
+    if (!iso) return 'Never'
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  const activeCount = tokens.length
+  const atCap = activeCount >= MAX_TOKENS
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-discord-text mb-1">API Tokens</h2>
+        <p className="text-sm text-discord-muted">
+          Personal API tokens let scripts and bots act on your behalf.
+          Tokens are shown only once at creation.
+        </p>
+      </div>
+
+      {/* Token list */}
+      <div className="space-y-2">
+        {isLoading && <p className="text-discord-muted text-sm">Loading…</p>}
+        {!isLoading && tokens.length === 0 && (
+          <p className="text-discord-muted text-sm">No active tokens.</p>
+        )}
+        {tokens.map((t) => (
+          <div key={t.id} className="flex items-center gap-3 px-4 py-3 rounded-md bg-discord-input">
+            <Icon name="key" size={16} className="shrink-0 text-discord-muted" />
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-discord-text truncate">{t.name}</div>
+              <div className="text-xs text-discord-muted font-mono">
+                {t.token_prefix}{'·'.repeat(8)}
+                <span className="ml-3 font-sans">Last used: {fmtDate(t.last_used_at)}</span>
+              </div>
+            </div>
+            {revokeId === t.id ? (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-discord-muted">Revoke?</span>
+                <button
+                  onClick={() => revokeMut.mutate(t.id)}
+                  disabled={revokeMut.isPending}
+                  className="px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-xs"
+                >
+                  Yes
+                </button>
+                <button onClick={() => setRevokeId(null)} className="px-2 py-0.5 rounded bg-discord-muted/20 hover:bg-discord-muted/30 text-discord-text text-xs">
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setRevokeId(t.id)}
+                title="Revoke token"
+                className="p-1.5 rounded hover:bg-red-500/20 text-discord-muted hover:text-red-400 transition-colors"
+              >
+                <Icon name="trash" size={15} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Create button */}
+      <button
+        onClick={() => { setShowCreate(true); setNewName('') }}
+        disabled={atCap}
+        className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+        title={atCap ? `Maximum of ${MAX_TOKENS} active tokens` : undefined}
+      >
+        Create Token ({activeCount}/{MAX_TOKENS})
+      </button>
+
+      {/* Create modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowCreate(false)}>
+          <div className="bg-discord-sidebar rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-discord-text">New API Token</h3>
+            <div>
+              <label className="block text-xs font-semibold text-discord-muted uppercase mb-1">Token Name</label>
+              <input
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && newName.trim()) createMut.mutate(newName.trim()) }}
+                placeholder="e.g. My bot"
+                className="w-full px-3 py-2 rounded bg-discord-input border border-discord-border text-discord-text placeholder:text-discord-muted text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            {createMut.isError && <p className="text-red-400 text-sm">{(createMut.error as Error)?.message ?? 'Failed to create token.'}</p>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded text-discord-muted hover:text-discord-text text-sm">Cancel</button>
+              <button
+                onClick={() => { if (newName.trim()) createMut.mutate(newName.trim()) }}
+                disabled={!newName.trim() || createMut.isPending}
+                className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium"
+              >
+                {createMut.isPending ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* One-time token reveal modal */}
+      {revealed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-discord-sidebar rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-discord-text">Token Created</h3>
+            <p className="text-sm text-yellow-400 font-medium">
+              Copy your token now. It will not be shown again.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={revealed.token}
+                className="flex-1 px-3 py-2 rounded bg-discord-input border border-discord-border text-discord-text font-mono text-xs focus:outline-none select-all"
+                onFocus={(e) => e.target.select()}
+              />
+              <button
+                onClick={handleCopy}
+                title="Copy to clipboard"
+                className="p-2 rounded bg-discord-input hover:bg-discord-muted/30 text-discord-muted hover:text-discord-text transition-colors"
+              >
+                <Icon name={copied ? 'checkmark' : 'copy'} size={16} />
+              </button>
+            </div>
+            {copied && <p className="text-xs text-green-400">Copied to clipboard!</p>}
+            <div className="flex justify-end">
+              <button
+                onClick={() => { setRevealed(null); setCopied(false) }}
+                className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function SettingsPage() {
@@ -1012,6 +1198,7 @@ export function SettingsPage() {
             {tab === 'appearance'    && <AppearanceTab />}
             {tab === 'voice'         && <VoiceTab />}
             {tab === 'notifications' && <NotificationsTab />}
+            {tab === 'tokens'        && <TokensTab />}
           </div>
         </div>
         {/* Close button */}

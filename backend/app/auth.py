@@ -51,3 +51,25 @@ def generate_refresh_token() -> tuple[str, str]:
 def hash_refresh_token(raw: str) -> str:
     """SHA-256 hex digest of a raw refresh token."""
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Personal API token helpers
+# ---------------------------------------------------------------------------
+
+def generate_api_token() -> tuple[str, str, str]:
+    """Return (raw_token, prefix, sha256_hex_hash).
+
+    Token format: ``<prefix8>.<random_body>``
+    Store only the hash in the database; show the raw token to the user once.
+    """
+    prefix = secrets.token_urlsafe(6)[:8]  # 8 URL-safe chars
+    body = secrets.token_urlsafe(42)        # ~56 URL-safe chars
+    raw = f"{prefix}.{body}"
+    hashed = hashlib.sha256(raw.encode()).hexdigest()
+    return raw, prefix, hashed
+
+
+def hash_api_token(raw: str) -> str:
+    """SHA-256 hex digest of a raw API token."""
+    return hashlib.sha256(raw.encode()).hexdigest()

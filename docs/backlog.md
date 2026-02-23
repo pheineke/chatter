@@ -234,10 +234,13 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   Display names, server names, channel descriptions, and bios are rendered as React text nodes — inherently XSS-safe.
 -   `onclick` attrs are stripped by DOMPurify; spoiler interactivity uses React event delegation instead.
 
-### 8.4. Auth Token Rotation & Invalidation
--   JWT access tokens are short-lived; refresh tokens are issued alongside and rotated on every use.
--   All refresh tokens for a user are invalidated on explicit logout or when suspicious activity is detected (e.g. token reuse).
--   A user can view and revoke all active sessions from account settings.
+### ~~8.4. Auth Token Rotation & Invalidation~~ ✅ Implemented
+-   JWT access tokens are short-lived (15 min); rotating refresh tokens (7-day expiry) are issued at login.
+-   Every `/auth/refresh` call revokes the submitted token and issues a fresh pair — replay of a used token revokes all sessions for that user.
+-   `User-Agent` header and `last_used_at` timestamp are recorded per session (migration `n6o7p8q9r0s1`).
+-   `GET /auth/sessions` lists all active sessions; `DELETE /auth/sessions/{id}` revokes one; `DELETE /auth/sessions` revokes all except the current one.
+-   Frontend auto-refresh interceptor in `api/client.ts` transparently retries 401s using the stored refresh token, queuing concurrent requests until the new token arrives.
+-   **Settings → My Account → Active Sessions**: shows each session with browser/OS label + last-active time, a per-session Revoke button, and a "Log out all other sessions" bulk action. Current session is marked "This device".
 
 ### ~~8.5. File Upload MIME Type Validation~~ ✅ Implemented
 -   `verify_image_magic` / `verify_image_magic_with_dims` in `file_validation.py` inspects magic bytes and rejects disguised files.

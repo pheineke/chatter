@@ -24,10 +24,11 @@ import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
 
-from app.auth import decode_access_token
+from app.auth import decode_access_token, hash_api_token
 from app.database import AsyncSessionLocal
 from app.presence import broadcast_presence
 from app.ws_manager import manager
+from models.api_token import ApiToken
 from models.server import ServerMember
 from models.user import User, UserStatus
 
@@ -43,14 +44,31 @@ router = APIRouter(tags=["websocket"])
 
 async def _authenticate_ws(ws: WebSocket, token: str) -> uuid.UUID:
     """
-    Validate the JWT token query param.
+    Validate the token query param.  Accepts either a short-lived JWT or a
+    personal API token (``<prefix8>.<body>`` format).
     Returns the user_id UUID or closes the websocket with 4001 if invalid.
     """
+    # Try JWT first
     user_id = decode_access_token(token)
-    if user_id is None:
-        await ws.close(code=4001, reason="Invalid or expired token")
-        return None  # type: ignore[return-value]
-    return user_id
+    if user_id is not None:
+        return user_id
+
+    # Fall back to personal API token (contains a dot separator)
+    if "." in token:
+        token_hash = hash_api_token(token)
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(ApiToken).where(
+                    ApiToken.token_hash == token_hash,
+                    ApiToken.revoked.is_(False),
+                )
+            )
+            api_token = result.scalar_one_or_none()
+        if api_token is not None:
+            return api_token.user_id
+
+    await ws.close(code=4001, reason="Invalid or expired token")
+    return None  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
@@ -238,3 +256,58 @@ async def personal_ws(
                     db.add(user)
                     await db.commit()
                     await broadcast_presence(user_id, "offline", db)
+
+
+# ---------------------------------------------------------------------------
+# Bot gateway  (/ws/bot)
+# ---------------------------------------------------------------------------
+
+@router.websocket("/ws/bot")
+async def bot_gateway_ws(
+    ws: WebSocket,
+    token: str = Query(..., description="Personal API token or JWT"),
+):
+    """
+    Bot / automation gateway.  A single connection receives:
+      - All personal events (dm.created, friend_request.*, user.status_changed)
+      - Channel & server events for every server the token owner is a member of.
+
+    Clients MUST send ``{"type": "ping"}`` at least every 60 s; the server
+    replies with ``{"type": "pong"}``.  The connection is closed after
+    ``_HEARTBEAT_TIMEOUT`` seconds of silence.
+    """
+    user_id = await _authenticate_ws(ws, token)
+    if user_id is None:
+        return
+
+    # Gather all rooms: personal + all servers the user belongs to
+    async with AsyncSessionLocal() as db:
+        rows = await db.execute(
+            select(ServerMember.server_id).where(ServerMember.user_id == user_id)
+        )
+        server_ids = [r[0] for r in rows.all()]
+
+    rooms: list[str] = [manager.user_room(user_id)]
+    for sid in server_ids:
+        rooms.append(manager.server_room(sid))
+
+    for room in rooms:
+        await manager.connect(room, ws)
+
+    try:
+        while True:
+            try:
+                text = await asyncio.wait_for(ws.receive_text(), timeout=_HEARTBEAT_TIMEOUT)
+            except asyncio.TimeoutError:
+                break
+            try:
+                data = json.loads(text)
+                if isinstance(data, dict) and data.get("type") == "ping":
+                    await ws.send_text('{"type":"pong"}')
+            except (json.JSONDecodeError, Exception):
+                pass
+    except WebSocketDisconnect:
+        pass
+    finally:
+        for room in rooms:
+            await manager.disconnect(room, ws)
