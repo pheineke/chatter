@@ -4,12 +4,13 @@ import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icon'
 import { UserAvatar } from '../components/UserAvatar'
 import { updateMe, uploadAvatar, uploadBanner, changePassword } from '../api/users'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UserStatus, DMPermission } from '../api/types'
 import { COLOR_SWATCHES, loadColorOverrides, applyColorOverrides } from '../utils/colorOverrides'
 import { useSoundManager } from '../hooks/useSoundManager'
 import { useBlocks } from '../hooks/useBlocks'
 import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
+import { getSessions, revokeSession, revokeAllOtherSessions, type Session } from '../api/sessions'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications'
 
@@ -248,6 +249,118 @@ function AccountTab() {
           </div>
         </div>
       </div>
+
+      {/* Active sessions */}
+      <SessionsSection />
+    </div>
+  )
+}
+
+// ─── Sessions section (used inside AccountTab) ─────────────────────────────
+
+function SessionsSection() {
+  const qc = useQueryClient()
+
+  const { data: sessions = [], isLoading } = useQuery({
+    queryKey: ['sessions'],
+    queryFn: getSessions,
+    staleTime: 30_000,
+  })
+
+  const revokeMut = useMutation({
+    mutationFn: revokeSession,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
+  })
+
+  const revokeAllMut = useMutation({
+    mutationFn: revokeAllOtherSessions,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
+  })
+
+  function formatUA(ua: string | null): string {
+    if (!ua) return 'Unknown device'
+    // Extract a readable browser / OS summary from the UA string
+    const browser =
+      ua.includes('Firefox') ? 'Firefox' :
+      ua.includes('Edg/') ? 'Edge' :
+      ua.includes('Chrome') ? 'Chrome' :
+      ua.includes('Safari') ? 'Safari' :
+      ua.includes('curl') ? 'curl' :
+      'Unknown browser'
+    const os =
+      ua.includes('Windows') ? 'Windows' :
+      ua.includes('Mac') ? 'macOS' :
+      ua.includes('Linux') ? 'Linux' :
+      ua.includes('Android') ? 'Android' :
+      ua.includes('iPhone') || ua.includes('iPad') ? 'iOS' :
+      'Unknown OS'
+    return `${browser} on ${os}`
+  }
+
+  function formatDate(iso: string | null): string {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' at ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  }
+
+  return (
+    <div className="bg-discord-sidebar rounded-lg p-4 mt-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-xs font-bold text-discord-muted uppercase">Active Sessions</div>
+        {sessions.length > 1 && (
+          <button
+            onClick={() => revokeAllMut.mutate()}
+            disabled={revokeAllMut.isPending}
+            className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+          >
+            {revokeAllMut.isPending ? 'Logging out…' : 'Log out all other sessions'}
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-discord-muted">Loading sessions…</p>
+      ) : sessions.length === 0 ? (
+        <p className="text-sm text-discord-muted">No active sessions found.</p>
+      ) : (
+        <div className="space-y-2">
+          {sessions.map((s: Session, i: number) => {
+            const isCurrent = i === 0
+            return (
+              <div
+                key={s.id}
+                className="flex items-center gap-3 p-3 rounded-lg bg-discord-bg"
+              >
+                <Icon name="monitor" size={20} className="shrink-0 text-discord-muted" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium truncate">{formatUA(s.user_agent)}</span>
+                    {isCurrent && (
+                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 shrink-0">
+                        This device
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-discord-muted">
+                    Last active: {formatDate(s.last_used_at)}
+                  </div>
+                </div>
+                {!isCurrent && (
+                  <button
+                    onClick={() => revokeMut.mutate(s.id)}
+                    disabled={revokeMut.isPending}
+                    className="shrink-0 text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 px-2 py-1 rounded hover:bg-red-500/10"
+                    title="Revoke this session"
+                  >
+                    Revoke
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

@@ -27,5 +27,10 @@ class RefreshToken(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
     )
+    # Session metadata (populated on login / refresh)
+    user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     user: Mapped["User"] = relationship("User")  # noqa: F821
