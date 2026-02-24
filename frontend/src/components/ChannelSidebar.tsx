@@ -4,8 +4,7 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory, updateCategory, deleteCategory, getPermissions, setPermission } from '../api/channels'
 import { getMembers, getServer, getRoles } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
-import { StatusIndicator } from './StatusIndicator'
-import { UserAvatar } from './UserAvatar'
+import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
 import { useServerWS } from '../hooks/useServerWS'
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
@@ -328,7 +327,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-discord-channels">
       {/* Server name header */}
       <div
         className="px-4 font-bold border-b border-black/20 shadow-sm flex items-center justify-between cursor-pointer hover:bg-discord-input/30 transition-colors select-none h-12 shrink-0"
@@ -447,61 +446,9 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         )}
       </div>
 
-      {/* User panel */}
-      <div className="px-3 py-2 h-14 bg-discord-bg border-t border-black/20 flex items-center gap-2 shrink-0">
-        <div 
-          className="flex items-center gap-2 flex-1 min-w-0 hover:bg-discord-input/40 p-1 rounded cursor-pointer transition-colors"
-          onClick={(e) => {
-            if (!user) return
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-            const statuses: { label: string; value: string; icon: string }[] = [
-              { label: 'Online',  value: 'online',  icon: 'ellipse' },
-              { label: 'Away',    value: 'away',    icon: 'time' },
-              { label: 'Do Not Disturb', value: 'dnd',  icon: 'remove-circle' },
-              { label: 'Offline', value: 'offline', icon: 'ellipse' },
-            ]
-            setContextMenu({
-              x: rect.left,
-              y: rect.top - 4,
-              items: statuses.map(s => ({
-                label: s.label,
-                icon: s.icon,
-                active: user.status === s.value,
-                onClick: async () => {
-                  await updateMe({ status: s.value as any })
-                  await refreshUser()
-                },
-              })),
-            })
-          }}
-        >
-          <div className="relative">
-            <UserAvatar user={user} size={32} />
-            {user && (
-              <span className="absolute -bottom-0.5 -right-0.5">
-                <StatusIndicator status={user.status} size={10} />
-              </span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">{user?.username}</div>
-            <div className="text-xs text-discord-muted truncate capitalize">{user?.status}</div>
-          </div>
-        </div>
-        <button
-          title="User Settings"
-          onClick={() => navigate('/channels/settings')}
-          className="text-discord-muted hover:text-discord-text leading-none p-2 rounded hover:bg-discord-input/40 transition-colors"
-        >
-          <Icon name="settings" size={18} />
-        </button>
-        {user?.status === 'dnd' && (
-          <span title="Do Not Disturb — notifications silenced" className="text-discord-dnd">
-            <Icon name="bell-off" size={16} />
-          </span>
-        )}
-      </div>
 
+
+      {/* User panel Moved to AppShell */}
       {/* Edit category modal */}
       {editCategory && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditCategory(null)}>
@@ -1023,14 +970,12 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
               className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-discord-muted hover:bg-discord-input/40 cursor-pointer"
               onClick={(e) => handleUserClick(e, u.id)}
             >
-              <div className={`relative shrink-0 rounded-full transition-all ${
-                isSpeaking ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-discord-sidebar' : ''
-              }`}>
-                <UserAvatar user={u} size={20} />
-                <span className="absolute -bottom-0.5 -right-0.5">
-                  <StatusIndicator status={u.status} size={7} />
-                </span>
-              </div>
+              <AvatarWithStatus
+                user={u}
+                size={20}
+                bg="bg-discord-channels"
+                className={`rounded-full transition-all ${isSpeaking ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-discord-sidebar' : ''}`}
+              />
               <span className={`truncate flex-1 transition-colors ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>
               {/* Right-side status indicators */}
               <div className="flex items-center gap-0.5 ml-auto shrink-0">

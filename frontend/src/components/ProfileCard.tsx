@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { UserAvatar } from './UserAvatar'
-import { StatusIndicator } from './StatusIndicator'
+import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getUser } from '../api/users'
@@ -115,13 +114,6 @@ export function ProfileCard({ userId, onClose, position }: Props) {
 
   if (!user) return null
 
-  const statusColors: Record<string, string> = {
-    online: 'bg-green-500',
-    idle: 'bg-yellow-500', 
-    dnd: 'bg-red-500',
-    offline: 'bg-gray-500',
-  }
-
   return (
     <div ref={ref} style={style} className="w-80 bg-discord-sidebar rounded-lg shadow-2xl overflow-hidden flex flex-col text-discord-text animate-fade-in-up">
        {/* Banner */}
@@ -133,10 +125,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
        <div className="px-4 pb-4 relative">
           {/* Avatar */}
           <div className="absolute -top-10 left-4 rounded-full p-1.5 bg-discord-sidebar">
-             <div className="relative">
-                <UserAvatar user={user} size={80} className="rounded-full" />
-                <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-discord-sidebar ${statusColors[user.status]}`} />
-             </div>
+             <AvatarWithStatus user={user} size={80} bg="bg-discord-sidebar" />
           </div>
           
           <div className="mt-12">

@@ -10,6 +10,7 @@ import { FriendsPane } from '../components/FriendsPane'
 import { DMPane } from '../components/DMPane'
 import { DMSidebar } from '../components/DMSidebar'
 import { VoiceChannelBar } from '../components/VoiceChannelBar'
+import { UserPanel } from '../components/UserPanel'
 import { VoiceCallProvider } from '../contexts/VoiceCallContext'
 import { SettingsPage } from './SettingsPage'
 import { ServerSettingsPage } from './ServerSettingsPage'
@@ -93,25 +94,40 @@ export default function AppShell() {
             {/* ── Left panel: server icons + channel/DM list ──────────────
                 Mobile (<md): fixed off-screen, slides in from left.
                 Desktop (md+): static in-flow columns, always visible.   */}
-            <div className={`flex fixed inset-y-0 left-0 z-40 transition-transform duration-200 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
-              {/* Far-left: server icons */}
-              <ServerSidebar hasUnreadDMs={hasUnreadDMs} />
+            <div className={`flex flex-col fixed inset-y-0 left-0 z-40 w-[312px] bg-discord-sidebar transition-transform duration-200 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
+              
+              {/* Top area: Split into Server List (left) and Channel List (right) */}
+              <div className="flex flex-1 min-h-0 overflow-hidden">
+                {/* Far-left: server icons */}
+                <ServerSidebar hasUnreadDMs={hasUnreadDMs} />
 
-              {/* Second column: channel/DM list */}
-              <div className="flex flex-col w-60 shrink-0 bg-discord-sidebar overflow-hidden">
-                <Routes>
-                  <Route path="@me/*" element={<DMSidebar />} />
-                  <Route
-                    path=":serverId/*"
-                    element={
-                      <ChannelSidebar
-                        voiceSession={voiceSession}
-                        onJoinVoice={setVoiceSession}
-                        onLeaveVoice={handleLeaveVoice}
-                      />
-                    }
+                {/* Second column: channel/DM list */}
+                <div className="flex flex-col flex-1 min-w-0 bg-discord-channels overflow-hidden">
+                  <Routes>
+                    <Route path="@me/*" element={<DMSidebar />} />
+                    <Route
+                      path=":serverId/*"
+                      element={
+                        <ChannelSidebar
+                          voiceSession={voiceSession}
+                          onJoinVoice={setVoiceSession}
+                          onLeaveVoice={handleLeaveVoice}
+                        />
+                      }
+                    />
+                  </Routes>
+                </div>
+              </div>
+
+              {/* Bottom area: Voice/User panel */}
+              <div className="flex flex-col shrink-0 bg-discord-user border-t border-black/20 z-50">
+                {voiceSession && (
+                  <VoiceChannelBar 
+                    session={voiceSession} 
+                    onLeave={handleLeaveVoice} 
                   />
-                </Routes>
+                )}
+                <UserPanel />
               </div>
             </div>
 
@@ -133,14 +149,6 @@ export default function AppShell() {
                   />
                 </Routes>
               </div>
-
-              {/* Voice status bar at the very bottom */}
-              {voiceSession && (
-                <VoiceChannelBar
-                  session={voiceSession}
-                  onLeave={handleLeaveVoice}
-                />
-              )}
             </div>
           </VoiceCallProvider>
         } />

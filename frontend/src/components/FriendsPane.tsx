@@ -10,7 +10,7 @@ import {
 } from '../api/friends'
 import { getUserByUsername } from '../api/users'
 import { UserAvatar } from './UserAvatar'
-import { StatusIndicator } from './StatusIndicator'
+import { AvatarWithStatus } from './AvatarWithStatus'
 
 type Tab = 'online' | 'all' | 'pending' | 'add'
 
@@ -175,12 +175,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
             {displayed.map((f) => (
               <div key={f.user.id} className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group cursor-pointer"
                 onClick={() => navigate(`/channels/@me/${f.user.id}`)}>
-                <div className="relative">
-                  <UserAvatar user={f.user} size={40} />
-                  <span className="absolute -bottom-0.5 -right-0.5">
-                    <StatusIndicator status={f.user.status} size={12} />
-                  </span>
-                </div>
+                <AvatarWithStatus user={f.user} size={40} bg="bg-discord-bg" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm">{f.user.username}</p>
                   <p className="text-xs text-discord-muted capitalize">{

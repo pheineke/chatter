@@ -6,8 +6,7 @@ import { getConversations } from '../api/dms'
 import { updateMe } from '../api/users'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotificationSettings } from '../hooks/useNotificationSettings'
-import { UserAvatar } from './UserAvatar'
-import { StatusIndicator } from './StatusIndicator'
+import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
@@ -97,12 +96,7 @@ export function DMSidebar() {
                   ? 'bg-discord-input text-white'
                   : 'text-discord-muted hover:bg-discord-input/50 hover:text-discord-text'}`}
             >
-              <div className="relative shrink-0">
-                <UserAvatar user={conv.other_user} size={32} />
-                <span className="absolute -bottom-0.5 -right-0.5">
-                  <StatusIndicator status={conv.other_user.status} size={10} />
-                </span>
-              </div>
+              <AvatarWithStatus user={conv.other_user} size={32} bg="bg-discord-channels" />
               <span className={`flex-1 text-left truncate ${hasUnread ? 'text-white font-medium' : ''}`}>
                 {conv.other_user.username}
               </span>
@@ -122,61 +116,7 @@ export function DMSidebar() {
         )}
       </div>
 
-      {/* User panel */}
-      <div className="px-3 py-2 h-14 bg-discord-bg border-t border-black/20 flex items-center gap-2 shrink-0">
-        <div
-          className="flex items-center gap-2 flex-1 min-w-0 hover:bg-discord-input/40 p-1 rounded cursor-pointer transition-colors"
-          onClick={(e) => {
-            if (!user) return
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-            const statuses: { label: string; value: string; icon: string }[] = [
-              { label: 'Online',         value: 'online',  icon: 'ellipse' },
-              { label: 'Away',           value: 'away',    icon: 'time' },
-              { label: 'Do Not Disturb', value: 'dnd',     icon: 'remove-circle' },
-              { label: 'Offline',        value: 'offline', icon: 'ellipse' },
-            ]
-            setContextMenu({
-              x: rect.left,
-              y: rect.top - 4,
-              items: statuses.map(s => ({
-                label: s.label,
-                icon: s.icon,
-                active: user.status === s.value,
-                onClick: async () => {
-                  await updateMe({ status: s.value as any })
-                  await refreshUser()
-                },
-              })),
-            })
-          }}
-        >
-          <div className="relative">
-            <UserAvatar user={user} size={32} />
-            {user && (
-              <span className="absolute -bottom-0.5 -right-0.5">
-                <StatusIndicator status={user.status} size={10} />
-              </span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">{user?.username}</div>
-            <div className="text-xs text-discord-muted truncate capitalize">{user?.status}</div>
-          </div>
-        </div>
-        <button
-          title="User Settings"
-          onClick={() => navigate('/channels/settings')}
-          className="text-discord-muted hover:text-discord-text leading-none p-2 rounded hover:bg-discord-input/40 transition-colors"
-        >
-          <Icon name="settings" size={18} />
-        </button>
-        {user?.status === 'dnd' && (
-          <span title="Do Not Disturb — notifications silenced" className="text-discord-dnd">
-            <Icon name="bell-off" size={16} />
-          </span>
-        )}
-      </div>
-
+      {/* User panel MOVED to AppShell */}
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}

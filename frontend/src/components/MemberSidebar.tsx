@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getMembers, getRoles } from '../api/servers'
-import { UserAvatar } from './UserAvatar'
-import { StatusIndicator } from './StatusIndicator'
+import { AvatarWithStatus } from './AvatarWithStatus'
 import { ProfileCard } from './ProfileCard'
 import { useState } from 'react'
 import type { Member, Role } from '../api/types'
@@ -80,7 +79,7 @@ export function MemberSidebar({ serverId }: Props) {
   const offlineSorted = [...offline].sort((a, b) => a.user.username.localeCompare(b.user.username))
 
   return (
-    <div className="hidden md:flex flex-col w-60 shrink-0 bg-discord-sidebar h-full overflow-y-auto border-l border-black/20">
+    <div className="hidden md:flex flex-col w-60 shrink-0 bg-discord-channels h-full overflow-y-auto border-l border-black/20">
       <div className="px-3 flex items-center h-12 shrink-0 border-b border-black/20 shadow-sm">
         <span className="text-xs font-bold uppercase text-discord-muted tracking-wider">
           Members — {members.length}
@@ -151,12 +150,7 @@ function MemberRow({ member, onClick }: { member: Member; onClick: (e: React.Mou
       className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded mx-1 hover:bg-discord-input/60 transition-colors text-left group"
       style={{ width: 'calc(100% - 8px)' }}
     >
-      <div className="relative shrink-0">
-        <UserAvatar user={member.user} size={32} />
-        <span className="absolute -bottom-0.5 -right-0.5">
-          <StatusIndicator status={member.user.status} size={11} />
-        </span>
-      </div>
+      <AvatarWithStatus user={member.user} size={32} bg="bg-discord-channels" />
       <span
         className={`text-sm font-medium truncate transition-colors ${
           member.user.status === 'offline' ? 'text-discord-muted' : 'text-discord-text'

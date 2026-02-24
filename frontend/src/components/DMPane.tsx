@@ -5,8 +5,7 @@ import { getDMChannel } from '../api/dms'
 import { getUser } from '../api/users'
 import { useAuth } from '../contexts/AuthContext'
 import { useChannelWS } from '../hooks/useChannelWS'
-import { UserAvatar } from './UserAvatar'
-import { StatusIndicator } from './StatusIndicator'
+import { AvatarWithStatus } from './AvatarWithStatus'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { Icon } from './Icon'
@@ -56,14 +55,7 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
             <Icon name="menu" size={22} />
           </button>
         )}
-        <div className="relative">
-          <UserAvatar user={otherUser ?? null} size={32} />
-          {otherUser && (
-            <span className="absolute -bottom-0.5 -right-0.5">
-              <StatusIndicator status={otherUser.status} size={10} />
-            </span>
-          )}
-        </div>
+        <AvatarWithStatus user={otherUser ?? null} size={32} bg="bg-discord-bg" />
         <span className="font-bold">{otherUser?.username ?? '…'}</span>
       </div>
 

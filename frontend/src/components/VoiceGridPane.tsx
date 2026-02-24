@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { getMembers } from '../api/servers'
 import { UserAvatar } from './UserAvatar'
-import { StatusIndicator } from './StatusIndicator'
+import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
 import { useVoiceCall } from '../contexts/VoiceCallContext'
 import type { VoiceSession } from '../pages/AppShell'
@@ -124,12 +124,7 @@ function ParticipantCard({
         </>
       ) : (
         <>
-          <div className="relative">
-            <UserAvatar user={tile.user} size={compact ? 40 : 64} />
-            <span className="absolute -bottom-1 -right-1">
-              <StatusIndicator status={tile.user.status} size={compact ? 9 : 13} />
-            </span>
-          </div>
+          <AvatarWithStatus user={tile.user} size={compact ? 40 : 64} bg="bg-discord-sidebar" />
           {!compact && (
             <span className="mt-2 text-sm font-semibold text-discord-text truncate max-w-full px-2">
               {tile.user.username}{tile.isSelf ? ' (You)' : ''}
