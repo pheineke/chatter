@@ -5,7 +5,7 @@ import { Icon } from '../components/Icon'
 import { UserAvatar } from '../components/UserAvatar'
 import { updateMe, uploadAvatar, uploadBanner, changePassword } from '../api/users'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { UserStatus, DMPermission } from '../api/types'
+import type { User, UserStatus, DMPermission } from '../api/types'
 import { COLOR_SWATCHES, loadColorOverrides, applyColorOverrides } from '../utils/colorOverrides'
 import { useSoundManager } from '../hooks/useSoundManager'
 import { useBlocks } from '../hooks/useBlocks'
@@ -13,6 +13,7 @@ import { useDesktopNotificationsContext } from '../contexts/DesktopNotifications
 import { getSessions, revokeSession, revokeAllOtherSessions, type Session } from '../api/sessions'
 import { getTokens, createToken, revokeToken, type ApiToken, type ApiTokenCreated } from '../api/tokens'
 import { AVATAR_FRAMES } from '../utils/avatarFrames'
+import { getMyDecorations, redeemDecorationCode } from '../api/decorations'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications' | 'tokens'
 
@@ -198,43 +199,7 @@ function AccountTab() {
       </div>
 
       {/* Avatar Decoration */}
-      <div className="bg-discord-sidebar rounded-lg p-4 mb-6">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Avatar Decoration</div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* "None" option */}
-          <button
-            onClick={() => updateMut.mutate({ avatar_decoration: '' } as any)}
-            className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
-              !user?.avatar_decoration
-                ? 'border-discord-mention bg-discord-mention/10'
-                : 'border-discord-input bg-discord-bg hover:border-discord-muted'
-            }`}
-            title="None"
-          >
-            <Icon name="close" size={20} className="text-discord-muted" />
-          </button>
-          {AVATAR_FRAMES.map(frame => {
-            const active = user?.avatar_decoration === frame.id
-            return (
-              <button
-                key={frame.id}
-                onClick={() => updateMut.mutate({ avatar_decoration: frame.id } as any)}
-                className={`relative w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
-                  active
-                    ? 'border-discord-mention bg-discord-mention/10'
-                    : 'border-discord-input bg-discord-bg hover:border-discord-muted'
-                }`}
-                title={frame.label}
-              >
-                <div className="relative w-10 h-10">
-                  <UserAvatar user={user} size={28} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" hideDecoration />
-                  <img src={frame.src} alt={frame.label} className="absolute inset-0 w-full h-full pointer-events-none" />
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      <AvatarDecorationSection user={user} updateMut={updateMut} />
 
       {/* Editable fields */}
       <div className="bg-discord-sidebar rounded-lg p-4 space-y-2 divide-y divide-discord-input">
@@ -294,6 +259,110 @@ function AccountTab() {
 
       {/* Active sessions */}
       <SessionsSection />
+    </div>
+  )
+}
+
+// ─── Avatar Decoration section (used inside AccountTab) ────────────────────
+
+function AvatarDecorationSection({ user, updateMut }: { user: User | null; updateMut: ReturnType<typeof useMutation<any, any, any>> }) {
+  const qc = useQueryClient()
+  const [redeemCode, setRedeemCode] = useState('')
+  const [redeemError, setRedeemError] = useState<string | null>(null)
+  const [redeemSuccess, setRedeemSuccess] = useState<string | null>(null)
+
+  const { data: owned = [] } = useQuery({
+    queryKey: ['myDecorations'],
+    queryFn: getMyDecorations,
+  })
+
+  const ownedFrameIds = new Set(owned.map(o => o.frame_id))
+  const unlockedFrames = AVATAR_FRAMES.filter(f => ownedFrameIds.has(f.id))
+
+  const redeemMut = useMutation({
+    mutationFn: (code: string) => redeemDecorationCode(code),
+    onSuccess: (entry) => {
+      const frame = AVATAR_FRAMES.find(f => f.id === entry.frame_id)
+      setRedeemSuccess(`Unlocked: ${frame?.label ?? entry.frame_id}!`)
+      setRedeemError(null)
+      setRedeemCode('')
+      qc.invalidateQueries({ queryKey: ['myDecorations'] })
+      setTimeout(() => setRedeemSuccess(null), 4000)
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail
+      setRedeemError(typeof detail === 'string' ? detail : 'Failed to redeem code')
+      setRedeemSuccess(null)
+    },
+  })
+
+  function handleRedeem() {
+    if (!redeemCode.trim()) return
+    redeemMut.mutate(redeemCode.trim())
+  }
+
+  return (
+    <div className="bg-discord-sidebar rounded-lg p-4 mb-6">
+      <div className="text-xs font-bold text-discord-muted uppercase mb-3">Avatar Decoration</div>
+
+      {/* Frame selector — only unlocked frames */}
+      <div className="flex items-center gap-3 flex-wrap mb-4">
+        {/* "None" option */}
+        <button
+          onClick={() => updateMut.mutate({ avatar_decoration: '' } as any)}
+          className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
+            !user?.avatar_decoration
+              ? 'border-discord-mention bg-discord-mention/10'
+              : 'border-discord-input bg-discord-bg hover:border-discord-muted'
+          }`}
+          title="None"
+        >
+          <Icon name="close" size={20} className="text-discord-muted" />
+        </button>
+        {unlockedFrames.map(frame => {
+          const active = user?.avatar_decoration === frame.id
+          return (
+            <button
+              key={frame.id}
+              onClick={() => updateMut.mutate({ avatar_decoration: frame.id } as any)}
+              className={`relative w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
+                active
+                  ? 'border-discord-mention bg-discord-mention/10'
+                  : 'border-discord-input bg-discord-bg hover:border-discord-muted'
+              }`}
+              title={frame.label}
+            >
+              <div className="relative w-10 h-10">
+                <UserAvatar user={user} size={28} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" hideDecoration />
+                <img src={frame.src} alt={frame.label} className="absolute inset-0 w-full h-full pointer-events-none" />
+              </div>
+            </button>
+          )
+        })}
+        {unlockedFrames.length === 0 && (
+          <span className="text-xs text-discord-muted italic">No decorations unlocked yet</span>
+        )}
+      </div>
+
+      {/* Redeem code input */}
+      <div className="flex items-center gap-2">
+        <input
+          className="input flex-1"
+          placeholder="Enter decoration code…"
+          value={redeemCode}
+          onChange={e => setRedeemCode(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleRedeem() }}
+        />
+        <button
+          onClick={handleRedeem}
+          disabled={redeemMut.isPending || !redeemCode.trim()}
+          className="btn py-1.5 px-4"
+        >
+          {redeemMut.isPending ? 'Redeeming…' : 'Redeem'}
+        </button>
+      </div>
+      {redeemError && <p className="text-red-400 text-sm mt-2">{redeemError}</p>}
+      {redeemSuccess && <p className="text-green-400 text-sm mt-2">{redeemSuccess}</p>}
     </div>
   )
 }

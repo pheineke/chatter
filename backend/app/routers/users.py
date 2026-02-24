@@ -15,6 +15,7 @@ from app.utils.file_validation import verify_image_magic_with_dims, AVATAR_MAX, 
 from app.utils.rate_limiter import image_limiter, profile_limiter
 from models.user import User, UserStatus
 from models.note import UserNote
+from models.decoration_code import DecorationCode
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -62,6 +63,16 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
         current_user.hide_status = body.hide_status
     if body.avatar_decoration is not None:
         # Empty string clears the decoration
+        if body.avatar_decoration:
+            # Verify user owns this frame
+            owned = await db.execute(
+                select(DecorationCode.id).where(
+                    DecorationCode.redeemed_by == current_user.id,
+                    DecorationCode.frame_id == body.avatar_decoration,
+                ).limit(1)
+            )
+            if not owned.scalar_one_or_none():
+                raise HTTPException(status_code=403, detail="You do not own this decoration")
         current_user.avatar_decoration = body.avatar_decoration or None
     db.add(current_user)
     await db.commit()

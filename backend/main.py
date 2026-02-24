@@ -16,6 +16,7 @@ from app.routers import voice as voice_router
 from app.routers import notifications as notifications_router
 from app.routers import meta as meta_router
 from app.routers import tokens as tokens_router
+from app.routers import decorations as decorations_router
 
 app = FastAPI(
     title="Chat API",
@@ -42,6 +43,7 @@ app.include_router(ws_router.router)
 app.include_router(voice_router.router)
 app.include_router(meta_router.router)
 app.include_router(tokens_router.router)
+app.include_router(decorations_router.router)
 
 
 @app.get("/health", tags=["health"])

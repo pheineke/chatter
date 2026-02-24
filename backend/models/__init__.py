@@ -17,6 +17,7 @@ from models.notification import (
     NotificationLevel,
 )
 from models.word_filter import WordFilter, ServerBan, WordFilterAction
+from models.decoration_code import DecorationCode
 
 __all__ = [
     "Base",
@@ -51,4 +52,5 @@ __all__ = [
     "WordFilter",
     "ServerBan",
     "WordFilterAction",
+    "DecorationCode",
 ]
