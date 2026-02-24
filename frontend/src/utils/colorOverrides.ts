@@ -10,15 +10,15 @@ export const COLOR_SWATCHES: { key: string; label: string; default: string; gene
     `,
   },
   {
-    key: 'bg', label: 'Background', default: '#313338',
+    key: 'bg', label: 'Background', default: '#1a1a1e',
     generate: v => `body { background-color: ${v} !important; } .bg-discord-bg { background-color: ${v} !important; }`,
   },
   {
-    key: 'sidebar', label: 'Sidebar', default: '#1e1f22',
+    key: 'sidebar', label: 'Sidebar', default: '#121214',
     generate: v => `.bg-discord-sidebar { background-color: ${v} !important; }`,
   },
   {
-    key: 'servers', label: 'Server Bar', default: '#111214',
+    key: 'servers', label: 'Server Bar', default: '#121214',
     generate: v => `.bg-discord-servers { background-color: ${v} !important; }`,
   },
   {

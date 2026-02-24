@@ -124,7 +124,7 @@ function ParticipantCard({
         </>
       ) : (
         <>
-          <AvatarWithStatus user={tile.user} size={compact ? 40 : 64} bg="bg-discord-sidebar" />
+          <AvatarWithStatus user={tile.user} size={compact ? 40 : 64} />
           {!compact && (
             <span className="mt-2 text-sm font-semibold text-discord-text truncate max-w-full px-2">
               {tile.user.username}{tile.isSelf ? ' (You)' : ''}

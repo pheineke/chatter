@@ -91,12 +91,14 @@ export function DMSidebar() {
               key={conv.channel_id}
               onClick={() => navigate(`/channels/@me/${conv.other_user.id}`)}
               onContextMenu={openConvContextMenu}
+              data-avatar-ring
+              style={{ '--avatar-ring': isActive ? '#383a40' : '#121214', '--avatar-ring-hover': isActive ? '#383a40' : '#25262a' } as React.CSSProperties}
               className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm transition-colors
                 ${isActive
                   ? 'bg-discord-input text-white'
                   : 'text-discord-muted hover:bg-discord-input/50 hover:text-discord-text'}`}
             >
-              <AvatarWithStatus user={conv.other_user} size={32} bg="bg-discord-channels" />
+              <AvatarWithStatus user={conv.other_user} size={32} />
               <span className={`flex-1 text-left truncate ${hasUnread ? 'text-white font-medium' : ''}`}>
                 {conv.other_user.username}
               </span>

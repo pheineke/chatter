@@ -6,6 +6,7 @@ interface Props {
   channelId: string
   onJump: (messageId: string) => void
   onClose: () => void
+  query: string
 }
 
 function formatDate(iso: string): string {
@@ -18,18 +19,11 @@ function formatDate(iso: string): string {
   })
 }
 
-export function SearchPanel({ channelId, onJump, onClose }: Props) {
-  const [query, setQuery] = useState('')
+export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
   const [results, setResults] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  // Auto-focus input when panel opens.
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
 
   // Debounced search
   useEffect(() => {
@@ -69,22 +63,15 @@ export function SearchPanel({ channelId, onJump, onClose }: Props) {
   }, [onClose])
 
   return (
-    <div className="w-72 flex flex-col bg-discord-sidebar border-l border-black/20 h-full">
+    <div className="w-72 flex flex-col bg-discord-sidebar border-l-2 border-white/[0.07] h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-black/20">
-        <svg className="w-4 h-4 text-discord-muted shrink-0" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-        </svg>
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search messages…"
-          className="flex-1 bg-transparent text-sm text-discord-text placeholder-discord-muted outline-none"
-        />
+      <div className="flex items-center gap-2 px-3 h-12 border-b border-white/[0.07] shrink-0">
+        <span className="text-discord-muted text-xs font-semibold uppercase tracking-wide">
+          {results.length > 0 ? `${results.length} result${results.length !== 1 ? 's' : ''}` : 'Search Results'}
+        </span>
         <button
           onClick={onClose}
-          className="text-discord-muted hover:text-discord-text transition-colors shrink-0"
+          className="ml-auto text-discord-muted hover:text-discord-text transition-colors shrink-0"
           title="Close search"
         >
           <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

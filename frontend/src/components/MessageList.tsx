@@ -146,9 +146,10 @@ export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds 
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-end pb-4 text-discord-muted text-sm">
-        <div className="text-4xl mb-2">👋</div>
-        <p>This is the beginning of the channel.</p>
+      <div className="flex-1 flex flex-col justify-end pb-4 px-4 text-discord-muted">
+        <Icon name="hash" size={72} className="mb-4 opacity-20" />
+        <p className="text-2xl font-bold text-discord-text mb-1">This is the beginning of the channel.</p>
+        <p className="text-sm">Send a message to get things started.</p>
       </div>
     )
   }
@@ -165,9 +166,10 @@ export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds 
           Loading older messages…
         </div>
       ) : !hasNextPage ? (
-        <div className="flex flex-col items-center py-6 text-discord-muted text-sm select-none">
-          <div className="text-4xl mb-2">🏁</div>
-          <p>You've reached the beginning of this channel.</p>
+        <div className="flex flex-col py-6 px-4 text-discord-muted select-none">
+          <Icon name="hash" size={72} className="mb-4 opacity-20" />
+          <p className="text-2xl font-bold text-discord-text mb-1">You've reached the beginning.</p>
+          <p className="text-sm">That's everything in this channel.</p>
         </div>
       ) : null}
 

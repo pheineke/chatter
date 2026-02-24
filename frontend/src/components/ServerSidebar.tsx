@@ -98,7 +98,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
   })
 
   return (
-    <div className="flex flex-col items-center gap-2 py-3 w-[72px] bg-discord-servers overflow-y-auto scrollbar-none">
+    <div className="flex flex-col items-center gap-2 py-3 w-[72px] bg-discord-servers overflow-y-auto scrollbar-none border-r-2 border-discord-divider">
       {/* DMs */}
       <div className="relative">
         <button

@@ -55,7 +55,7 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
             <Icon name="menu" size={22} />
           </button>
         )}
-        <AvatarWithStatus user={otherUser ?? null} size={32} bg="bg-discord-bg" />
+        <AvatarWithStatus user={otherUser ?? null} size={32} ringColor="#1a1a1e" />
         <span className="font-bold">{otherUser?.username ?? '…'}</span>
       </div>
 

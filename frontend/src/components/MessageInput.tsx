@@ -254,7 +254,7 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
   }
 
   return (
-    <div className="px-4 pb-4 relative">
+    <div className="px-2 pb-2 relative">
       {/* @mention autocomplete dropdown */}
       {mentionQuery !== null && mentionCandidates.length > 0 && (
         <div
@@ -301,9 +301,10 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
         </div>
       )}
 
+      <div className="rounded-lg ring-1 ring-white/[0.07] overflow-hidden" style={{ background: '#222327' }}>
       {/* Reply banner */}
       {replyTo && (
-        <div className="flex items-center gap-2 bg-discord-input/60 rounded-t-lg px-3 py-1.5 text-xs text-discord-muted border-b border-white/5">
+        <div className="flex items-center gap-2 bg-white/5 rounded-t-lg px-3 py-1.5 text-xs text-discord-muted border-b border-white/5">
           <Icon name="corner-up-left" size={13} className="text-discord-mention shrink-0" />
           <span>
             Replying to{' '}
@@ -323,7 +324,7 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
         </div>
       )}
 
-      <div className={`flex bg-discord-input ${replyTo ? 'rounded-b-lg' : 'rounded-lg'} px-3 py-2.5`}>
+      <div className="flex items-center min-h-[52px] px-3 py-2.5">
         {/* Attachment button */}
         <button
           title="Attach File"
@@ -382,6 +383,8 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
         >
           <Icon name="paper-plane" size={20} />
         </button>
+      </div>
+
       </div>
 
       {emojiPickerPos && (

@@ -173,9 +173,10 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
               {tab === 'online' ? 'Online' : 'All Friends'} — {displayed.length}
             </p>
             {displayed.map((f) => (
-              <div key={f.user.id} className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group cursor-pointer"
+              <div key={f.user.id} data-avatar-ring className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group cursor-pointer"
+                style={{ '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#26272c' } as React.CSSProperties}
                 onClick={() => navigate(`/channels/@me/${f.user.id}`)}>
-                <AvatarWithStatus user={f.user} size={40} bg="bg-discord-bg" />
+                <AvatarWithStatus user={f.user} size={40} ringColor="#1a1a1e" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm">{f.user.username}</p>
                   <p className="text-xs text-discord-muted capitalize">{

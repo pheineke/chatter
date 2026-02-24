@@ -4,7 +4,6 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.schemas.user import UserRead
-from app.utils.sanitize import strip_html
 
 
 class AttachmentRead(BaseModel):
@@ -46,10 +45,10 @@ class MessageBase(BaseModel):
     def sanitize_content(cls, v) -> str | None:
         if v is None:
             return None
-        cleaned = strip_html(str(v)) or ''
-        if len(cleaned) > 2000:
+        val = str(v)
+        if len(val) > 2000:
             raise ValueError('Message content cannot exceed 2000 characters')
-        return cleaned or None
+        return val or None
 
 
 class MessageCreate(MessageBase):
@@ -62,12 +61,11 @@ class MessageUpdate(BaseModel):
     @field_validator('content')
     @classmethod
     def sanitize_content(cls, v: str) -> str:
-        cleaned = strip_html(v) or ''
-        if not cleaned.strip():
+        if not v.strip():
             raise ValueError('Message content cannot be empty')
-        if len(cleaned) > 2000:
+        if len(v) > 2000:
             raise ValueError('Message content cannot exceed 2000 characters')
-        return cleaned
+        return v
 
 
 class MessageRead(MessageBase):

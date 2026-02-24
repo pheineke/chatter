@@ -6,11 +6,11 @@ export default {
       colors: {
         // Discord-inspired palette
         discord: {
-          bg: '#313338', // Main chat background
-          sidebar: '#1e1f22', // Legacy sidebar (likely server rail)
-          server: '#1e1f22', // Server list rail
-          servers: '#1e1f22', // Server list rail (compat)
-          channels: '#2b2d31', // Channel list background
+          bg: '#1a1a1e', // Main chat background
+          sidebar: '#121214', // Legacy sidebar (likely server rail)
+          server: '#121214', // Server list rail
+          servers: '#121214', // Server list rail (compat)
+          channels: '#121214', // Channel list background
           user: '#232428', // User panel at bottom
           input: '#383a40', // Chat input background
           'input-text': '#dbdee1',
@@ -23,7 +23,7 @@ export default {
           offline: '#80848e',
           hover: '#3f4147', // Generic hover
           'channel-hover': '#35373c',
-          divider: '#1e1f22', // Splitters
+          divider: '#161618', // Splitters
           popup: '#111214', // Tooltips/Popups
           danger: '#da373c',
         },

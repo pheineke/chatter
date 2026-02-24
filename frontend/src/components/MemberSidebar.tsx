@@ -79,8 +79,8 @@ export function MemberSidebar({ serverId }: Props) {
   const offlineSorted = [...offline].sort((a, b) => a.user.username.localeCompare(b.user.username))
 
   return (
-    <div className="hidden md:flex flex-col w-60 shrink-0 bg-discord-channels h-full overflow-y-auto border-l border-black/20">
-      <div className="px-3 flex items-center h-12 shrink-0 border-b border-black/20 shadow-sm">
+    <div className="hidden md:flex flex-col w-60 shrink-0 bg-discord-bg h-full overflow-y-auto border-l-2 border-white/[0.03]">
+      <div className="px-3 flex items-center h-12 shrink-0 border-b border-white/[0.07] shadow-sm">
         <span className="text-xs font-bold uppercase text-discord-muted tracking-wider">
           Members — {members.length}
         </span>
@@ -147,10 +147,11 @@ function MemberRow({ member, onClick }: { member: Member; onClick: (e: React.Mou
   return (
     <button
       onClick={onClick}
+      data-avatar-ring
       className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded mx-1 hover:bg-discord-input/60 transition-colors text-left group"
-      style={{ width: 'calc(100% - 8px)' }}
+      style={{ width: 'calc(100% - 8px)', '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#2c2d32' } as React.CSSProperties}
     >
-      <AvatarWithStatus user={member.user} size={32} bg="bg-discord-channels" />
+      <AvatarWithStatus user={member.user} size={32} />
       <span
         className={`text-sm font-medium truncate transition-colors ${
           member.user.status === 'offline' ? 'text-discord-muted' : 'text-discord-text'
