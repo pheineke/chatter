@@ -34,7 +34,7 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
   const { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam } = useVoiceCall()
   
   return (
-    <div className="flex flex-col px-2 py-2 bg-discord-user border-t border-b border-black/20 shrink-0 gap-2">
+    <div className="flex flex-col px-2 py-2 shrink-0 gap-2">
       {/* Connection info */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col min-w-0">

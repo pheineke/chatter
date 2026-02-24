@@ -119,13 +119,19 @@ export default function AppShell() {
                 </div>
               </div>
 
-              {/* Bottom area: Voice/User panel */}
-              <div className="flex flex-col shrink-0 bg-discord-user border-t border-black/20 z-50">
+              {/* Bottom area: Voice + User panel — single floating card */}
+              <div
+                className="mx-2 mb-2 mt-1 rounded-lg ring-1 ring-white/[0.07] overflow-hidden shrink-0 z-50"
+                style={{ background: '#202024' }}
+              >
                 {voiceSession && (
-                  <VoiceChannelBar 
-                    session={voiceSession} 
-                    onLeave={handleLeaveVoice} 
-                  />
+                  <>
+                    <VoiceChannelBar
+                      session={voiceSession}
+                      onLeave={handleLeaveVoice}
+                    />
+                    <div className="border-b border-white/[0.08] mx-0" />
+                  </>
                 )}
                 <UserPanel />
               </div>
