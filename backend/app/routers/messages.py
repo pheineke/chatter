@@ -12,7 +12,7 @@ from typing import List, Dict
 import aiofiles
 import filetype
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
-from sqlalchemy import select, delete, or_
+from sqlalchemy import select, delete, or_, exists
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
@@ -241,9 +241,14 @@ async def list_messages(
     before: uuid.UUID | None = Query(None, description="Cursor: return messages before this ID"),
     limit: int = Query(50, ge=1, le=100),
     q: str | None = Query(None, description="Full-text search query"),
+    author: str | None = Query(None, description="Filter by author username (partial match)"),
+    mentions: str | None = Query(None, description="Filter to messages mentioning this username"),
+    has_type: str | None = Query(None, description="Filter by content type: link, file, embed"),
 ):
     channel = await _get_channel_or_404(channel_id, db)
     await _require_channel_access(channel, current_user.id, db)
+
+    is_search = q or author or mentions or has_type
 
     query = (
         select(Message)
@@ -253,8 +258,27 @@ async def list_messages(
         .limit(limit)
     )
     if q:
-        # Search mode: ignore cursor, filter by content (case-insensitive)
         query = query.where(Message.content.ilike(f'%{q}%'))
+    if author:
+        author_subq = select(User.id).where(User.username.ilike(f'%{author}%')).scalar_subquery()
+        query = query.where(Message.author_id.in_(author_subq))
+    if mentions:
+        mentions_subq = (
+            select(Mention.message_id)
+            .join(User, Mention.mentioned_user_id == User.id)
+            .where(User.username.ilike(f'%{mentions}%'))
+            .scalar_subquery()
+        )
+        query = query.where(Message.id.in_(mentions_subq))
+    if has_type:
+        if has_type == 'link':
+            query = query.where(Message.content.ilike('%http%'))
+        elif has_type in ('file', 'embed', 'image'):
+            query = query.where(
+                exists(select(Attachment.id).where(Attachment.message_id == Message.id))
+            )
+    if is_search:
+        pass  # already filtered above; skip cursor
     elif before:
         before_msg = await db.execute(select(Message).where(Message.id == before))
         bm = before_msg.scalar_one_or_none()

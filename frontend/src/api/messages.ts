@@ -53,9 +53,20 @@ export async function unpinMessage(channelId: string, messageId: string): Promis
   await client.delete(`/channels/${channelId}/messages/${messageId}/pin`)
 }
 
-export async function searchMessages(channelId: string, q: string, limit = 50): Promise<Message[]> {
+export async function searchMessages(
+  channelId: string,
+  q: string,
+  filters: { author?: string; mentions?: string; has?: string } = {},
+  limit = 50,
+): Promise<Message[]> {
   const { data } = await client.get<Message[]>(`/channels/${channelId}/messages`, {
-    params: { q, limit },
+    params: {
+      q: q || undefined,
+      author: filters.author || undefined,
+      mentions: filters.mentions || undefined,
+      has_type: filters.has || undefined,
+      limit,
+    },
   })
   return data
 }
