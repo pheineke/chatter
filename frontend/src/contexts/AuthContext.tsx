@@ -23,22 +23,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const me = await getMe()
       setUser(me)
+      localStorage.setItem('cachedUser', JSON.stringify(me))
     } catch {
       setUser(null)
+      localStorage.removeItem('cachedUser')
     }
   }
 
   const updateUser = (patch: Partial<User>) => {
-    setUser(prev => prev ? { ...prev, ...patch } : prev)
+    setUser(prev => {
+      if (!prev) return prev
+      const next = { ...prev, ...patch }
+      localStorage.setItem('cachedUser', JSON.stringify(next))
+      return next
+    })
   }
 
   useEffect(() => {
     const token = localStorage.getItem('token')
-    if (token) {
-      refreshUser().finally(() => setLoading(false))
-    } else {
-      setLoading(false)
+    if (!token) { setLoading(false); return }
+
+    // Restore from cache immediately so the UI is never stuck
+    const cached = localStorage.getItem('cachedUser')
+    if (cached) {
+      try { setUser(JSON.parse(cached)) } catch { /* ignore */ }
     }
+    setLoading(false)
+
+    // Validate in background — update or clear user silently
+    refreshUser()
   }, [])
 
   const login = async (username: string, password: string) => {
@@ -55,11 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     const refreshToken = localStorage.getItem('refreshToken')
     if (refreshToken) {
-      // Fire-and-forget – revoke the refresh token on the server
       void apiLogout(refreshToken)
     }
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
+    localStorage.removeItem('cachedUser')
     setUser(null)
   }
 
