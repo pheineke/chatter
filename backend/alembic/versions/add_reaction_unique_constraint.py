@@ -17,15 +17,28 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # First deduplicate any existing dupes (keep lowest rowid)
-    op.execute("""
-        DELETE FROM reactions
-        WHERE rowid NOT IN (
-            SELECT MIN(rowid)
-            FROM reactions
-            GROUP BY message_id, user_id, emoji
-        )
-    """)
+    # First deduplicate any existing dupes (keep one id per group).
+    # PostgreSQL doesn't support MIN() on UUID directly, so cast to text there.
+    conn = op.get_bind()
+    dialect_name = getattr(conn.dialect, "name", None)
+    if dialect_name == "postgresql":
+        op.execute("""
+            DELETE FROM reactions
+            WHERE id NOT IN (
+                SELECT (MIN(id::text))::uuid
+                FROM reactions
+                GROUP BY message_id, user_id, emoji
+            )
+        """)
+    else:
+        op.execute("""
+            DELETE FROM reactions
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM reactions
+                GROUP BY message_id, user_id, emoji
+            )
+        """)
     # SQLite requires batch mode to add a unique constraint
     with op.batch_alter_table('reactions') as batch_op:
         batch_op.create_unique_constraint(

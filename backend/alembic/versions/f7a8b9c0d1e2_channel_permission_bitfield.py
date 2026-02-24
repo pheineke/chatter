@@ -35,10 +35,13 @@ def upgrade() -> None:
     #   can_read  → VIEW_CHANNEL    (bit 0, value 1)
     #   can_write → SEND_MESSAGES   (bit 1, value 2)
     #   can_edit  → MANAGE_MESSAGES (bit 2, value 4)
-    # SQLite supports bitwise | operator.
+    # Convert booleans to integers using CASE so this works on Postgres and SQLite.
     op.execute(
         "UPDATE channel_permissions "
-        "SET allow_bits = (can_read * 1) | (can_write * 2) | (can_edit * 4)"
+        "SET allow_bits = "
+        "(CASE WHEN can_read  THEN 1 ELSE 0 END) | "
+        "(CASE WHEN can_write THEN 2 ELSE 0 END) | "
+        "(CASE WHEN can_edit  THEN 4 ELSE 0 END)"
     )
 
     # Step 3: drop the old boolean columns

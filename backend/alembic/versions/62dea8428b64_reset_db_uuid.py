@@ -28,7 +28,7 @@ def upgrade() -> None:
     sa.Column('banner', sa.String(length=255), nullable=True),
     sa.Column('pronouns', sa.String(length=50), nullable=True),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('status', sa.Enum('online', 'away', 'busy', 'offline', name='user_status'), nullable=False),
+    sa.Column('status', sa.Enum('online', 'away', 'busy', 'dnd', 'offline', name='user_status'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )

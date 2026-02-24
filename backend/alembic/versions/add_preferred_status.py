@@ -23,7 +23,7 @@ def upgrade() -> None:
         'users',
         sa.Column(
             'preferred_status',
-            sa.Enum('online', 'away', 'busy', 'offline', name='user_status'),
+            sa.Enum('online', 'away', 'busy', 'dnd', 'offline', name='user_status'),
             nullable=False,
             server_default='online',
         ),

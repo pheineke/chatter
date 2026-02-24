@@ -11,6 +11,7 @@ Create Date: 2026-02-22 00:00:00.000000
 from typing import Sequence, Union
 
 from alembic import op
+import sqlalchemy as sa
 
 
 revision: str = 'g8b9c0d1e2f3'
@@ -20,6 +21,24 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    dialect_name = getattr(conn.dialect, "name", None)
+    if dialect_name == "postgresql":
+        # Try to add the enum value using the psql subprocess so it is
+        # executed in its own transaction and committed immediately. This
+        # avoids driver/transaction issues that can prevent using the new
+        # enum value in later statements within the same migration run.
+        import subprocess
+        import shlex
+
+        try:
+            # Build a simple psql command; rely on env vars or .env for creds
+            cmd = "psql -c \"ALTER TYPE user_status ADD VALUE 'dnd';\""
+            subprocess.run(shlex.split(cmd), check=True)
+        except Exception:
+            # If the value already exists or psql isn't available, ignore.
+            pass
+
     op.execute("UPDATE users SET status           = 'dnd' WHERE status           = 'busy'")
     op.execute("UPDATE users SET preferred_status = 'dnd' WHERE preferred_status = 'busy'")
 
