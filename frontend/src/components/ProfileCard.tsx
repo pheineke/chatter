@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getUser } from '../api/users'
-import { getNote, setNote } from '../api/users'
 import { getDMChannel } from '../api/dms'
 import { sendMessage } from '../api/messages'
 import { getMyServers } from '../api/servers'
@@ -49,12 +48,10 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   const qc = useQueryClient()
   const ref = useRef<HTMLDivElement>(null)
   const [msg, setMsg] = useState('')
-  const [noteText, setNoteText] = useState('')
-  const [noteSaving, setNoteSaving] = useState(false)
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [showInviteSubmenu, setShowInviteSubmenu] = useState(false)
   const [showFullProfile, setShowFullProfile] = useState(false)
+  const [focusNote, setFocusNote] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const devMode = localStorage.getItem('devMode') === 'true'
   const { user: currentUser } = useAuth()
@@ -79,34 +76,6 @@ export function ProfileCard({ userId, onClose, position }: Props) {
       await sendMessage(channel_id, `${window.location.origin}/invite/${invite.code}`)
       setMenuOpen(false)
     } catch { /* ignore */ }
-  }
-
-  const { data: savedNote } = useQuery({
-    queryKey: ['note', userId],
-    queryFn: () => getNote(userId),
-    enabled: !isSelf,
-  })
-
-  // Sync textarea when note data loads
-  useEffect(() => {
-    if (savedNote !== undefined) setNoteText(savedNote)
-  }, [savedNote])
-
-  const noteMut = useMutation({
-    mutationFn: (content: string) => setNote(userId, content),
-    onSuccess: () => {
-      setNoteSaving(false)
-      qc.invalidateQueries({ queryKey: ['note', userId] })
-    },
-  })
-
-  function handleNoteChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setNoteText(e.target.value)
-    setNoteSaving(true)
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
-      noteMut.mutate(e.target.value)
-    }, 800)
   }
 
   useEffect(() => {
@@ -140,7 +109,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   if (!user) return null
 
   return (
-    <div ref={ref} style={style} className="w-80 bg-discord-sidebar rounded-lg shadow-2xl overflow-hidden flex flex-col text-discord-text animate-fade-in-up">
+    <div ref={ref} style={style} className="group/card w-80 bg-discord-sidebar rounded-lg shadow-2xl overflow-hidden flex flex-col text-discord-text animate-fade-in-up">
        {/* Banner */}
        <div 
          className="h-24 bg-discord-mention relative"
@@ -164,45 +133,57 @@ export function ProfileCard({ userId, onClose, position }: Props) {
                  className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors"
                >View Full Profile</button>
 
-               {/* Invite to Server submenu */}
-               <div
-                 className="relative"
-                 onMouseEnter={() => setShowInviteSubmenu(true)}
-                 onMouseLeave={() => setShowInviteSubmenu(false)}
-               >
-                 <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors flex items-center justify-between">
-                   <span>Invite to Server</span>
-                   <Icon name="chevron-right" size={14} className="text-discord-muted" />
-                 </button>
-                 {showInviteSubmenu && (
-                   <div className="absolute left-full top-0 ml-1 w-48 bg-[#111214] border border-white/[0.07] rounded-md shadow-2xl py-1">
-                     {!myServers && <div className="px-3 py-2 text-xs text-discord-muted">Loading…</div>}
-                     {myServers && myServers.length === 0 && <div className="px-3 py-2 text-xs text-discord-muted">No servers</div>}
-                     {myServers?.map(s => (
-                       <button
-                         key={s.id}
-                         onClick={() => handleInviteToServer(s.id)}
-                         className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text text-sm transition-colors truncate"
-                       >{s.title}</button>
-                     ))}
+               {isSelf ? (
+                 <>
+                   {/* Edit Profile — self only */}
+                   <button
+                     onClick={() => { navigate('/channels/settings?tab=profile'); setMenuOpen(false); onClose() }}
+                     className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors"
+                   >Edit Profile</button>
+                 </>
+               ) : (
+                 <>
+                   {/* Invite to Server submenu */}
+                   <div
+                     className="relative"
+                     onMouseEnter={() => setShowInviteSubmenu(true)}
+                     onMouseLeave={() => setShowInviteSubmenu(false)}
+                   >
+                     <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors flex items-center justify-between">
+                       <span>Invite to Server</span>
+                       <Icon name="chevron-right" size={14} className="text-discord-muted" />
+                     </button>
+                     {showInviteSubmenu && (
+                       <div className="absolute left-full top-0 ml-1 w-48 bg-[#111214] border border-white/[0.07] rounded-md shadow-2xl py-1">
+                         {!myServers && <div className="px-3 py-2 text-xs text-discord-muted">Loading…</div>}
+                         {myServers && myServers.length === 0 && <div className="px-3 py-2 text-xs text-discord-muted">No servers</div>}
+                         {myServers?.map(s => (
+                           <button
+                             key={s.id}
+                             onClick={() => handleInviteToServer(s.id)}
+                             className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text text-sm transition-colors truncate"
+                           >{s.title}</button>
+                         ))}
+                       </div>
+                     )}
                    </div>
-                 )}
-               </div>
 
-               {/* Separator */}
-               <div className="my-1 border-t border-white/[0.08]" />
+                   {/* Separator */}
+                   <div className="my-1 border-t border-white/[0.08]" />
 
-               {/* Ignore */}
-               <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors"
-                 onClick={() => setMenuOpen(false)}
-               >Ignore</button>
+                   {/* Ignore */}
+                   <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors"
+                     onClick={() => setMenuOpen(false)}
+                   >Ignore</button>
 
-               {/* Block */}
-               <button
-                 onClick={() => { isBlocked ? unblock(userId) : block(userId); setMenuOpen(false) }}
-                 disabled={blockPending}
-                 className="w-full text-left px-3 py-2 hover:bg-red-500/20 text-red-400 transition-colors"
-               >{isBlocked ? 'Unblock' : 'Block'}</button>
+                   {/* Block */}
+                   <button
+                     onClick={() => { isBlocked ? unblock(userId) : block(userId); setMenuOpen(false) }}
+                     disabled={blockPending}
+                     className="w-full text-left px-3 py-2 hover:bg-red-500/20 text-red-400 transition-colors"
+                   >{isBlocked ? 'Unblock' : 'Block'}</button>
+                 </>
+               )}
 
                {/* Separator + Copy User ID (dev mode only) */}
                {devMode && (
@@ -226,7 +207,18 @@ export function ProfileCard({ userId, onClose, position }: Props) {
           </div>
           
           <div className="mt-12">
-             <div className="text-xl font-bold leading-tight">{user.username}</div>
+             <div className="flex items-center gap-2">
+               <div className="text-xl font-bold leading-tight">{user.username}</div>
+               {!isSelf && (
+                 <span
+                   title="Add Note"
+                   onClick={() => { setShowFullProfile(true); setFocusNote(true) }}
+                   className="cursor-pointer text-discord-muted hover:text-discord-text transition-colors leading-none opacity-0 group-hover/card:opacity-100 translate-y-px"
+                 >
+                   <Icon name="file-text" size={14} />
+                 </span>
+               )}
+             </div>
              <UserTag userId={user.id} />
              <div className="text-sm text-discord-muted">{user.pronouns}</div>
              
@@ -237,22 +229,6 @@ export function ProfileCard({ userId, onClose, position }: Props) {
                       ? <Linkified text={user.description} noMentions />
                       : <span className="italic text-discord-muted">No bio yet.</span>}
                  </div>
-             </div>
-
-             <div className="mt-4 border-t border-discord-input pt-2">
-                 <div className="flex items-center justify-between mb-1">
-                   <div className="text-xs font-bold text-discord-muted uppercase">Note</div>
-                   {noteSaving && <span className="text-[10px] text-discord-muted">Saving…</span>}
-                 </div>
-                 {isSelf ? null : (
-                   <textarea
-                     className="input w-full text-xs bg-black/20 border-0 px-2 py-1.5 placeholder:text-discord-muted resize-none"
-                     rows={2}
-                     value={noteText}
-                     onChange={handleNoteChange}
-                     placeholder="Click to add a note"
-                   />
-                 )}
              </div>
 
              <form onSubmit={handleMessage} className="mt-4">
@@ -269,7 +245,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
        </div>
 
        {/* Full profile modal */}
-       {showFullProfile && <ProfileFullModal user={user} onClose={() => setShowFullProfile(false)} />}
+       {showFullProfile && <ProfileFullModal user={user} onClose={() => { setShowFullProfile(false); setFocusNote(false) }} focusNote={focusNote} />}
     </div>
   )
 }
