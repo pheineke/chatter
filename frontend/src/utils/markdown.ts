@@ -32,6 +32,12 @@ const renderer = {
   heading({ text }: { text: string; depth: number }): string {
     return `<p><strong>${text}</strong></p>\n`
   },
+
+  // Escape raw HTML so tags like <div> show as literal text instead of being
+  // interpreted (and potentially stripped by DOMPurify).
+  html({ text }: { text: string }): string {
+    return text.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  },
 }
 
 // ── Custom inline extensions ─────────────────────────────────────────────────
