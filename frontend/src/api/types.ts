@@ -8,6 +8,7 @@ export interface User {
   username: string
   avatar: string | null
   banner: string | null
+  avatar_decoration: string | null
   description: string | null
   pronouns: string | null
   status: UserStatus

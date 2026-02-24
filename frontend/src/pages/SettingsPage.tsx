@@ -12,6 +12,7 @@ import { useBlocks } from '../hooks/useBlocks'
 import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
 import { getSessions, revokeSession, revokeAllOtherSessions, type Session } from '../api/sessions'
 import { getTokens, createToken, revokeToken, type ApiToken, type ApiTokenCreated } from '../api/tokens'
+import { AVATAR_FRAMES } from '../utils/avatarFrames'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications' | 'tokens'
 
@@ -193,6 +194,45 @@ function AccountTab() {
               {statusLabels[s]}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Avatar Decoration */}
+      <div className="bg-discord-sidebar rounded-lg p-4 mb-6">
+        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Avatar Decoration</div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* "None" option */}
+          <button
+            onClick={() => updateMut.mutate({ avatar_decoration: '' } as any)}
+            className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
+              !user?.avatar_decoration
+                ? 'border-discord-mention bg-discord-mention/10'
+                : 'border-discord-input bg-discord-bg hover:border-discord-muted'
+            }`}
+            title="None"
+          >
+            <Icon name="close" size={20} className="text-discord-muted" />
+          </button>
+          {AVATAR_FRAMES.map(frame => {
+            const active = user?.avatar_decoration === frame.id
+            return (
+              <button
+                key={frame.id}
+                onClick={() => updateMut.mutate({ avatar_decoration: frame.id } as any)}
+                className={`relative w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
+                  active
+                    ? 'border-discord-mention bg-discord-mention/10'
+                    : 'border-discord-input bg-discord-bg hover:border-discord-muted'
+                }`}
+                title={frame.label}
+              >
+                <div className="relative w-10 h-10">
+                  <UserAvatar user={user} size={28} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" hideDecoration />
+                  <img src={frame.src} alt={frame.label} className="absolute inset-0 w-full h-full pointer-events-none" />
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 

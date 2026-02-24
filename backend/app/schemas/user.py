@@ -36,6 +36,7 @@ class UserUpdate(BaseModel):
     banner: str | None = None
     dm_permission: DMPermission | None = None
     hide_status: bool | None = None
+    avatar_decoration: str | None = None
 
     @field_validator('description', 'pronouns', mode='before')
     @classmethod
@@ -49,6 +50,7 @@ class UserRead(UserBase):
     id: uuid.UUID
     avatar: str | None
     banner: str | None
+    avatar_decoration: str | None = None
     preferred_status: UserStatus = UserStatus.online
     dm_permission: DMPermission = DMPermission.everyone
     hide_status: bool = False

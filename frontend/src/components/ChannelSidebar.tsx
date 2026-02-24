@@ -330,7 +330,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     <div className="flex flex-col h-full overflow-hidden bg-discord-channels">
       {/* Server name header */}
       <div
-        className="px-4 font-bold border-b border-black/20 shadow-sm flex items-center justify-between cursor-pointer hover:bg-discord-input/30 transition-colors select-none h-12 shrink-0"
+        className="px-4 font-bold border-b border-white/[0.07] flex items-center justify-between cursor-pointer hover:bg-discord-input/30 transition-colors select-none h-12 shrink-0"
         onClick={handleHeaderClick}
       >
         <span className="truncate">{server?.title ?? 'Server'}</span>
@@ -930,6 +930,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
             pronouns: null,
             dm_permission: 'everyone' as const,
             hide_status: false,
+            avatar_decoration: null,
           }
         }
         return { user: user as User, isSelf, isSpeaking: p.is_speaking ?? false, isMuted: p.is_muted, isDeafened: p.is_deafened, isSharingScreen: p.is_sharing_screen ?? false }
@@ -973,7 +974,6 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
               <AvatarWithStatus
                 user={u}
                 size={20}
-                bg="bg-discord-channels"
                 className={`rounded-full transition-all ${isSpeaking ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-discord-sidebar' : ''}`}
               />
               <span className={`truncate flex-1 transition-colors ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>

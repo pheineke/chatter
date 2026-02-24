@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '../api/types'
+import { AVATAR_FRAMES } from '../utils/avatarFrames'
 
 interface Props {
   user: User | null
   size?: number
   className?: string
+  /** Hide the decoration overlay (e.g. in tiny contexts) */
+  hideDecoration?: boolean
 }
 
 const COLORS = [
@@ -65,40 +68,77 @@ function GifAvatar({ src, alt, size, className }: { src: string; alt: string; si
   )
 }
 
-export function UserAvatar({ user, size = 40, className = '' }: Props) {
+export function UserAvatar({ user, size = 40, className = '', hideDecoration = false }: Props) {
   const px = `${size}px`
   const style = { width: px, height: px, minWidth: px, fontSize: size * 0.4 }
 
+  // Resolve the decoration SVG src (if any)
+  const decorationSrc = (!hideDecoration && user?.avatar_decoration)
+    ? AVATAR_FRAMES.find(f => f.id === user.avatar_decoration)?.src ?? null
+    : null
+
+  // The decoration overlay extends ~25% outside the avatar circle on each side
+  const decoScale = 1.45
+  const decoPx = `${size * decoScale}px`
+  const decoOffset = `${-(size * (decoScale - 1)) / 2}px`
+
   if (!user) {
     return (
-      <div
-        style={style}
-        className={`rounded-full bg-discord-input flex items-center justify-center ${className}`}
-      />
+      <div style={{ position: 'relative', width: px, height: px, minWidth: px }} className={`shrink-0 ${className}`}>
+        <div
+          style={style}
+          className="rounded-full bg-discord-input flex items-center justify-center"
+        />
+      </div>
     )
   }
+
+  let avatarEl: React.ReactNode
 
   if (user.avatar) {
     const src = `/api/static/${user.avatar}`
     if (user.avatar.toLowerCase().endsWith('.gif')) {
-      return <GifAvatar src={src} alt={user.username} size={size} className={className} />
+      avatarEl = <GifAvatar src={src} alt={user.username} size={size} className="" />
+    } else {
+      avatarEl = (
+        <img
+          src={src}
+          alt={user.username}
+          style={style}
+          className="rounded-full object-cover"
+        />
+      )
     }
-    return (
-      <img
-        src={src}
-        alt={user.username}
+  } else {
+    avatarEl = (
+      <div
         style={style}
-        className={`rounded-full object-cover ${className}`}
-      />
+        className={`rounded-full flex items-center justify-center text-white font-bold select-none ${colorFor(user.username)}`}
+      >
+        {user.username[0].toUpperCase()}
+      </div>
     )
   }
 
   return (
-    <div
-      style={style}
-      className={`rounded-full flex items-center justify-center text-white font-bold select-none ${colorFor(user.username)} ${className}`}
-    >
-      {user.username[0].toUpperCase()}
+    <div style={{ position: 'relative', width: px, height: px, minWidth: px }} className={`shrink-0 ${className}`}>
+      {avatarEl}
+      {decorationSrc && (
+        <img
+          src={decorationSrc}
+          alt=""
+          aria-hidden
+          draggable={false}
+          className="pointer-events-none select-none"
+          style={{
+            position: 'absolute',
+            width: decoPx,
+            height: decoPx,
+            top: decoOffset,
+            left: decoOffset,
+          }}
+        />
+      )}
     </div>
   )
 }

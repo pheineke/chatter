@@ -47,6 +47,7 @@ class User(Base):
         String(20), default=DMPermission.everyone, server_default="everyone"
     )
     hide_status: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    avatar_decoration: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

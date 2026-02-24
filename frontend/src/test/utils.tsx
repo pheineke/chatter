@@ -56,6 +56,7 @@ export function makeUser(overrides: Partial<import('../api/types').User> = {}): 
     username: 'testuser',
     avatar: null,
     banner: null,
+    avatar_decoration: null,
     description: null,
     pronouns: null,
     status: 'online',
