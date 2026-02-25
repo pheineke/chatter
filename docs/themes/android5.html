@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Material - Final Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================
+           1. CORE MATERIAL VARIABLES
+           ========================================= */
+        :root {
+            --primary: #3F51B5;      /* Indigo 500 */
+            --primary-dark: #303F9F; /* Indigo 700 */
+            --accent: #FF4081;       /* Pink A200 */
+            --bg-app: #ECEFF1;
+            --bg-paper: #FFFFFF;
+            --text-primary: #212121;
+            --text-secondary: #757575;
+            --divider: #E0E0E0;
+            --danger: #F44336;
+            
+            --status-online: #4CAF50;
+            --status-idle: #FFC107;
+            --status-dnd: #F44336;
+            --status-offline: #BDBDBD;
+            
+            /* Elevation (Shadows) */
+            --z1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            --z2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+            --z3: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+            --z4: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto', sans-serif; }
+        body { background-color: var(--bg-app); color: var(--text-primary); height: 100vh; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+
+        /* Icon Helper */
+        .icon-svg { width: 24px; height: 24px; display: block; }
+        .icon-svg .cls-2 { fill: currentColor; }
+
+        /* =========================================
+           2. APP BAR (HEADER)
+           ========================================= */
+        .app-bar {
+            height: 56px; background-color: var(--primary); color: white;
+            display: flex; align-items: center; padding: 0 8px; box-shadow: var(--z2);
+            z-index: 20; position: relative;
+        }
+        .app-title { font-size: 20px; font-weight: 500; flex: 1; margin-left: 12px; }
+        .icon-btn {
+            width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+            border-radius: 50%; cursor: pointer; transition: background 0.2s; color: white;
+        }
+        .icon-btn:hover { background-color: rgba(255,255,255,0.1); }
+
+        /* =========================================
+           3. DRAWERS (LEFT & RIGHT)
+           ========================================= */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .overlay.active { opacity: 1; pointer-events: auto; }
+
+        .drawer {
+            position: fixed; top: 0; bottom: 0; width: 300px; background-color: var(--bg-paper);
+            z-index: 40; box-shadow: var(--z4); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column;
+        }
+        .drawer-left { left: 0; transform: translateX(-105%); }
+        .drawer-right { right: 0; transform: translateX(105%); }
+        .drawer.open { transform: translateX(0); }
+
+        /* User Header (Burger Menu Top) */
+        .drawer-header-user {
+            height: 80px; background-color: var(--primary-dark); padding: 0 16px;
+            display: flex; align-items: center; color: white; cursor: pointer;
+        }
+        .avatar-circle { width: 48px; height: 48px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--primary); font-weight: bold; font-size: 20px; margin-right: 16px; box-shadow: var(--z1); }
+
+        /* Server Box in Burger Menu */
+        .server-box {
+            display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--divider); cursor: pointer;
+        }
+        .server-box:hover { background-color: #f5f5f5; }
+        .server-box.active { background-color: #E8EAF6; }
+        .server-icon-sq { width: 50px; height: 50px; border-radius: 4px; background-color: #9E9E9E; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 16px; flex-shrink: 0; }
+        .v-status { display: flex; align-items: center; font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--status-online); margin-right: 6px; }
+
+        /* Member List (Right Drawer) */
+        .member-item { display: flex; align-items: center; padding: 12px 16px; cursor: pointer; position: relative; }
+        .member-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #ddd; margin-right: 16px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .status-dot-right { width: 14px; height: 14px; border-radius: 50%; margin-left: auto; border: 2px solid white; box-shadow: var(--z1); }
+
+        /* =========================================
+           4. MAIN LAYOUT (CHANNELS & CHAT)
+           ========================================= */
+        .main-content { display: flex; flex: 1; height: calc(100vh - 56px); }
+        
+        .channel-sidebar { width: 260px; background: #FAFAFA; border-right: 1px solid var(--divider); overflow-y: auto; }
+        .category-name { padding: 24px 16px 8px; font-size: 12px; font-weight: bold; color: var(--text-secondary); text-transform: uppercase; }
+        .channel-row { padding: 12px 16px; display: flex; align-items: center; cursor: pointer; color: #616161; }
+        .channel-row.active { background: #E0E0E0; color: black; font-weight: 500; }
+        .channel-row:hover { background: #eeeeee; }
+
+        .chat-pane { flex: 1; display: flex; flex-direction: column; background: #ECEFF1; }
+        .message-list { flex: 1; padding: 16px; overflow-y: auto; }
+
+        /* Message Bubble Design */
+        .message-wrapper { display: flex; margin-bottom: 16px; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .chat-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 16px; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .paper-bubble {
+            background: white; padding: 12px 16px; border-radius: 4px; box-shadow: var(--z1);
+            position: relative; flex: 1; max-width: 85%; cursor: pointer;
+        }
+        .paper-bubble:active { background-color: #f9f9f9; }
+        .paper-bubble::before { content: ''; position: absolute; left: -6px; top: 12px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid white; }
+
+        /* Input Bar */
+        .input-bar { background: white; padding: 8px 12px; display: flex; align-items: center; box-shadow: 0 -1px 2px rgba(0,0,0,0.1); }
+        .input-field { flex: 1; border: none; padding: 12px; font-size: 16px; outline: none; }
+        .icon-btn-dark { color: var(--text-secondary); }
+
+        /* =========================================
+           5. OVERLAYS (SETTINGS, MODALS, SHEETS)
+           ========================================= */
+        .full-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #F5F5F5; z-index: 100; transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex;
+        }
+        .full-overlay.open { transform: translateY(0); }
+        .settings-nav { width: 280px; background: white; border-right: 1px solid var(--divider); }
+        .settings-item { padding: 16px 24px; cursor: pointer; border-left: 4px solid transparent; }
+        .settings-item.active { background: #E8EAF6; color: var(--primary); font-weight: bold; border-left-color: var(--primary); }
+        .settings-body { flex: 1; padding: 40px; overflow-y: auto; position: relative; }
+        .fab-close { position: absolute; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; box-shadow: var(--z3); cursor: pointer; font-size: 24px; }
+
+        /* Profile Modal */
+        .profile-modal-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 150; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: 0.2s; }
+        .profile-modal-bg.open { opacity: 1; pointer-events: auto; }
+        .profile-card { width: 320px; background: white; border-radius: 4px; overflow: hidden; box-shadow: var(--z4); transform: scale(0.9); transition: 0.2s; }
+        .profile-modal-bg.open .profile-card { transform: scale(1); }
+        .p-banner { height: 80px; background: var(--primary); }
+        .p-avatar-wrap { padding: 0 16px; margin-top: -40px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .p-big-avatar { width: 80px; height: 80px; border-radius: 50%; border: 4px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 32px; }
+
+        /* Action Sheet */
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: white;
+            z-index: 200; transform: translateY(100%); transition: transform 0.2s;
+            border-top-left-radius: 16px; border-top-right-radius: 16px; padding-bottom: 12px; box-shadow: var(--z4);
+        }
+        .bottom-sheet.open { transform: translateY(0); }
+        .sheet-item { padding: 16px 24px; display: flex; align-items: center; cursor: pointer; }
+        .sheet-item .icon-svg { margin-right: 24px; color: var(--text-secondary); }
+        .sheet-item.danger { color: var(--danger); }
+        .sheet-item.danger .icon-svg { color: var(--danger); }
+
+        /* Context Menu (Input Bar) */
+        .context-menu { position: absolute; bottom: 60px; left: 12px; width: 220px; background: white; border-radius: 4px; box-shadow: var(--z3); display: none; padding: 8px 0; z-index: 101; }
+        .context-menu.open { display: block; animation: scaleIn 0.1s ease-out; }
+        @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="overlay" id="global-overlay"></div>
+
+    <!-- 1. APP BAR -->
+    <header class="app-bar">
+        <div class="icon-btn" onclick="toggleDrawer('drawer-left')">☰</div>
+        <div class="app-title" id="active-title"># general</div>
+        
+        <!-- Server Settings Trigger -->
+        <div class="icon-btn" onclick="openFullPage('server-settings')">
+            <svg class="icon-svg" id="svg-settings" viewBox="0 0 24 24"></svg>
+        </div>
+        
+        <!-- Members List Trigger -->
+        <div class="icon-btn" onclick="toggleDrawer('drawer-right')">
+            <svg class="icon-svg" id="svg-people" viewBox="0 0 24 24"></svg>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <!-- 2. CHANNEL SIDEBAR -->
+        <aside class="channel-sidebar">
+            <div class="category-name">Welcome Area</div>
+            <div class="channel-row" onclick="switchChannel('rules')"># rules</div>
+            <div class="channel-row" onclick="switchChannel('announcements')"># announcements</div>
+            
+            <div class="category-name">Public Hub</div>
+            <div class="channel-row active" onclick="switchChannel('general')"># general</div>
+            <div class="channel-row" onclick="switchChannel('memes')"># memes</div>
+            <div class="channel-row" onclick="switchChannel('voice-lounge')">🔊 Voice Lounge</div>
+        </aside>
+
+        <!-- 3. CHAT AREA -->
+        <main class="chat-pane">
+            <div class="message-list" id="chat-scroller">
+                <!-- Messages injected here -->
+            </div>
+
+            <div class="input-bar">
+                <!-- Three Dot Context Menu Trigger -->
+                <div class="icon-btn icon-btn-dark" onclick="toggleContextMenu(event)">⋮</div>
+                
+                <input type="text" class="input-field" id="msg-input" placeholder="Message #general">
+                
+                <div class="icon-btn" style="color:var(--primary)" onclick="sendMessage()">➤</div>
+
+                <!-- Input Context Menu -->
+                <div class="context-menu" id="input-menu">
+                    <div class="sheet-item" onclick="toggleContextMenu()">
+                        <div class="icon-svg-wrap" style="margin-right:16px" id="svg-file-add-ctx"></div>
+                        Add attachment
+                    </div>
+                    <div class="sheet-item" onclick="toggleContextMenu()">
+                        <div style="margin-right:16px">📊</div>
+                        Create Poll
+                    </div>
+                    <div class="sheet-item" onclick="toggleContextMenu()">
+                        <div style="margin-right:16px">🤖</div>
+                        Bot Commands
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 4. DRAWERS -->
+    <!-- Left Drawer (Servers) -->
+    <nav class="drawer drawer-left" id="drawer-left">
+        <div class="drawer-header-user" onclick="openFullPage('user-settings')">
+            <div class="avatar-circle">A</div>
+            <div>
+                <div style="font-weight:bold">AndroidUser</div>
+                <div style="font-size:12px; opacity:0.8">#8492</div>
+            </div>
+        </div>
+        <div class="server-list-scroll">
+            <div class="drawer-label">Servers</div>
+            <div class="server-box active">
+                <div class="server-icon-sq" style="background:#5865F2">D</div>
+                <div>
+                    <div>Dev Hangout</div>
+                    <div class="v-status"><span class="dot"></span> 4 active</div>
+                </div>
+            </div>
+            <div class="server-box">
+                <div class="server-icon-sq" style="background:#4CAF50">G</div>
+                <div>
+                    <div>Gaming Room</div>
+                    <div class="v-status"><span class="dot" style="background:var(--status-offline)"></span> No voice</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Right Drawer (Members) -->
+    <aside class="drawer drawer-right" id="drawer-right">
+        <div class="member-header">MEMBERS</div>
+        <div class="member-list" id="member-list-ui">
+            <!-- Members injected here -->
+        </div>
+    </aside>
+
+    <!-- 5. BOTTOM SHEET (Long Press Menu) -->
+    <div class="bottom-sheet" id="action-sheet">
+        <div style="width:40px; height:4px; background:#e0e0e0; margin:12px auto; border-radius:2px;"></div>
+        <div id="sheet-options"></div>
+    </div>
+
+    <!-- 6. SETTINGS PAGES -->
+    <div class="full-overlay" id="user-settings">
+        <div class="settings-nav">
+            <div class="settings-header" style="padding:20px; background:var(--primary); color:white">User Settings</div>
+            <div class="settings-item active">My Account</div>
+            <div class="settings-item">Appearance</div>
+            <div class="settings-item">Privacy & Safety</div>
+        </div>
+        <div class="settings-body">
+            <div class="section-title">My Account</div>
+            <div style="margin-bottom:20px">
+                <label style="font-size:12px; color:var(--text-secondary)">USERNAME</label>
+                <input type="text" value="AndroidUser" style="width:100%; border:none; border-bottom:1px solid #ccc; padding:8px 0; font-size:16px; outline:none">
+            </div>
+            <div class="fab-close" onclick="closeFullPages()">✕</div>
+        </div>
+    </div>
+
+    <div class="full-overlay" id="server-settings">
+        <div class="settings-nav">
+            <div class="settings-header" style="padding:20px; background:#4CAF50; color:white">Server Settings</div>
+            <div class="settings-item active">Overview</div>
+            <div class="settings-item">Roles</div>
+            <div class="settings-item">Emoji</div>
+        </div>
+        <div class="settings-body">
+            <div class="section-title">Server Overview</div>
+            <div style="margin-bottom:20px">
+                <label style="font-size:12px; color:var(--text-secondary)">SERVER NAME</label>
+                <input type="text" value="Dev Hangout" style="width:100%; border:none; border-bottom:1px solid #ccc; padding:8px 0; font-size:16px; outline:none">
+            </div>
+            <div class="fab-close" onclick="closeFullPages()">✕</div>
+        </div>
+    </div>
+
+    <!-- 7. PROFILE MODAL -->
+    <div class="profile-modal-bg" id="profile-modal" onclick="closeProfile()">
+        <div class="profile-card" onclick="event.stopPropagation()">
+            <div class="p-banner" id="p-banner"></div>
+            <div class="p-avatar-wrap">
+                <div class="p-big-avatar" id="p-avatar"></div>
+            </div>
+            <div style="padding:16px">
+                <div style="font-size:20px; font-weight:bold" id="p-name">User</div>
+                <div style="color:#999; margin-bottom:12px">#0000</div>
+                <div style="font-size:12px; font-weight:bold; color:var(--text-secondary); text-transform:uppercase">About Me</div>
+                <div style="font-size:14px; margin-top:4px">Android Material Design enthusiast.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // 1. ASSET STORAGE (SVGs)
+        // ============================================
+        const ICONS = {
+            settings: `<g id="Layer_2" data-name="Layer 2"><g id="settings"><g id="settings-2" data-name="settings"><rect class="cls-1" width="24" height="24"/><g id="_Group_" data-name="&lt;Group&gt;"><path class="cls-2" d="M8.61,22a2.25,2.25,0,0,1-1.35-.46L5.19,20a2.37,2.37,0,0,1-.49-3.22,2.06,2.06,0,0,0,.23-1.86l-.06-.16a1.83,1.83,0,0,0-1.12-1.22h0l-.16,0a2.34,2.34,0,0,1-1.48-2.94l.82-2.6A2.18,2.18,0,0,1,4.05,6.59a2.14,2.14,0,0,1,1.68-.12,1.93,1.93,0,0,0,1.78-.29l.13-.1a1.94,1.94,0,0,0,.73-1.51V4.33A2.32,2.32,0,0,1,10.66,2h2.55a2.26,2.26,0,0,1,1.6.67,2.37,2.37,0,0,1,.68,1.68v.28a1.76,1.76,0,0,0,.69,1.43l.11.08a1.74,1.74,0,0,0,1.59.26l.34-.11A2.26,2.26,0,0,1,21.1,7.8l.79,2.52a2.36,2.36,0,0,1-1.46,2.93l-.2.07A1.89,1.89,0,0,0,19,14.6a2,2,0,0,0,.25,1.65l.26.38a2.38,2.38,0,0,1-.5,3.23L17,21.41a2.24,2.24,0,0,1-3.22-.53l-.12-.17a1.75,1.75,0,0,0-1.5-.78,1.8,1.8,0,0,0-1.43.77l-.23.33A2.25,2.25,0,0,1,9,22,2,2,0,0,1,8.61,22ZM4.4,11.62a3.83,3.83,0,0,1,2.38,2.5l0,.12a4,4,0,0,1-.46,3.62.38.38,0,0,0,0,.51L8.47,20a.25.25,0,0,0,.37-.07l.23-.33a3.77,3.77,0,0,1,6.2,0l.12.18a.3.3,0,0,0,.18.12.25.25,0,0,0,.19-.05l2.06-1.56a.36.36,0,0,0,.07-.49l-.26-.38A4,4,0,0,1,17.1,14a3.92,3.92,0,0,1,2.49-2.61l.2-.07a.34.34,0,0,0,.19-.44L19.2,8.39A.35.35,0,0,0,19,8.2a.21.21,0,0,0-.19,0l-.34.11a3.74,3.74,0,0,1-3.43-.57L15,7.65a3.76,3.76,0,0,1-1.49-3V4.34a.37.37,0,0,0-.1-.26A.31.31,0,0,0,13.2,4H10.66a.31.31,0,0,0-.29.33v.25A3.9,3.9,0,0,1,8.85,7.67l-.13.1a3.91,3.91,0,0,1-3.63.59.22.22,0,0,0-.14,0,.28.28,0,0,0-.12.15L4,11.12a.36.36,0,0,0,.22.45Z"/></g><path class="cls-2" d="M12,15.5A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Zm0-5A1.5,1.5,0,1,0,13.5,12,1.5,1.5,0,0,0,12,10.5Z"/></g></g></g>`,
+            people: `<g id="Layer_2" data-name="Layer 2"><g id="people"><g id="people-2" data-name="people"><rect class="cls-1" width="24" height="24"/><path class="cls-2" d="M9,11A4,4,0,1,0,5,7,4,4,0,0,0,9,11ZM9,5A2,2,0,1,1,7,7,2,2,0,0,1,9,5Z"/><path class="cls-2" d="M17,13a3,3,0,1,0-3-3A3,3,0,0,0,17,13Zm0-4a1,1,0,1,1-1,1A1,1,0,0,1,17,9Z"/><path class="cls-2" d="M17,14a5,5,0,0,0-3.06,1.05A7,7,0,0,0,2,20a1,1,0,0,0,2,0,5,5,0,0,1,10,0,1,1,0,0,0,2,0,6.9,6.9,0,0,0-.86-3.35A3,3,0,0,1,20,19a1,1,0,0,0,2,0A5,5,0,0,0,17,14Z"/></g></g></g>`,
+            trash: `<g id="Layer_2" data-name="Layer 2"><g id="trash"><g id="trash-2" data-name="trash"><rect class="cls-1" width="24" height="24"/><path class="cls-2" d="M21,6H16V4.33A2.42,2.42,0,0,0,13.5,2h-3A2.42,2.42,0,0,0,8,4.33V6H3A1,1,0,0,0,3,8H4V19a3,3,0,0,0,3,3H17a3,3,0,0,0,3-3V8h1a1,1,0,0,0,0-2ZM10,4.33c0-.16.21-.33.5-.33h3c.29,0,.5.17.5.33V6H10ZM18,19a1,1,0,0,1-1,1H7a1,1,0,0,1-1-1V8H18Z"/></g></g></g>`,
+            fileAdd: `<g id="Layer_2" data-name="Layer 2"><g id="file-add"><g id="file-add-2" data-name="file-add"><rect class="cls-1" width="24" height="24"/><path class="cls-2" d="M19.74,8.33l-5.44-6A1,1,0,0,0,13.56,2h-7A2.53,2.53,0,0,0,4,4.5v15A2.53,2.53,0,0,0,6.56,22H17.44A2.53,2.53,0,0,0,20,19.5V9A1,1,0,0,0,19.74,8.33ZM14,5l2.74,3h-2A.79.79,0,0,1,14,7.15Zm3.44,15H6.56A.53.53,0,0,1,6,19.5V4.5A.53.53,0,0,1,6.56,4H12V7.15A2.79,2.79,0,0,0,14.71,10H18v9.5A.53.53,0,0,1,17.44,20Z"/><path class="cls-2" d="M14,13H13V12a1,1,0,0,0-2,0v1H10a1,1,0,0,0,0,2h1v1a1,1,0,0,0,2,0V15h1a1,1,0,0,0,0-2Z"/></g></g></g>`,
+            reply: `<g id="Layer_2" data-name="Layer 2"><g id="corner-up-left"><g id="corner-up-left-2" data-name="corner-up-left"><rect class="cls-1" width="24" height="24" transform="translate(24 0) rotate(90)"/><path class="cls-2" d="M16,10H7.08l2.7-3.38A1,1,0,1,0,8.22,5.38l-4,5a1,1,0,0,0,0,1.24l4,5A1,1,0,0,0,9,17a1,1,0,0,0,.62-.22,1,1,0,0,0,.16-1.4L7.08,12H16a1,1,0,0,1,1,1v5a1,1,0,0,0,2,0V13A3,3,0,0,0,16,10Z"/></g></g></g>`,
+            edit: `<g id="Layer_2" data-name="Layer 2"><g id="edit"><g id="edit-2" data-name="edit"><rect class="cls-1" width="24" height="24"/><path class="cls-2" d="M19.4,7.34h0L16.66,4.6A2,2,0,0,0,14,4.53l-9,9a2,2,0,0,0-.57,1.21L4,18.91a1,1,0,0,0,.29.8A1,1,0,0,0,5,20h.09l4.17-.38a2,2,0,0,0,1.21-.57l9-9A1.92,1.92,0,0,0,19.4,7.34ZM9.08,17.62l-3,.28.27-3L12,9.32l2.7,2.7ZM16,10.68,13.32,8,15.27,6,18,8.73Z"/></g></g></g>`,
+            star: `<g id="Layer_2" data-name="Layer 2"><g id="star"><g id="star-2" data-name="star"><rect class="cls-1" width="24" height="24" transform="translate(24 0) rotate(90)"/><path class="cls-2" d="M17.56,21a1,1,0,0,1-.46-.11L12,18.22,6.9,20.89a1,1,0,0,1-1.45-1.06l1-5.63-4.12-4a1,1,0,0,1-.25-1,1,1,0,0,1,.81-.68l5.7-.83L11.1,2.56a1,1,0,0,1,1.8,0l2.54,5.12,5.7.83a1,1,0,0,1,.81.68,1,1,0,0,1-.25,1l-4.12,4,1,5.63a1,1,0,0,1-.4,1A1,1,0,0,1,17.56,21ZM12,16.1a.92.92,0,0,1,.46.11l3.77,2L15.51,14a1,1,0,0,1,.29-.89l3-2.93-4.2-.62A1,1,0,0,1,13.89,9L12,5.25,10.11,9a1,1,0,0,1-.75.54l-4.2.62,3,2.93a1,1,0,0,1,.29.89l-.72,4.16,3.77-2A.92.92,0,0,1,12,16.1Z"/></g></g></g>`
+        };
+
+        // Inject Header Icons
+        document.getElementById('svg-settings').innerHTML = ICONS.settings;
+        document.getElementById('svg-people').innerHTML = ICONS.people;
+        document.getElementById('svg-file-add-ctx').innerHTML = `<svg class="icon-svg" style="color:var(--text-secondary)" viewBox="0 0 24 24">${ICONS.fileAdd}</svg>`;
+
+        // ============================================
+        // 2. CHAT DATA & MEMBERS
+        // ============================================
+        const chatData = {
+            general: [
+                { user: "MaterialBot", color: "#5865F2", text: "Welcome to the final build! Long-press me for options.", isMe: false, time: "12:00 PM" },
+                { user: "AndroidUser", color: "#3F51B5", text: "Testing my own message. Hold me to Edit or Delete!", isMe: true, time: "12:01 PM" }
+            ],
+            memes: [
+                { user: "Designer_Pro", color: "#9C27B0", text: "Center a div? In this economy?", isMe: false, time: "9:00 AM" }
+            ]
+        };
+
+        const members = [
+            { name: "MaterialBot", color: "#5865F2", status: "var(--status-online)" },
+            { name: "Designer_Pro", color: "#9C27B0", status: "var(--status-idle)" },
+            { name: "AndroidUser", color: "#3F51B5", status: "var(--status-online)" }
+        ];
+
+        let activeChannel = 'general';
+
+        // ============================================
+        // 3. CORE LOGIC
+        // ============================================
+        const scroller = document.getElementById('chat-scroller');
+        const overlay = document.getElementById('global-overlay');
+
+        function renderMessages() {
+            scroller.innerHTML = '';
+            chatData[activeChannel].forEach(msg => {
+                const html = `
+                    <div class="message-wrapper">
+                        <div class="chat-avatar" style="background:${msg.color}" onclick="openProfile('${msg.user}', '${msg.color}')">${msg.user[0]}</div>
+                        <div class="paper-bubble" 
+                             onmousedown="handleHoldStart(event, ${msg.isMe})" 
+                             ontouchstart="handleHoldStart(event, ${msg.isMe})"
+                             onmouseup="handleHoldEnd()"
+                             ontouchend="handleHoldEnd()"
+                             oncontextmenu="event.preventDefault(); openActionSheet(${msg.isMe})">
+                            <div class="msg-header">
+                                <span class="msg-username">${msg.user}</span>
+                                <span class="msg-timestamp">${msg.time}</span>
+                            </div>
+                            <div class="msg-content">${msg.text}</div>
+                        </div>
+                    </div>`;
+                scroller.insertAdjacentHTML('beforeend', html);
+            });
+            scroller.scrollTop = scroller.scrollHeight;
+        }
+
+        function renderMembers() {
+            const list = document.getElementById('member-list-ui');
+            list.innerHTML = '';
+            members.forEach(m => {
+                list.innerHTML += `
+                    <div class="member-item" onclick="openProfile('${m.name}', '${m.color}')">
+                        <div class="member-avatar" style="background:${m.color}">${m.name[0]}</div>
+                        <div class="member-name">${m.name}</div>
+                        <div class="status-dot-right" style="background:${m.status}"></div>
+                    </div>`;
+            });
+        }
+
+        // ============================================
+        // 4. NAVIGATION & OVERLAYS
+        // ============================================
+        function toggleDrawer(id) {
+            const el = document.getElementById(id);
+            const isOpen = el.classList.contains('open');
+            closeAll();
+            if (!isOpen) {
+                el.classList.add('open');
+                overlay.classList.add('active');
+            }
+        }
+
+        function openFullPage(id) {
+            closeAll();
+            document.getElementById(id).classList.add('open');
+        }
+
+        function closeAll() {
+            document.querySelectorAll('.drawer, .full-overlay, .bottom-sheet, .context-menu').forEach(el => el.classList.remove('open'));
+            overlay.classList.remove('active');
+            document.getElementById('input-menu').classList.remove('open');
+        }
+
+        function closeFullPages() {
+            document.querySelectorAll('.full-overlay').forEach(el => el.classList.remove('open'));
+        }
+
+        overlay.onclick = closeAll;
+
+        // ============================================
+        // 5. LONG PRESS & ACTION SHEET
+        // ============================================
+        let holdTimer;
+        function handleHoldStart(e, isMe) {
+            holdTimer = setTimeout(() => openActionSheet(isMe), 600);
+        }
+        function handleHoldEnd() { clearTimeout(holdTimer); }
+
+        function openActionSheet(isMe) {
+            const sheet = document.getElementById('action-sheet');
+            const container = document.getElementById('sheet-options');
+            
+            let options = `
+                <div class="sheet-item"><svg class="icon-svg">${ICONS.star}</svg> React</div>
+                <div class="sheet-item"><svg class="icon-svg">${ICONS.reply}</svg> Reply</div>
+            `;
+
+            if (isMe) {
+                options += `
+                    <div class="sheet-item"><svg class="icon-svg">${ICONS.edit}</svg> Edit Message</div>
+                    <div class="sheet-item danger"><svg class="icon-svg">${ICONS.trash}</svg> Delete Message</div>
+                `;
+            }
+
+            container.innerHTML = options;
+            sheet.classList.add('open');
+            overlay.classList.add('active');
+        }
+
+        // ============================================
+        // 6. CHAT & CONTEXT MENU
+        // ============================================
+        function sendMessage() {
+            const inp = document.getElementById('msg-input');
+            if (!inp.value.trim()) return;
+            chatData[activeChannel].push({
+                user: "AndroidUser", color: "#3F51B5", text: inp.value, isMe: true, time: "Now"
+            });
+            inp.value = '';
+            renderMessages();
+        }
+
+        function toggleContextMenu(e) {
+            if (e) e.stopPropagation();
+            document.getElementById('input-menu').classList.toggle('open');
+        }
+
+        function switchChannel(name) {
+            activeChannel = name;
+            document.querySelectorAll('.channel-row').forEach(r => r.classList.remove('active'));
+            document.getElementById('active-title').innerText = '# ' + name;
+            renderMessages();
+        }
+
+        function openProfile(name, color) {
+            document.getElementById('p-name').innerText = name;
+            document.getElementById('p-avatar').innerText = name[0];
+            document.getElementById('p-avatar').style.background = color;
+            document.getElementById('p-banner').style.background = color;
+            document.getElementById('profile-modal').classList.add('open');
+        }
+
+        function closeProfile() { document.getElementById('profile-modal').classList.remove('open'); }
+
+        // Init
+        renderMessages();
+        renderMembers();
+    </script>
+</body>
+</html>

@@ -71,6 +71,68 @@ npm run dev
 
 > **Note:** Copy `backend/.env.example` to `backend/.env` and set your `DATABASE_URL` and `SECRET_KEY`, then run `alembic upgrade head` inside `backend/` to apply the schema before starting the server.
 
+### Database setup & migrations
+
+Follow these steps to configure the database, apply migrations, reset the DB for a fresh start, and run the project using either PostgreSQL (recommended) or SQLite (quick local debug).
+
+- Create a `.env` from the example and set `DATABASE_URL` and other secrets (or export `DATABASE_URL` in your shell):
+
+```bash
+cd backend
+cp .env.example .env
+# Edit .env and set DATABASE_URL, SECRET_KEY, etc.
+# Example (Postgres):
+# DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/chat
+
+# Or use SQLite for quick local debugging:
+# DATABASE_URL=sqlite+aiosqlite:///./dev.db
+```
+
+- Apply migrations (Alembic) to create the schema:
+
+```bash
+cd backend
+. .venv/bin/activate  # if using the included venv
+alembic upgrade head
+```
+
+- Reset the database (Postgres): drop & recreate the DB, or drop the public schema.
+
+```bash
+# Using psql: adjust host/user/password as required
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=postgres
+DBNAME=chat
+
+# If you can stop connections, drop & recreate the DB:
+psql -h $PGHOST -p $PGPORT -U $PGUSER -c "DROP DATABASE IF EXISTS ${DBNAME};"
+psql -h $PGHOST -p $PGPORT -U $PGUSER -c "CREATE DATABASE ${DBNAME} OWNER ${PGUSER};"
+
+# Alternatively, drop and recreate the public schema (keeps DB settings/owner):
+psql -h $PGHOST -p $PGPORT -U $PGUSER -d ${DBNAME} -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+# Re-run migrations
+alembic upgrade head
+```
+
+- Reset the database (SQLite): remove the file and re-run migrations.
+
+```bash
+# If using the SQLite URL from above
+rm -f ./dev.db
+alembic upgrade head
+```
+
+Notes on dialects and debugging
+- The project defaults to PostgreSQL in `backend/app/config.py`. For local debugging and CI tests, SQLite (`sqlite+aiosqlite`) is supported and used by the test suite.
+- Migrations include dialect-aware fixes (UUID casting for Postgres, boolean -> bitfield conversions, and Postgres-safe enum updates) so they should work with both Postgres and SQLite.
+
+Troubleshooting
+- If `DROP DATABASE` fails due to other connections, either stop those sessions or drop the public schema instead (see commands above).
+- If you see enum errors when renaming values on Postgres, ensure the migration that adds the new enum value runs with autocommit (the repo includes a Postgres-safe pattern).
+
 ### Running Tests
 
 The test suite uses an in-memory SQLite database so no external database is required.
