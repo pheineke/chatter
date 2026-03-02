@@ -150,6 +150,10 @@ export interface Message {
   attachments: Attachment[]
   reactions: Reaction[]
   mentions: MentionInfo[]
+  /** True when content is AES-GCM ciphertext (base64) encrypted with the DM shared key */
+  is_encrypted: boolean
+  /** AES-GCM nonce (base64); required when is_encrypted is true */
+  nonce: string | null
 }
 
 export interface PinnedMessage {

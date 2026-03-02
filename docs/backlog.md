@@ -253,15 +253,16 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 -   Backend: `hide_status` boolean column on `users` (migration `k3l4m5n6o7p8`). When `True`, `broadcast_presence` always sends `offline` to servers/friends; `GET /users/{id}` and member-list responses mask status as `offline` for other viewers.
 -   The user's own status indicator in their panel is unaffected (shows real status).
 
-### 8.7. End-to-End Encryption for Private DMs
--   DM messages between two users are encrypted client-side before being sent to the server, so the server never has access to plaintext content.
--   **Key exchange**: Use the X25519 Diffie-Hellman algorithm. Each client generates a persistent key pair (stored locally, e.g. in IndexedDB). The public key is published to the server and retrievable by the other party.
--   **Message encryption**: Derive a shared secret via X25519, then encrypt each message with XChaCha20-Poly1305 (or AES-GCM). A random nonce is generated per message and stored alongside the ciphertext.
--   **Server role**: The server stores and relays only ciphertext + nonce + sender public key metadata — it cannot read message content.
--   **Key verification**: Users can optionally compare key fingerprints out-of-band (shown in the DM header) to guard against server-level MITM attacks.
--   **Key rotation**: Users can regenerate their key pair in settings; old messages encrypted with the previous key become unreadable (no history re-encryption).
--   **Fallback**: If the recipient's public key is unavailable (e.g. new account, cleared storage), display a clear warning instead of sending plaintext.
--   Implement using the [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) or a well-audited library such as `libsodium.js`.
+### ~~8.7. End-to-End Encryption for Private DMs~~ ✅ Implemented
+-   DM messages are encrypted client-side with **ECDH P-256 + AES-256-GCM** (Web Crypto API). The server stores and relays only ciphertext + nonce; it never sees plaintext message content.
+-   **Key pair**: Each user generates a persistent ECDH P-256 keypair on first use. The public key (SPKI base64) is uploaded to `PUT /me/e2ee-public-key`; the private key is stored in IndexedDB (Dexie) and never leaves the device.
+-   **Encryption flow**: On DM send, `encryptForUser(partnerId, plaintext)` derives a shared AES key via ECDH, encrypts with AES-256-GCM (random nonce), and sends `{content: <ciphertext>, nonce, is_encrypted: true}` to the server. On receipt, the reverse is applied in `decryptFromUser`.
+-   **Key verification**: The DM header shows a green 🔒 badge with the first 4 bytes of the partner's SHA-256 fingerprint. Full fingerprints are visible in Settings → Privacy & Safety → End-to-End Encryption.
+-   **Key rotation**: Settings → Privacy & Safety → Rotate key pair regenerates the keypair and republishes the public key. Old messages encrypted with the previous key become unreadable.
+-   **Key backup**: Settings → Privacy & Safety → Download key backup exports a JSON backup file containing the encrypted keypair. Import backup restores it. Backup is tied to the user's ID.
+-   **QR login / key transfer**: A new device visits `/qr-login` to display a QR code containing an ephemeral ECDH public key. A trusted device (with the existing keypair) opens Settings → Privacy & Safety → Approve QR login, scans the QR, and the existing private key is encrypted with the ephemeral shared secret and sent to the new device. The server also mints a fresh token pair so the approval doubles as a login.
+-   **Backend**: Migration `r0s1t2u3v4w5` adds `qr_sessions` table, `user_e2ee_keys` table, and `is_encrypted`/`nonce` columns to `messages`. New router `app/routers/e2ee.py` handles `POST /auth/qr/challenge`, `GET /auth/qr/{id}/status`, `POST /auth/qr/{id}/approve`, `PUT /me/e2ee-public-key`, `GET /users/{id}/e2ee-public-key`.
+-   **Fallback**: If the partner has no public key, messages are sent plaintext with a console warning (no hard block to avoid locking out users whose partner hasn't set up E2EE yet).
 
 ### ~~8.8. Profile Update Rate Limiting~~ ✅ Implemented
 -   `app/utils/rate_limiter.py` — sliding-window `RateLimiter`; two shared instances: `image_limiter` (2 / 10 min) and `profile_limiter` (5 / 10 min).

@@ -10,6 +10,8 @@ const PAGE_SIZE = 50
 
 interface Props {
   channelId: string
+  /** If set, decrypt E2EE messages from this DM partner */
+  partnerId?: string
   /** Called with a msg id so parent can provide scroll-to-message capability */
   onRegisterScrollTo?: (fn: (id: string) => void) => void
   /** Reply initiator passed down from MessagePane */
@@ -25,7 +27,7 @@ function isSameAuthorAndRecent(a: Message, b: Message): boolean {
   )
 }
 
-export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds }: Props) {
+export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply, pinnedIds }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const topSentinelRef = useRef<HTMLDivElement>(null)
@@ -181,6 +183,7 @@ export function MessageList({ channelId, onRegisterScrollTo, onReply, pinnedIds 
             <MessageBubble
               message={msg}
               channelId={channelId}
+              partnerId={partnerId}
               compact={compact}
               onReply={onReply}
               onScrollToMessage={scrollToMessage}

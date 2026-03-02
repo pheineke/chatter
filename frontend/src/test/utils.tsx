@@ -87,6 +87,8 @@ export function makeMessage(
     attachments: [],
     reactions: [],
     mentions: [],
+    is_encrypted: false,
+    nonce: null,
     ...overrides,
   }
 }

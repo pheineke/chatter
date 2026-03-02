@@ -86,6 +86,16 @@ export default function LoginPage() {
             Register
           </Link>
         </p>
+
+        <div className="mt-3 border-t border-white/10 pt-3">
+          <Link
+            to="/qr-login"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded bg-discord-input hover:bg-discord-muted/20 text-sm text-discord-muted hover:text-discord-text transition-colors"
+          >
+            <Icon name="qr-code" size={16} />
+            Log in with QR code
+          </Link>
+        </div>
       </div>
     </div>
   )

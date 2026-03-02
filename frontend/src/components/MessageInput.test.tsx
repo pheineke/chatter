@@ -143,6 +143,10 @@ describe('MessageInput', () => {
       reactions: [],
       attachments: [],
       author_nickname: null,
+      is_deleted: false,
+      mentions: [],
+      is_encrypted: false,
+      nonce: null,
     }
     const user = userEvent.setup()
     render(

@@ -24,6 +24,9 @@ class Message(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     is_edited: Mapped[bool] = mapped_column(Boolean, default=False)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # E2EE: when True, `content` holds base64 AES-GCM ciphertext and `nonce` the IV
+    is_encrypted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    nonce: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

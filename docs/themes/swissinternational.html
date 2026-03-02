@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Discord - Swiss International</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================
+           1. SWISS VARIABLES
+           ========================================= */
+        :root {
+            --bg: #FFFFFF;
+            --fg: #000000;
+            --accent: #FF3B00; /* International Orange */
+            --border: 1px solid #000000;
+            --border-thick: 2px solid #000000;
+            
+            --font-main: 'Inter', sans-serif;
+            
+            /* Spacing Grid */
+            --space-s: 8px;
+            --space-m: 16px;
+            --space-l: 24px;
+            --space-xl: 40px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: var(--font-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Typography Presets */
+        .type-display { font-weight: 800; font-size: 32px; letter-spacing: -1px; text-transform: uppercase; line-height: 1; }
+        .type-h1 { font-weight: 700; font-size: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .type-h2 { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #555; }
+        .type-body { font-weight: 400; font-size: 16px; line-height: 1.4; }
+        .type-mono { font-family: 'Courier New', monospace; font-size: 13px; }
+
+        /* Icon Helper */
+        .icon-svg { width: 24px; height: 24px; stroke-width: 1.5px; fill: none; stroke: currentColor; stroke-linecap: square; stroke-linejoin: miter; }
+
+        /* Interactive Elements */
+        button { border: none; background: none; font-family: inherit; cursor: pointer; color: inherit; }
+        
+        .btn-sq {
+            width: 48px; height: 48px;
+            display: flex; align-items: center; justify-content: center;
+            border: var(--border);
+            background: white;
+            transition: 0.1s;
+        }
+        .btn-sq:active { background: var(--fg); color: var(--bg); }
+        
+        /* Utility */
+        .grid-line-b { border-bottom: var(--border); }
+        .grid-line-t { border-top: var(--border); }
+        .grid-line-l { border-left: var(--border); }
+        .grid-line-r { border-right: var(--border); }
+
+        /* =========================================
+           2. APP BAR (The "Grid Header")
+           ========================================= */
+        .app-bar {
+            height: 56px;
+            display: flex; align-items: center;
+            border-bottom: var(--border-thick);
+            background: var(--bg);
+            z-index: 20;
+        }
+        .header-btn {
+            width: 56px; height: 56px;
+            display: flex; align-items: center; justify-content: center;
+            border-right: var(--border);
+            cursor: pointer;
+        }
+        .header-btn:active { background: var(--fg); color: white; }
+        
+        .header-title {
+            flex: 1; padding: 0 16px;
+            display: flex; align-items: center;
+        }
+        .hash { color: var(--accent); margin-right: 4px; font-weight: 800; }
+
+        /* =========================================
+           3. CHAT LAYOUT
+           ========================================= */
+        .main-container {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden;
+        }
+        
+        .chat-area {
+            flex: 1; padding: 0; overflow-y: auto;
+            background-image: 
+                linear-gradient(#e5e5e5 1px, transparent 1px),
+                linear-gradient(90deg, #e5e5e5 1px, transparent 1px);
+            background-size: 40px 40px; /* Subtle grid background */
+            background-position: -1px -1px;
+        }
+
+        /* Message Blocks */
+        .msg-block {
+            display: flex;
+            border-bottom: var(--border);
+            background: var(--bg);
+        }
+        .msg-sidebar {
+            width: 56px; border-right: var(--border);
+            display: flex; justify-content: center; padding-top: 16px;
+            background: #FAFAFA;
+        }
+        .msg-content {
+            flex: 1; padding: 16px;
+            display: flex; flex-direction: column;
+        }
+        
+        .avatar-sq {
+            width: 32px; height: 32px;
+            border: var(--border);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px;
+            background: white;
+        }
+
+        .msg-header { margin-bottom: 8px; display: flex; align-items: baseline; }
+        .msg-name { font-weight: 700; text-transform: uppercase; font-size: 14px; margin-right: 12px; }
+        .msg-time { font-family: 'Courier New', monospace; font-size: 12px; color: #666; }
+        
+        /* Self Messages: High Contrast */
+        .msg-block.self { background: white; }
+        .msg-block.self .msg-name { color: var(--accent); }
+        .msg-block.self .msg-sidebar { border-right: 1px solid var(--accent); }
+        .msg-block.self .avatar-sq { border-color: var(--accent); color: var(--accent); }
+
+        /* Input Area */
+        .input-grid {
+            border-top: var(--border-thick);
+            background: var(--bg);
+            padding: 0;
+            display: flex;
+        }
+        .input-wrap { flex: 1; display: flex; align-items: center; height: 60px; }
+        
+        .input-field {
+            flex: 1; height: 100%; border: none; outline: none;
+            padding: 0 24px; font-family: var(--font-main);
+            font-size: 16px; color: var(--fg);
+            background: transparent;
+        }
+        
+        .send-btn-txt {
+            padding: 0 24px; height: 100%;
+            font-weight: 800; font-size: 14px; letter-spacing: 1px;
+            color: var(--fg); border-left: var(--border);
+            display: flex; align-items: center;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+        .send-btn-txt:active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        /* =========================================
+           4. DRAWERS (Sliding Panels)
+           ========================================= */
+        .overlay {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.8);
+            backdrop-filter: grayscale(100%); z-index: 50;
+            opacity: 0; pointer-events: none; transition: 0.2s;
+        }
+        .overlay.active { opacity: 1; pointer-events: auto; }
+
+        .drawer {
+            position: fixed; top: 0; bottom: 0; width: 300px;
+            background: var(--bg); z-index: 60;
+            transition: transform 0.3s cubic-bezier(0,0,0,1); /* Linear/Sharp feel */
+            display: flex; flex-direction: column;
+            border: var(--border-thick);
+        }
+        .drawer-left { left: 0; transform: translateX(-100%); border-left: none; }
+        .drawer-right { right: 0; transform: translateX(100%); border-right: none; }
+        .drawer.open { transform: translateX(0); }
+
+        /* Left Drawer Layout */
+        .server-col {
+            width: 72px; border-right: var(--border);
+            display: flex; flex-direction: column; align-items: center;
+            padding-top: 24px; overflow-y: auto; height: 100%;
+        }
+        .server-sq {
+            width: 48px; height: 48px; border: var(--border);
+            margin-bottom: 16px; display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 20px; cursor: pointer;
+            transition: 0.1s;
+        }
+        .server-sq:hover, .server-sq.active {
+            background: var(--fg); color: var(--bg);
+            border-color: var(--fg);
+        }
+        
+        .channel-col { flex: 1; display: flex; flex-direction: column; }
+        .drawer-header {
+            height: 56px; border-bottom: var(--border);
+            display: flex; align-items: center; padding: 0 16px;
+            background: var(--fg); color: var(--bg);
+        }
+
+        .chn-item {
+            padding: 16px 24px; border-bottom: var(--border);
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+            transition: 0.1s;
+        }
+        .chn-item:hover { background: #eee; }
+        .chn-item.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .chn-item.active .hash { color: white; }
+
+        /* Right Drawer (Members) */
+        .member-row {
+            padding: 12px 16px; border-bottom: var(--border);
+            display: flex; align-items: center; cursor: pointer;
+        }
+        .member-row:hover { background: #FAFAFA; }
+        .status-sq {
+            width: 8px; height: 8px; background: var(--fg); margin-left: auto;
+        }
+        .status-sq.online { background: #00D26A; } /* Keep green for functionality, but square */
+
+        /* =========================================
+           5. OVERLAYS (Full Screen)
+           ========================================= */
+        .fs-page {
+            position: fixed; inset: 0; background: var(--bg); z-index: 100;
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0,0,0,1);
+            display: flex; flex-direction: column;
+        }
+        .fs-page.open { transform: translateY(0); }
+        
+        .fs-header {
+            padding: 40px 24px 24px; border-bottom: var(--border-thick);
+            display: flex; justify-content: space-between; align-items: flex-end;
+        }
+        .fs-body { padding: 0; overflow-y: auto; }
+        
+        .setting-row {
+            padding: 24px; border-bottom: var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 18px; font-weight: 600; cursor: pointer;
+        }
+        .setting-row:active { background: var(--fg); color: var(--bg); }
+
+        /* Action Sheet (Bottom Menu) */
+        .action-menu {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--bg); border-top: var(--border-thick);
+            transform: translateY(100%); transition: transform 0.2s;
+            z-index: 150; display: flex; flex-direction: column;
+        }
+        .action-menu.open { transform: translateY(0); }
+        
+        .action-btn {
+            padding: 20px; text-align: center;
+            border-bottom: var(--border);
+            font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+            cursor: pointer;
+        }
+        .action-btn:active { background: var(--fg); color: white; }
+        .action-btn.danger { color: var(--accent); }
+        .action-btn.danger:active { background: var(--accent); color: white; }
+        .cancel-btn { background: #f0f0f0; border-bottom: none; }
+
+        /* Profile Modal */
+        .profile-overlay {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.9);
+            z-index: 200; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: 0.2s;
+        }
+        .profile-overlay.open { opacity: 1; pointer-events: auto; }
+        
+        .profile-box {
+            width: 320px; border: var(--border-thick); background: white;
+            box-shadow: 16px 16px 0px rgba(0,0,0,0.2); /* Brutalist shadow */
+        }
+        .p-header {
+            height: 120px; background: var(--fg); color: white;
+            padding: 24px; display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .p-details { padding: 24px; }
+        .tag-box {
+            display: inline-block; border: var(--border); padding: 4px 8px;
+            font-size: 12px; font-weight: 700; text-transform: uppercase; margin-top: 16px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="overlay" id="overlay" onclick="closeAll()"></div>
+
+    <!-- 1. HEADER -->
+    <header class="app-bar">
+        <div class="header-btn" onclick="toggleDrawer('left')">
+            <svg class="icon-svg"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </div>
+        <div class="header-title">
+            <span class="type-h1" id="header-title"><span class="hash">#</span>GENERAL</span>
+        </div>
+        <div class="header-btn" style="border-right:none; border-left:var(--border)" onclick="toggleDrawer('right')">
+            <svg class="icon-svg"><rect x="3" y="3" width="18" height="18"/><circle cx="8.5" cy="8.5" r="1.5"/><line x1="16" y1="8.5" x2="12" y2="8.5"/><line x1="16" y1="12.5" x2="8" y2="12.5"/><line x1="16" y1="16.5" x2="8" y2="16.5"/></svg>
+        </div>
+    </header>
+
+    <!-- 2. MAIN CONTENT -->
+    <main class="main-container">
+        <div class="chat-area" id="chat-feed">
+            <!-- Messages injected here -->
+        </div>
+
+        <div class="input-grid">
+            <div class="header-btn" style="border-right:var(--border)" onclick="openActionSheet(false)">
+                <svg class="icon-svg"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <div class="input-wrap">
+                <input type="text" class="input-field" id="msg-input" placeholder="TYPE MESSAGE...">
+            </div>
+            <div class="send-btn-txt" onclick="sendMessage()">SEND</div>
+        </div>
+    </main>
+
+    <!-- 3. LEFT DRAWER (Structure) -->
+    <nav class="drawer drawer-left" id="drawer-left">
+        <div style="display:flex; height:100%">
+            <!-- Server Rail -->
+            <div class="server-col">
+                <div class="server-sq active">DH</div>
+                <div class="server-sq">GR</div>
+                <div class="server-sq" style="margin-top:auto" onclick="openPage('settings-page')">
+                    <svg class="icon-svg"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </div>
+            </div>
+
+            <!-- Channels -->
+            <div class="channel-col">
+                <div class="drawer-header">
+                    <span class="type-h1">DEV HANGOUT</span>
+                </div>
+                
+                <div style="padding: 24px 24px 8px;">
+                    <span class="type-h2">INFO</span>
+                </div>
+                <div class="chn-item" onclick="switchChannel('rules')">
+                    <span class="type-body"><span class="hash">#</span> rules</span>
+                </div>
+                <div class="chn-item" onclick="switchChannel('announcements')">
+                    <span class="type-body"><span class="hash">#</span> announcements</span>
+                </div>
+
+                <div style="padding: 24px 24px 8px;">
+                    <span class="type-h2">CHANNELS</span>
+                </div>
+                <div class="chn-item active" onclick="switchChannel('general')">
+                    <span class="type-body"><span class="hash">#</span> general</span>
+                </div>
+                <div class="chn-item" onclick="switchChannel('design')">
+                    <span class="type-body"><span class="hash">#</span> design</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 4. RIGHT DRAWER (Members) -->
+    <aside class="drawer drawer-right" id="drawer-right">
+        <div class="drawer-header">
+            <span class="type-h1">MEMBERS (12)</span>
+        </div>
+        <div id="member-list-container" style="overflow-y:auto; flex:1">
+            <!-- Members Injected -->
+        </div>
+    </aside>
+
+    <!-- 5. FULL SCREEN SETTINGS -->
+    <div class="fs-page" id="settings-page">
+        <div class="fs-header">
+            <div class="type-display">SETTINGS</div>
+            <div class="header-btn" style="border:var(--border)" onclick="closeAll()">✕</div>
+        </div>
+        <div class="fs-body">
+            <div class="setting-row">
+                <span>ACCOUNT</span>
+                <span class="type-mono">EDIT -></span>
+            </div>
+            <div class="setting-row">
+                <span>APPEARANCE</span>
+                <span class="type-mono">SWISS -></span>
+            </div>
+            <div class="setting-row">
+                <span>PRIVACY</span>
+                <span class="type-mono">OPEN -></span>
+            </div>
+            <div style="padding:40px 24px">
+                <div class="type-h2">VERSION 1.0</div>
+                <div class="type-mono">SWISS_INTL_BUILD_2024</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. ACTION SHEET -->
+    <div class="action-menu" id="action-sheet">
+        <div id="sheet-content"></div>
+        <div class="action-btn cancel-btn" onclick="closeAll()">CANCEL</div>
+    </div>
+
+    <!-- 7. PROFILE MODAL -->
+    <div class="profile-overlay" id="profile-modal" onclick="closeProfile()">
+        <div class="profile-box" onclick="event.stopPropagation()">
+            <div class="p-header">
+                <div class="avatar-sq" style="border-color:white; color:var(--fg); width:48px; height:48px; font-size:24px" id="p-avatar">A</div>
+                <div class="type-display" style="font-size:24px" id="p-name">USER</div>
+            </div>
+            <div class="p-details">
+                <div class="type-h2">STATUS</div>
+                <div class="type-body" style="margin-top:4px">Online via Mobile</div>
+                
+                <div class="type-h2" style="margin-top:24px">NOTE</div>
+                <div class="type-body" style="margin-top:4px">Design is intelligence made visible.</div>
+
+                <div class="tag-box">MESSAGE</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===========================================
+        // 1. DATA
+        // ===========================================
+        const users = {
+            me: { name: "ANDROID_USER", id: "AU" },
+            bot: { name: "SYSTEM_BOT", id: "SB" },
+            friend: { name: "HELVETICA_FAN", id: "HF" }
+        };
+
+        const chatData = {
+            general: [
+                { id:1, user: users.bot, text: "SYSTEM: SWISS THEME LOADED.", time: "09:00", isMe: false },
+                { id:2, user: users.friend, text: "The grid is the only way to organize content.", time: "09:05", isMe: false },
+                { id:3, user: users.me, text: "Agreed. No shadows, just structure.", time: "09:12", isMe: true }
+            ],
+            design: [
+                { id:4, user: users.friend, text: "Kerning is a bit tight on the header.", time: "11:20", isMe: false }
+            ]
+        };
+
+        let currentChannel = 'general';
+
+        // ===========================================
+        // 2. RENDER LOGIC
+        // ===========================================
+
+        function renderMessages() {
+            const container = document.getElementById('chat-feed');
+            container.innerHTML = '';
+            
+            const msgs = chatData[currentChannel] || [];
+            
+            msgs.forEach(msg => {
+                const isMe = msg.isMe;
+                const div = document.createElement('div');
+                div.className = `msg-block ${isMe ? 'self' : ''}`;
+                
+                div.innerHTML = `
+                    <div class="msg-sidebar">
+                        <div class="avatar-sq" onclick="openProfile('${msg.user.name}')">${msg.user.name[0]}</div>
+                    </div>
+                    <div class="msg-content" 
+                         oncontextmenu="event.preventDefault(); openActionSheet(${isMe})"
+                         ontouchstart="holdStart(event, ${isMe})" ontouchend="holdEnd()">
+                        <div class="msg-header">
+                            <span class="msg-name">${msg.user.name}</span>
+                            <span class="msg-time">${msg.time}</span>
+                        </div>
+                        <div class="type-body">${msg.text}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function renderMembers() {
+            const list = document.getElementById('member-list-container');
+            const members = [users.bot, users.friend, users.me];
+            
+            list.innerHTML = members.map(m => `
+                <div class="member-row" onclick="openProfile('${m.name}')">
+                    <div class="avatar-sq" style="width:24px; height:24px; font-size:10px; margin-right:12px">${m.name[0]}</div>
+                    <span class="type-body" style="font-weight:700; font-size:14px">${m.name}</span>
+                    <div class="status-sq online"></div>
+                </div>
+            `).join('');
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const text = input.value.trim();
+            if(!text) return;
+            
+            if(!chatData[currentChannel]) chatData[currentChannel] = [];
+            chatData[currentChannel].push({
+                id: Date.now(),
+                user: users.me,
+                text: text,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                isMe: true
+            });
+            
+            input.value = '';
+            renderMessages();
+        }
+
+        function switchChannel(id) {
+            currentChannel = id;
+            document.getElementById('header-title').innerHTML = `<span class="hash">#</span>${id.toUpperCase()}`;
+            
+            // UI Update
+            document.querySelectorAll('.chn-item').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            renderMessages();
+            closeAll();
+        }
+
+        // ===========================================
+        // 3. NAVIGATION
+        // ===========================================
+        
+        const overlay = document.getElementById('overlay');
+
+        function toggleDrawer(side) {
+            const el = document.getElementById('drawer-' + side);
+            const isOpen = el.classList.contains('open');
+            closeAll(); 
+            if(!isOpen) {
+                el.classList.add('open');
+                overlay.classList.add('active');
+            }
+        }
+
+        function openPage(id) {
+            closeAll();
+            document.getElementById(id).classList.add('open');
+        }
+
+        function closeAll() {
+            document.querySelectorAll('.drawer, .fs-page, .action-menu').forEach(e => e.classList.remove('open'));
+            document.getElementById('profile-modal').classList.remove('open');
+            overlay.classList.remove('active');
+        }
+
+        // ===========================================
+        // 4. ACTION SHEET
+        // ===========================================
+        let timer;
+        function holdStart(e, isMe) {
+            timer = setTimeout(() => openActionSheet(isMe), 600);
+        }
+        function holdEnd() { clearTimeout(timer); }
+
+        function openActionSheet(isMe) {
+            if(navigator.vibrate) navigator.vibrate(50);
+            const sheet = document.getElementById('action-sheet');
+            const content = document.getElementById('sheet-content');
+            
+            let html = `
+                <div class="action-btn">COPY TEXT</div>
+                <div class="action-btn">REPLY</div>
+            `;
+            
+            if(isMe) {
+                html += `<div class="action-btn danger" onclick="closeAll()">DELETE MESSAGE</div>`;
+            } else {
+                html += `<div class="action-btn">REACT</div>`;
+            }
+            
+            content.innerHTML = html;
+            sheet.classList.add('open');
+            overlay.classList.add('active');
+        }
+
+        // ===========================================
+        // 5. PROFILE
+        // ===========================================
+        function openProfile(name) {
+            document.getElementById('p-name').innerText = name;
+            document.getElementById('p-avatar').innerText = name[0];
+            document.getElementById('profile-modal').classList.add('open');
+        }
+        function closeProfile() {
+            document.getElementById('profile-modal').classList.remove('open');
+        }
+
+        // Init
+        renderMessages();
+        renderMembers();
+
+        // Enter key
+        document.getElementById('msg-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+    </script>
+</body>
+</html>

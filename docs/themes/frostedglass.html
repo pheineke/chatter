@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Discord - Frosted Glass</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================
+           1. GLASSMISM VARIABLES
+           ========================================= */
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.65);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.4);
+            --glass-blur: blur(25px);
+            
+            --text-main: #1d1d1f;
+            --text-dim: #6e6e73;
+            --accent: #007AFF; /* Apple Blue */
+            
+            --radius-bubble: 18px;
+            --radius-card: 32px;
+            
+            --shadow-soft: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-main);
+            /* Soft Mesh Gradient Background */
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%), 
+                        radial-gradient(circle at 0% 0%, #ffdee9 0%, #b5fffc 100%);
+            background-blend-mode: screen;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Generic Icon Helper */
+        .icon-svg { width: 22px; height: 22px; stroke-width: 2px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* Glass Surface Utility */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: var(--glass-border);
+            box-shadow: var(--shadow-soft);
+        }
+
+        button { border: none; background: none; cursor: pointer; color: inherit; font-family: inherit; }
+
+        /* =========================================
+           2. HEADER
+           ========================================= */
+        .header-wrap { padding: 16px 16px 8px; z-index: 10; }
+        .app-bar {
+            height: 60px; border-radius: 20px;
+            display: flex; align-items: center; padding: 0 12px;
+        }
+        .header-title { flex: 1; text-align: center; }
+        .header-title h1 { font-size: 17px; font-weight: 700; }
+        .header-title p { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* =========================================
+           3. MAIN CHAT
+           ========================================= */
+        .main-stage {
+            flex: 1; margin: 0 16px 16px; border-radius: var(--radius-card);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .chat-scroller {
+            flex: 1; padding: 20px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 16px;
+        }
+
+        /* Message Bubbles */
+        .msg-row { display: flex; gap: 12px; align-items: flex-end; animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .avatar-glass {
+            width: 36px; height: 36px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; color: white; font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .bubble-wrap { max-width: 75%; display: flex; flex-direction: column; gap: 4px; }
+        .bubble {
+            padding: 12px 16px; border-radius: 18px 18px 18px 4px;
+            background: rgba(255, 255, 255, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            font-size: 15px; line-height: 1.4;
+        }
+        .msg-meta { font-size: 11px; color: var(--text-dim); margin-left: 4px; }
+
+        .msg-row.self { flex-direction: row-reverse; }
+        .msg-row.self .bubble {
+            background: var(--accent); color: white;
+            border-radius: 18px 18px 4px 18px;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+        }
+        .msg-row.self .msg-meta { text-align: right; margin-right: 4px; }
+
+        /* Input */
+        .input-area { padding: 12px 16px 20px; }
+        .input-pill {
+            height: 50px; border-radius: 25px;
+            display: flex; align-items: center; padding: 0 6px 0 20px;
+        }
+        .input-field {
+            flex: 1; background: transparent; border: none; outline: none;
+            font-size: 16px; font-family: inherit; color: var(--text-main);
+        }
+        .send-btn {
+            width: 38px; height: 38px; background: var(--accent); color: white;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        }
+
+        /* =========================================
+           4. DRAWERS
+           ========================================= */
+        .drawer {
+            position: fixed; top: 0; bottom: 0; width: 280px;
+            z-index: 100; transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            padding: 24px; display: flex; flex-direction: column;
+        }
+        .drawer-left { left: 0; transform: translateX(-100%); border-right: var(--glass-border); }
+        .drawer-right { right: 0; transform: translateX(100%); border-left: var(--glass-border); }
+        .drawer.open { transform: translateX(0); }
+
+        .drawer-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.1);
+            backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: 0.3s;
+            z-index: 90;
+        }
+        .drawer-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .nav-item {
+            padding: 12px 16px; border-radius: 12px; margin-bottom: 4px;
+            display: flex; align-items: center; gap: 12px; transition: 0.2s;
+            font-weight: 500; font-size: 15px; color: var(--text-dim);
+        }
+        .nav-item.active { background: rgba(255,255,255,0.5); color: var(--text-main); }
+        .nav-item:active { transform: scale(0.96); }
+
+        .server-circle {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: white; display: flex; align-items: center; justify-content: center;
+            font-weight: 700; margin-bottom: 12px; border: 2px solid transparent;
+        }
+        .server-circle.active { border-color: var(--accent); transform: scale(1.1); }
+
+        /* =========================================
+           5. OVERLAYS & MODALS
+           ========================================= */
+        .full-page {
+            position: fixed; inset: 0; z-index: 200;
+            transform: scale(1.1); opacity: 0; pointer-events: none;
+            transition: 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            padding: 40px 24px;
+        }
+        .full-page.open { transform: scale(1); opacity: 1; pointer-events: auto; }
+        
+        .profile-card {
+            max-width: 320px; margin: 100px auto; border-radius: 28px;
+            overflow: hidden; text-align: center; padding-bottom: 24px;
+        }
+        .p-avatar-lg {
+            width: 90px; height: 90px; border-radius: 24px;
+            margin: -45px auto 16px; border: 4px solid var(--glass-bg);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 32px; font-weight: 700; color: white;
+        }
+
+        .action-sheet {
+            position: fixed; bottom: 16px; left: 16px; right: 16px;
+            border-radius: 24px; padding: 8px; z-index: 250;
+            transform: translateY(120%); transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .action-sheet.open { transform: translateY(0); }
+        .sheet-btn {
+            padding: 16px; text-align: center; border-radius: 16px;
+            font-weight: 500; font-size: 17px;
+        }
+        .sheet-btn:active { background: rgba(0,0,0,0.05); }
+        .sheet-btn.danger { color: #FF3B30; }
+
+    </style>
+</head>
+<body>
+
+    <div class="drawer-overlay" id="overlay" onclick="closeAll()"></div>
+
+    <!-- 1. HEADER -->
+    <div class="header-wrap">
+        <header class="app-bar glass">
+            <button onclick="toggleDrawer('left')">
+                <svg class="icon-svg"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <div class="header-title">
+                <p>Chatting in</p>
+                <h1 id="header-chan"># general</h1>
+            </div>
+            <button onclick="toggleDrawer('right')">
+                <svg class="icon-svg"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </button>
+        </header>
+    </div>
+
+    <!-- 2. MAIN CHAT AREA -->
+    <main class="main-stage glass">
+        <div class="chat-scroller" id="chat-feed">
+            <!-- Messages Injected -->
+        </div>
+
+        <div class="input-area">
+            <div class="input-pill glass">
+                <button style="margin-right:12px; color:var(--text-dim)" onclick="openActionSheet(false)">
+                    <svg class="icon-svg"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </button>
+                <input type="text" class="input-field" id="msg-input" placeholder="Message #general">
+                <button class="send-btn" onclick="sendMessage()">
+                    <svg class="icon-svg" style="width:18px; height:18px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- 3. LEFT DRAWER (SERVERS) -->
+    <nav class="drawer drawer-left glass" id="drawer-left">
+        <div style="display:flex; gap:20px; height:100%">
+            <!-- Icons -->
+            <div style="width:50px; display:flex; flex-direction:column; align-items:center;">
+                <div class="server-circle active">DH</div>
+                <div class="server-circle" style="background:#E91E63; color:white">G</div>
+                <div style="flex:1"></div>
+                <div class="server-circle" onclick="openPage('settings-page')">
+                    <svg class="icon-svg" style="stroke: #333;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </div>
+            </div>
+            <!-- Channels -->
+            <div style="flex:1">
+                <h2 style="font-size:20px; margin-bottom:20px">Dev Hangout</h2>
+                <div class="nav-item active" onclick="switchChannel('general')"># general</div>
+                <div class="nav-item" onclick="switchChannel('design')"># design-talk</div>
+                <div class="nav-item" onclick="switchChannel('memes')"># memes</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 4. RIGHT DRAWER (MEMBERS) -->
+    <aside class="drawer drawer-right glass" id="drawer-right">
+        <h3 style="font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:16px">Online — 3</h3>
+        <div id="member-list">
+            <!-- Injected -->
+        </div>
+    </aside>
+
+    <!-- 5. SETTINGS -->
+    <div class="full-page glass" id="settings-page">
+        <div style="max-width:500px; margin:0 auto">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:32px">
+                <h2 style="font-size:32px; font-weight:700">Settings</h2>
+                <button onclick="closeAll()" style="font-size:17px; color:var(--accent); font-weight:600">Done</button>
+            </div>
+            <div class="glass" style="border-radius:16px; overflow:hidden">
+                <div style="padding:16px; border-bottom:var(--glass-border); display:flex; justify-content:space-between">
+                    <span>Account</span>
+                    <span style="color:var(--text-dim)">Android User ></span>
+                </div>
+                <div style="padding:16px; border-bottom:var(--glass-border); display:flex; justify-content:space-between">
+                    <span>Notifications</span>
+                    <span style="color:var(--text-dim)">On ></span>
+                </div>
+                <div style="padding:16px; display:flex; justify-content:space-between">
+                    <span>Appearance</span>
+                    <span style="color:var(--text-dim)">Glass ></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. ACTION SHEET -->
+    <div class="action-sheet glass" id="action-sheet">
+        <div class="sheet-btn" style="border-bottom:var(--glass-border)">Copy Message</div>
+        <div class="sheet-btn" style="border-bottom:var(--glass-border)">Reply</div>
+        <div id="sheet-owner-options"></div>
+        <div class="sheet-btn" style="color:var(--accent); font-weight:700; margin-top:8px" onclick="closeAll()">Cancel</div>
+    </div>
+
+    <!-- 7. PROFILE -->
+    <div class="full-page" id="profile-modal" onclick="closeAll()" style="background:rgba(0,0,0,0.2); backdrop-filter:blur(10px)">
+        <div class="profile-card glass" onclick="event.stopPropagation()">
+            <div style="height:100px; background:var(--accent)"></div>
+            <div class="p-avatar-lg" id="p-avatar">A</div>
+            <h2 id="p-name" style="font-size:24px">User Name</h2>
+            <p style="color:var(--text-dim); margin-bottom:20px">Active Now</p>
+            <div style="padding: 0 24px">
+                <button class="sheet-btn" style="background:var(--accent); color:white; width:100%; border-radius:12px">Send Message</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const users = {
+            me: { name: "You", color: "#007AFF" },
+            bot: { name: "GlassBot", color: "#5856D6" },
+            friend: { name: "AppleFan", color: "#FF2D55" }
+        };
+
+        const chatData = {
+            general: [
+                { user: users.bot, text: "Look at the background blur on this bubble! 🫧", isMe: false, time: "9:41 AM" },
+                { user: users.me, text: "It looks very premium. Very iOS-like.", isMe: true, time: "9:42 AM" }
+            ],
+            design: [
+                { user: users.friend, text: "The backdrop-filter CSS property is magic.", isMe: false, time: "10:15 AM" }
+            ]
+        };
+
+        let currentChannel = 'general';
+
+        function renderMessages() {
+            const feed = document.getElementById('chat-feed');
+            feed.innerHTML = '';
+            (chatData[currentChannel] || []).forEach(msg => {
+                feed.innerHTML += `
+                    <div class="msg-row ${msg.isMe ? 'self' : ''}">
+                        ${!msg.isMe ? `<div class="avatar-glass" style="background:${msg.user.color}" onclick="openProfile('${msg.user.name}', '${msg.user.color}')">${msg.user.name[0]}</div>` : ''}
+                        <div class="bubble-wrap">
+                            <div class="bubble">${msg.text}</div>
+                            <div class="msg-meta">${msg.user.name} • ${msg.time}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        function renderMembers() {
+            const list = document.getElementById('member-list');
+            list.innerHTML = Object.values(users).map(u => `
+                <div class="nav-item" onclick="openProfile('${u.name}', '${u.color}')">
+                    <div class="avatar-glass" style="background:${u.color}; width:28px; height:28px; font-size:12px">${u.name[0]}</div>
+                    ${u.name}
+                </div>
+            `).join('');
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            if(!input.value.trim()) return;
+            chatData[currentChannel].push({ user: users.me, text: input.value, isMe: true, time: "Now" });
+            input.value = '';
+            renderMessages();
+        }
+
+        function toggleDrawer(side) {
+            const el = document.getElementById('drawer-' + side);
+            const isOpen = el.classList.contains('open');
+            closeAll();
+            if(!isOpen) {
+                el.classList.add('open');
+                document.getElementById('overlay').classList.add('active');
+            }
+        }
+
+        function openPage(id) {
+            closeAll();
+            document.getElementById(id).classList.add('open');
+        }
+
+        function closeAll() {
+            document.querySelectorAll('.drawer, .full-page, .action-sheet').forEach(e => e.classList.remove('open'));
+            document.getElementById('overlay').classList.remove('active');
+        }
+
+        function openActionSheet(isMe) {
+            const sheet = document.getElementById('action-sheet');
+            const ownerArea = document.getElementById('sheet-owner-options');
+            ownerArea.innerHTML = isMe ? `<div class="sheet-btn danger">Delete Message</div>` : '';
+            sheet.classList.add('open');
+            document.getElementById('overlay').classList.add('active');
+        }
+
+        function openProfile(name, color) {
+            document.getElementById('p-name').innerText = name;
+            document.getElementById('p-avatar').innerText = name[0];
+            document.getElementById('p-avatar').style.background = color;
+            document.getElementById('profile-modal').classList.add('open');
+        }
+
+        function switchChannel(name) {
+            currentChannel = name;
+            document.getElementById('header-chan').innerText = '# ' + name;
+            renderMessages();
+            closeAll();
+        }
+
+        renderMessages();
+        renderMembers();
+        
+        document.getElementById('msg-input').onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+    </script>
+</body>
+</html>

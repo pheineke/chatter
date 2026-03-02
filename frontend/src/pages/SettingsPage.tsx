@@ -14,6 +14,8 @@ import { getSessions, revokeSession, revokeAllOtherSessions, type Session } from
 import { getTokens, createToken, revokeToken, type ApiToken, type ApiTokenCreated } from '../api/tokens'
 import { AVATAR_FRAMES } from '../utils/avatarFrames'
 import { getMyDecorations, redeemDecorationCode } from '../api/decorations'
+import { useE2EE } from '../contexts/E2EEContext'
+import { QRScanner } from '../components/QRScanner'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications' | 'tokens'
 
@@ -880,6 +882,12 @@ function PrivacyTab() {
   const { user, refreshUser } = useAuth()
   const qc = useQueryClient()
   const { blockedUsers, unblock } = useBlocks()
+  const e2ee = useE2EE()
+  const [showQRScanner, setShowQRScanner] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [rotateConfirm, setRotateConfirm] = useState(false)
+  const [rotateLoading, setRotateLoading] = useState(false)
+  const backupImportRef = useRef<HTMLInputElement>(null)
 
   const updateMut = useMutation({
     mutationFn: (patch: any) => updateMe(patch),
@@ -962,6 +970,112 @@ function PrivacyTab() {
           </div>
         )}
       </div>
+
+      {/* E2EE section */}
+      <div className="bg-discord-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-discord-muted uppercase mb-3">End-to-End Encryption</div>
+
+        {e2ee.initialising ? (
+          <p className="text-sm text-discord-muted">Initialising encryption keys…</p>
+        ) : !e2ee.isEnabled ? (
+          <p className="text-sm text-discord-muted">Encryption keys not available on this device.</p>
+        ) : (
+          <div className="space-y-4">
+            {/* Fingerprint */}
+            <div className="rounded bg-discord-bg p-3">
+              <div className="text-xs text-discord-muted mb-1">Your key fingerprint</div>
+              <code className="text-xs font-mono text-green-400 break-all select-all">{e2ee.fingerprint ?? '—'}</code>
+              <p className="text-xs text-discord-muted mt-1">Compare this with the other person's view in a DM to verify your connection.</p>
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Download backup */}
+              <button
+                onClick={() => e2ee.downloadBackup(user?.username ?? 'chatter')}
+                className="flex items-center gap-2 px-3 py-2 rounded bg-discord-input hover:bg-discord-muted/20 transition-colors text-sm"
+              >
+                <Icon name="download" size={16} />
+                Download key backup
+              </button>
+
+              {/* Import backup */}
+              <button
+                onClick={() => { setImportError(null); backupImportRef.current?.click() }}
+                className="flex items-center gap-2 px-3 py-2 rounded bg-discord-input hover:bg-discord-muted/20 transition-colors text-sm"
+              >
+                <Icon name="cloud-upload" size={16} />
+                Import key backup
+              </button>
+              <input
+                ref={backupImportRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setImportError(null)
+                  try {
+                    const text = await file.text()
+                    const backup = JSON.parse(text)
+                    await e2ee.importBackup(backup)
+                  } catch {
+                    setImportError('Invalid backup file or could not restore keys.')
+                  }
+                  e.target.value = ''
+                }}
+              />
+
+              {/* Scan QR (trust transfer) */}
+              <button
+                onClick={() => setShowQRScanner(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded bg-discord-input hover:bg-discord-muted/20 transition-colors text-sm"
+              >
+                <Icon name="qr-code" size={16} />
+                Approve QR login
+              </button>
+
+              {/* Rotate key */}
+              {!rotateConfirm ? (
+                <button
+                  onClick={() => setRotateConfirm(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded bg-discord-input hover:bg-red-500/20 hover:text-red-400 transition-colors text-sm"
+                >
+                  <Icon name="refresh" size={16} />
+                  Rotate key pair
+                </button>
+              ) : (
+                <div className="col-span-full flex items-center gap-2 p-3 rounded bg-red-500/10 border border-red-500/30">
+                  <p className="text-sm text-red-400 flex-1">This will break decryption of old messages. Continue?</p>
+                  <button
+                    disabled={rotateLoading}
+                    onClick={async () => {
+                      setRotateLoading(true)
+                      await e2ee.rotateKeyPair()
+                      setRotateLoading(false)
+                      setRotateConfirm(false)
+                    }}
+                    className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+                  >
+                    {rotateLoading ? 'Rotating…' : 'Confirm'}
+                  </button>
+                  <button onClick={() => setRotateConfirm(false)} className="px-3 py-1 rounded bg-discord-input hover:bg-discord-muted/20 text-xs transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {importError && (
+              <p className="text-xs text-red-400">{importError}</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* QR Scanner modal */}
+      {showQRScanner && <QRScanner onClose={() => setShowQRScanner(false)} />}
     </div>
   )
 }

@@ -4,10 +4,12 @@ import { UnreadChannelsProvider } from './contexts/UnreadChannelsContext'
 import { DesktopNotificationsProvider } from './contexts/DesktopNotificationsContext'
 import { RequireAuth } from './components/RequireAuth'
 import { ReloadPrompt } from './components/ReloadPrompt'
+import { E2EEWrapper } from './components/E2EEWrapper'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import AppShell from './pages/AppShell'
 import InvitePage from './pages/InvitePage'
+import QRLoginPage from './pages/QRLoginPage'
 
 export default function App() {
   return (
@@ -18,12 +20,15 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/qr-login" element={<QRLoginPage />} />
             <Route path="/invite/:code" element={<RequireAuth><InvitePage /></RequireAuth>} />
             <Route
               path="/channels/*"
               element={
                 <RequireAuth>
-                  <AppShell />
+                  <E2EEWrapper>
+                    <AppShell />
+                  </E2EEWrapper>
                 </RequireAuth>
               }
             />

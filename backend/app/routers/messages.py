@@ -343,6 +343,8 @@ async def send_message(
         author_id=current_user.id,
         content=body.content,
         reply_to_id=body.reply_to_id,
+        is_encrypted=body.is_encrypted,
+        nonce=body.nonce,
     )
     db.add(msg)
     await db.flush()

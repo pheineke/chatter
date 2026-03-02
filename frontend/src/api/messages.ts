@@ -8,10 +8,17 @@ export async function getMessages(channelId: string, before?: string, limit = 50
   return data
 }
 
-export async function sendMessage(channelId: string, content: string | null, replyToId?: string): Promise<Message> {
+export async function sendMessage(
+  channelId: string,
+  content: string | null,
+  replyToId?: string,
+  encrypted?: { ciphertext: string; nonce: string },
+): Promise<Message> {
   const { data } = await client.post<Message>(`/channels/${channelId}/messages`, {
-    content: content || null,
+    content: encrypted ? encrypted.ciphertext : content || null,
     reply_to_id: replyToId ?? null,
+    is_encrypted: !!encrypted,
+    nonce: encrypted?.nonce ?? null,
   })
   return data
 }

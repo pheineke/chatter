@@ -13,10 +13,13 @@ import { useBlocks } from '../hooks/useBlocks'
 import { MarkdownContent } from './MarkdownContent'
 import { LinkEmbed } from './LinkEmbed'
 import { extractURLs, getDismissed } from '../utils/embeds'
+import { useE2EE } from '../contexts/E2EEContext'
 
 interface Props {
   message: Message
   channelId: string
+  /** If this is a DM channel, pass the partner's userId so we can decrypt */
+  partnerId?: string
   /** If true, collapse the header (same author, within 7 min of previous) */
   compact?: boolean
   /** Called when the user clicks Reply on this message */
@@ -40,10 +43,11 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function MessageBubble({ message: msg, channelId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
+export function MessageBubble({ message: msg, channelId, partnerId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
   const { user } = useAuth()
   const { blockedIds } = useBlocks()
   const qc = useQueryClient()
+  const e2ee = useE2EE()
   const isOwn = user?.id === msg.author.id
   const [showBlocked, setShowBlocked] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -55,6 +59,34 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
   const [cardPos, setCardPos] = useState<{ x: number; y: number } | null>(null)
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  // E2EE: decrypt the message content if it was sent encrypted
+  const [decryptedContent, setDecryptedContent] = useState<string | null>(null)
+  const [decryptFailed, setDecryptFailed] = useState(false)
+
+  useEffect(() => {
+    if (!msg.is_encrypted || !msg.content || !msg.nonce) return
+
+    // Determine who the other party is: if I sent it, they are the DM partner; if they sent it, they are the author
+    const otherId = isOwn ? partnerId : msg.author.id
+    if (!otherId || !e2ee.isEnabled) {
+      setDecryptFailed(true)
+      return
+    }
+
+    let cancelled = false
+    e2ee.decryptFromUser(otherId, msg.content, msg.nonce).then(plain => {
+      if (cancelled) return
+      if (plain === null) setDecryptFailed(true)
+      else setDecryptedContent(plain)
+    })
+    return () => { cancelled = true }
+  }, [msg.id, msg.is_encrypted, msg.content, msg.nonce, isOwn, partnerId, e2ee])
+
+  // Effective display content: decrypted (if E2EE), otherwise raw
+  const displayContent = msg.is_encrypted
+    ? (decryptFailed ? null : decryptedContent)
+    : msg.content
 
   const pinMut = useMutation({
     mutationFn: () => isPinned ? unpinMessage(channelId, msg.id) : pinMessage(channelId, msg.id),
@@ -187,16 +219,34 @@ export function MessageBubble({ message: msg, channelId, compact = false, onRepl
           </div>
         ) : (
           <div className="text-sm text-discord-text break-words leading-relaxed">
-            {msg.content && <MarkdownContent text={msg.content} />}
+            {msg.is_encrypted && !decryptedContent && !decryptFailed && (
+              <span className="text-discord-muted italic text-xs flex items-center gap-1">
+                <Icon name="lock" size={11} />
+                Decrypting…
+              </span>
+            )}
+            {msg.is_encrypted && decryptFailed && (
+              <span className="text-red-400 italic text-xs flex items-center gap-1">
+                <Icon name="lock" size={11} />
+                Could not decrypt message (key mismatch or missing)
+              </span>
+            )}
+            {displayContent && <MarkdownContent text={displayContent} />}
           </div>
         )}
         {msg.is_edited && (
           <span className="text-[11px] text-discord-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
         )}
+        {msg.is_encrypted && decryptedContent && (
+          <span className="text-[10px] text-discord-online/60 ml-1 select-none flex items-center gap-0.5 inline-flex">
+            <Icon name="lock" size={9} />
+            E2EE
+          </span>
+        )}
 
         {/* URL / image embeds */}
-        {!editing && msg.content && (() => {
-          const urls = extractURLs(msg.content)
+        {!editing && displayContent && (() => {
+          const urls = extractURLs(displayContent)
           if (urls.length === 0) return null
           return (
             <div className="flex flex-col items-start gap-1">

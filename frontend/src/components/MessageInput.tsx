@@ -6,6 +6,7 @@ import { getMembers } from '../api/servers'
 import { Icon } from './Icon'
 import { EmojiPicker } from './EmojiPicker'
 import { UserAvatar } from './UserAvatar'
+import { useE2EE } from '../contexts/E2EEContext'
 import type { Message, Member } from '../api/types'
 
 const TYPING_THROTTLE_MS = 8_000  // retransmit at most every 8s while typing (Discord-style)
@@ -13,6 +14,8 @@ const TYPING_THROTTLE_MS = 8_000  // retransmit at most every 8s while typing (D
 interface Props {
   channelId: string
   serverId?: string
+  /** If set, messages to this DM channel will be end-to-end encrypted */
+  partnerId?: string
   placeholder?: string
   replyTo?: Message | null
   onCancelReply?: () => void
@@ -36,7 +39,7 @@ function findMentionTrigger(text: string, cursorPos: number): { query: string; t
   return { query: query.toLowerCase(), triggerStart: i }
 }
 
-export function MessageInput({ channelId, serverId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping, slowmodeDelay = 0 }: Props) {
+export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping, slowmodeDelay = 0 }: Props) {
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -44,6 +47,7 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const qc = useQueryClient()
   const lastTypingSent = useRef(0)
+  const e2ee = useE2EE()
 
   // Cooldown state: timestamp (ms) when the user is allowed to send again
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
@@ -106,7 +110,17 @@ export function MessageInput({ channelId, serverId, placeholder = 'Send a messag
   }, [replyTo])
 
   const sendMut = useMutation({
-    mutationFn: (content: string) => sendMessage(channelId, content, replyTo?.id),
+    mutationFn: async (content: string) => {
+      // Encrypt DM messages if E2EE is ready and a partnerId is supplied
+      if (partnerId && e2ee.isEnabled) {
+        const encrypted = await e2ee.encryptForUser(partnerId, content)
+        if (encrypted) {
+          return sendMessage(channelId, null, replyTo?.id, encrypted)
+        }
+        // Fall through to plaintext if partner has no public key
+      }
+      return sendMessage(channelId, content, replyTo?.id)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['messages', channelId] })
       onCancelReply?.()

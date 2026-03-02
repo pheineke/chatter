@@ -6,6 +6,8 @@ interface AuthContextValue {
   user: User | null
   loading: boolean
   login: (username: string, password: string) => Promise<void>
+  /** Authenticate using a pre-issued token pair (e.g. from QR login). */
+  loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>
   register: (username: string, password: string) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
@@ -61,6 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refreshUser()
   }
 
+  const loginWithTokens = async (accessToken: string, refreshToken: string) => {
+    localStorage.setItem('token', accessToken)
+    localStorage.setItem('refreshToken', refreshToken)
+    await refreshUser()
+  }
+
   const register = async (username: string, password: string) => {
     await apiRegister(username, password)
   }
@@ -77,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithTokens, register, logout, refreshUser, updateUser }}>
       {children}
     </AuthContext.Provider>
   )
