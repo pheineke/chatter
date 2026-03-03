@@ -67,12 +67,20 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
   useEffect(() => {
     if (!msg.is_encrypted || !msg.content || !msg.nonce) return
 
+    // Wait for E2EE to finish initialising — avoid a permanent decryptFailed flag
+    // while keys are still loading on first mount.
+    if (e2ee.initialising) return
+
     // Determine who the other party is: if I sent it, they are the DM partner; if they sent it, they are the author
     const otherId = isOwn ? partnerId : msg.author.id
     if (!otherId || !e2ee.isEnabled) {
       setDecryptFailed(true)
       return
     }
+
+    // Reset on every retry so a previous false-fail doesn't persist
+    setDecryptFailed(false)
+    setDecryptedContent(null)
 
     let cancelled = false
     e2ee.decryptFromUser(otherId, msg.content, msg.nonce).then(plain => {
