@@ -80,7 +80,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
       <div className="flex items-center gap-0 px-4 py-3 border-b border-black/20 shadow-sm shrink-0 space-x-1">
         {onOpenNav && (
           <button
-            className="md:hidden p-1 -ml-1 mr-3 text-discord-muted hover:text-discord-text shrink-0"
+            className="md:hidden p-1 -ml-1 mr-3 text-sp-muted hover:text-sp-text shrink-0"
             onClick={onOpenNav}
             aria-label="Open navigation"
           >
@@ -93,7 +93,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
             key={t}
             onClick={() => setTab(t)}
             className={`px-3 py-1 rounded text-sm capitalize transition-colors relative
-              ${tab === t ? 'bg-discord-input text-discord-text' : 'text-discord-muted hover:bg-discord-input/60 hover:text-discord-text'}`}
+              ${tab === t ? 'bg-sp-input text-sp-text' : 'text-sp-muted hover:bg-sp-input/60 hover:text-sp-text'}`}
           >
             {t}
             {t === 'pending' && incoming.length > 0 && (
@@ -109,7 +109,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
         {tab === 'add' ? (
           <div className="max-w-md">
             <h3 className="font-semibold mb-1">Add Friend</h3>
-            <p className="text-sm text-discord-muted mb-3">You can add friends with their username or user ID.</p>
+            <p className="text-sm text-sp-muted mb-3">You can add friends with their username or user ID.</p>
             <div className="flex gap-2">
               <input
                 autoFocus
@@ -130,17 +130,17 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
           <div className="space-y-2">
             {incoming.length > 0 && (
               <>
-                <p className="text-xs uppercase font-semibold text-discord-muted mb-2">Incoming — {incoming.length}</p>
+                <p className="text-xs uppercase font-semibold text-sp-muted mb-2">Incoming — {incoming.length}</p>
                 {incoming.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group">
+                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group">
                     <UserAvatar user={r.sender} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{r.sender.username}</p>
-                      <p className="text-xs text-discord-muted">Incoming Friend Request</p>
+                      <p className="text-xs text-sp-muted">Incoming Friend Request</p>
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => acceptMut.mutate(r.id)} className="btn text-sm py-1 px-3" title="Accept"><Icon name="checkmark-circle" size={16} /></button>
-                      <button onClick={() => declineMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-discord-input hover:bg-red-500" title="Decline"><Icon name="close-circle" size={16} /></button>
+                      <button onClick={() => declineMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-sp-input hover:bg-red-500" title="Decline"><Icon name="close-circle" size={16} /></button>
                     </div>
                   </div>
                 ))}
@@ -148,38 +148,38 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
             )}
             {outgoing.length > 0 && (
               <>
-                <p className="text-xs uppercase font-semibold text-discord-muted mt-4 mb-2">Outgoing — {outgoing.length}</p>
+                <p className="text-xs uppercase font-semibold text-sp-muted mt-4 mb-2">Outgoing — {outgoing.length}</p>
                 {outgoing.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group">
+                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group">
                     <UserAvatar user={r.recipient} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{r.recipient.username}</p>
-                      <p className="text-xs text-discord-muted">Outgoing Friend Request</p>
+                      <p className="text-xs text-sp-muted">Outgoing Friend Request</p>
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => cancelMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-discord-input hover:bg-red-500" title="Cancel"><Icon name="close-circle" size={16} /></button>
+                      <button onClick={() => cancelMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-sp-input hover:bg-red-500" title="Cancel"><Icon name="close-circle" size={16} /></button>
                     </div>
                   </div>
                 ))}
               </>
             )}
             {incoming.length === 0 && outgoing.length === 0 && (
-              <p className="text-sm text-discord-muted">No pending friend requests.</p>
+              <p className="text-sm text-sp-muted">No pending friend requests.</p>
             )}
           </div>
         ) : (
           <div className="space-y-1">
-            <p className="text-xs uppercase font-semibold text-discord-muted mb-2">
+            <p className="text-xs uppercase font-semibold text-sp-muted mb-2">
               {tab === 'online' ? 'Online' : 'All Friends'} — {displayed.length}
             </p>
             {displayed.map((f) => (
-              <div key={f.user.id} data-avatar-ring className="flex items-center gap-3 p-2 rounded hover:bg-discord-input/40 group cursor-pointer"
+              <div key={f.user.id} data-avatar-ring className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group cursor-pointer"
                 style={{ '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#26272c' } as React.CSSProperties}
                 onClick={() => navigate(`/channels/@me/${f.user.id}`)}>
                 <AvatarWithStatus user={f.user} size={40} ringColor="#1a1a1e" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm">{f.user.username}</p>
-                  <p className="text-xs text-discord-muted capitalize">{
+                  <p className="text-xs text-sp-muted capitalize">{
                     f.user.status === 'away' ? 'Away' :
                     f.user.status === 'dnd' ? 'Do Not Disturb' :
                     f.user.status === 'online' ? 'Online' : 'Offline'
@@ -187,7 +187,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
                 </div>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={(e) => { e.stopPropagation(); navigate(`/channels/@me/${f.user.id}`) }} className="btn text-sm py-1 px-3" title="Message"><Icon name="message-circle" size={16} /></button>
-                  <button onClick={(e) => { e.stopPropagation(); removeMut.mutate(f.user.id) }} className="btn text-sm py-1 px-2 bg-discord-input hover:bg-red-500" title="Remove"><Icon name="close" size={16} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); removeMut.mutate(f.user.id) }} className="btn text-sm py-1 px-2 bg-sp-input hover:bg-red-500" title="Remove"><Icon name="close" size={16} /></button>
                 </div>
               </div>
             ))}

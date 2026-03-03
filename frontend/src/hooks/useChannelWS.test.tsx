@@ -25,15 +25,20 @@ function makeMsg(overrides: Partial<Message> = {}): Message {
   return {
     id: 'msg-1',
     channel_id: 'chan-1',
-    author: { id: 'u1', username: 'alice', status: 'online', avatar: null, banner: null, bio: '', display_name: null, preferred_status: null, hide_status: false },
+    author: { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' },
     content: 'hello',
     created_at: '2024-01-01T00:00:00Z',
     edited_at: null,
-    is_pinned: false,
     reply_to: null,
     reply_to_id: null,
     reactions: [],
     attachments: [],
+    author_nickname: null,
+    is_deleted: false,
+    is_edited: false,
+    mentions: [],
+    is_encrypted: false,
+    nonce: null,
     ...overrides,
   }
 }

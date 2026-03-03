@@ -9,10 +9,13 @@ const makeUser = (overrides: Partial<User> = {}): User => ({
   status: 'online',
   avatar: null,
   banner: null,
-  bio: '',
-  display_name: null,
-  preferred_status: null,
+  avatar_decoration: null,
+  description: null,
+  pronouns: null,
+  dm_permission: 'everyone' as const,
+  preferred_status: 'online' as const,
   hide_status: false,
+  created_at: '',
   ...overrides,
 })
 

@@ -17,7 +17,7 @@ const mockLogin = usersApi.login as ReturnType<typeof vi.fn>
 const mockRegister = usersApi.register as ReturnType<typeof vi.fn>
 const mockLogout = usersApi.logout as ReturnType<typeof vi.fn>
 
-const fakeUser = { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, bio: '', display_name: null, preferred_status: null, hide_status: false }
+const fakeUser = { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' }
 
 /** Small consumer component so we can test the hook */
 function Consumer() {
@@ -26,11 +26,11 @@ function Consumer() {
     <div>
       {loading && <span data-testid="loading">loading</span>}
       {user && <span data-testid="username">{user.username}</span>}
-      {user && <span data-testid="bio">{user.bio}</span>}
+      {user && <span data-testid="bio">{user.description}</span>}
       <button onClick={() => login('alice', 'pw')}>login</button>
       <button onClick={() => register('alice', 'pw')}>register</button>
       <button onClick={logout}>logout</button>
-      <button onClick={() => updateUser({ bio: 'updated bio' })}>update</button>
+      <button onClick={() => updateUser({ description: 'updated bio' })}>update</button>
     </div>
   )
 }

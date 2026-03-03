@@ -29,8 +29,10 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
           navigate(last ? `/channels/${server.id}/${last}` : `/channels/${server.id}`)
         }}
         onContextMenu={onContextMenu}
-        className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-150 select-none
-          ${active ? 'rounded-2xl bg-discord-mention text-white' : 'bg-discord-input text-discord-text hover:rounded-2xl hover:bg-discord-mention hover:text-white'}`}
+        className={`w-12 h-12 flex items-center justify-center text-sm font-bold transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] select-none shadow-sm
+          ${active 
+            ? 'rounded-[12px] bg-sp-primary text-sp-on-primary shadow-sp-2 scale-105' 
+            : 'rounded-[24px] bg-sp-surface-variant text-sp-on-surface hover:rounded-[12px] hover:bg-sp-primary/20 hover:text-sp-primary hover:shadow-sp-2 hover:scale-105'}`}
       >
         {server.image ? (
           <img src={`/api/static/${server.image}`} alt={server.title} className="w-full h-full rounded-[inherit] object-cover" />
@@ -39,11 +41,11 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
         )}
       </button>
       {hasUnread && !active && (
-        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-white border-2 border-discord-servers pointer-events-none" />
+        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-white border-2 border-sp-servers pointer-events-none" />
       )}
       {isMuted && (
-        <span className="absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full bg-discord-servers flex items-center justify-center pointer-events-none">
-          <Icon name="bell-off" size={10} className="text-discord-muted" />
+        <span className="absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full bg-sp-servers flex items-center justify-center pointer-events-none">
+          <Icon name="bell-off" size={10} className="text-sp-muted" />
         </span>
       )}
     </div>
@@ -98,22 +100,22 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
   })
 
   return (
-    <div className="flex flex-col items-center gap-2 py-3 w-[72px] bg-discord-servers overflow-y-auto scrollbar-none border-r-2 border-discord-divider">
+    <div className="flex flex-col items-center gap-2 py-3 w-[72px] bg-sp-servers overflow-y-auto scrollbar-none border-r border-sp-divider/60">
       {/* DMs */}
       <div className="relative">
         <button
           title="Direct Messages"
           onClick={() => navigate('/channels/@me')}
-          className={`w-12 h-12 rounded-full flex items-center justify-center bg-discord-sidebar hover:rounded-2xl hover:bg-discord-mention transition-all text-discord-mention hover:text-white text-xl font-bold`}
+          className={`w-12 h-12 rounded-full flex items-center justify-center bg-sp-input hover:bg-sp-hover transition-all shadow-sp-1 hover:shadow-sp-2 hover:scale-105 text-sp-mention text-xl font-bold`}
         >
           <Icon name="message-circle" size={24} />
         </button>
         {hasUnreadDMs && (
-          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-discord-online border-2 border-discord-servers" />
+          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-sp-online border-2 border-sp-servers" />
         )}
       </div>
 
-      <div className="w-8 h-px bg-discord-input" />
+      <div className="w-8 h-px bg-sp-divider/60" />
 
       {servers.map((s) => (
         <ServerIcon
@@ -129,13 +131,13 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
         />
       ))}
 
-      <div className="w-8 h-px bg-discord-input" />
+      <div className="w-8 h-px bg-sp-divider/60" />
 
       {/* Add / Join server */}
       <button
         title="Create or Join Server"
         onClick={() => setShowCreate(true)}
-        className="w-12 h-12 rounded-full bg-discord-input hover:rounded-2xl hover:bg-green-500 transition-all flex items-center justify-center text-green-400 hover:text-white"
+        className="w-12 h-12 rounded-full bg-sp-input hover:bg-sp-hover transition-all shadow-sp-1 hover:shadow-sp-2 hover:scale-105 flex items-center justify-center text-sp-mention"
       >
         <Icon name="plus" size={24} />
       </button>
@@ -205,7 +207,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
       {/* Join server modal */}
       {showJoin && (
         <Modal title="Join Server" onClose={() => setShowJoin(false)}>
-          <p className="text-sm text-discord-muted mb-3">Paste an invite link or code below.</p>
+          <p className="text-sm text-sp-muted mb-3">Paste an invite link or code below.</p>
           <input
             autoFocus
             className="input w-full mb-2"
@@ -227,7 +229,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
 function Modal({ title, onClose, children, className = 'w-80' }: { title: string; onClose: () => void; children: React.ReactNode; className?: string }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
-      <div className={`bg-discord-sidebar rounded-lg p-6 ${className}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`bg-sp-popup border border-sp-divider/60 rounded-sp-xl p-6 ${className}`} style={{ boxShadow: 'var(--sp-shadow-3)' }} onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold mb-4">{title}</h2>
         {children}
       </div>

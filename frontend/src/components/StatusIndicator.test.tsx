@@ -3,24 +3,24 @@ import { render } from '@testing-library/react'
 import { StatusIndicator } from './StatusIndicator'
 
 describe('StatusIndicator', () => {
-  it('renders bg-discord-online for online status', () => {
+  it('renders bg-sp-online for online status', () => {
     const { container } = render(<StatusIndicator status="online" />)
-    expect(container.firstElementChild?.className).toContain('bg-discord-online')
+    expect(container.firstElementChild?.className).toContain('bg-sp-online')
   })
 
-  it('renders bg-discord-idle for away status', () => {
+  it('renders bg-sp-idle for away status', () => {
     const { container } = render(<StatusIndicator status="away" />)
-    expect(container.firstElementChild?.className).toContain('bg-discord-idle')
+    expect(container.firstElementChild?.className).toContain('bg-sp-idle')
   })
 
-  it('renders bg-discord-dnd for dnd status', () => {
+  it('renders bg-sp-dnd for dnd status', () => {
     const { container } = render(<StatusIndicator status="dnd" />)
-    expect(container.firstElementChild?.className).toContain('bg-discord-dnd')
+    expect(container.firstElementChild?.className).toContain('bg-sp-dnd')
   })
 
-  it('renders bg-discord-offline for offline status', () => {
+  it('renders bg-sp-offline for offline status', () => {
     const { container } = render(<StatusIndicator status="offline" />)
-    expect(container.firstElementChild?.className).toContain('bg-discord-offline')
+    expect(container.firstElementChild?.className).toContain('bg-sp-offline')
   })
 
   it('applies the given size as inline style', () => {

@@ -1,9 +1,14 @@
 import client from './client'
 import type { Message, PinnedMessage } from './types'
 
-export async function getMessages(channelId: string, before?: string, limit = 50): Promise<Message[]> {
+export async function getMessages(
+  channelId: string,
+  before?: string,
+  limit = 50,
+  after?: string,
+): Promise<Message[]> {
   const { data } = await client.get<Message[]>(`/channels/${channelId}/messages`, {
-    params: { before, limit },
+    params: { before, after, limit },
   })
   return data
 }

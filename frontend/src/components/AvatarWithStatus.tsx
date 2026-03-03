@@ -5,7 +5,7 @@ import type { User } from '../api/types'
 interface Props {
   user: User | null
   size?: number
-  /** Hex color matching the parent background — used for the "cutout" ring around the status dot. */
+  /** @deprecated No longer needed — the ring is now a transparent CSS outline that clips against any background. */
   ringColor?: string
   className?: string
 }
@@ -13,16 +13,11 @@ interface Props {
 /**
  * Avatar + status indicator badge as a single composable unit.
  *
- * The ring around the status dot uses an inline background-color so it always
- * matches the parent surface — including on hover.  Parent rows should set the
- * CSS variable `--avatar-ring` on hover so the cutout follows along:
- *
- *   style={{ '--avatar-ring': '#121214' } as React.CSSProperties}
- *   + a :hover rule (or Tailwind arbitrary) that changes the variable.
- *
- * If the variable isn't set, `ringColor` (prop) is used as fallback.
+ * The ring around the status dot is rendered via `outline: transparent` so it
+ * clips naturally against any parent background without needing a matching
+ * background-color value.
  */
-export function AvatarWithStatus({ user, size = 32, ringColor = '#121214', className = '' }: Props) {
+export function AvatarWithStatus({ user, size = 32, className = '' }: Props) {
   const dotSize = Math.max(6, Math.round(size * 0.3))
   const pad = size <= 24 ? 1.5 : size >= 60 ? 4 : 3
 
@@ -31,8 +26,8 @@ export function AvatarWithStatus({ user, size = 32, ringColor = '#121214', class
       <UserAvatar user={user} size={size} />
       {user && (
         <span
-          className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center transition-[background-color] duration-150"
-          style={{ padding: pad, backgroundColor: `var(--avatar-ring, ${ringColor})` }}
+          className="absolute -bottom-0.5 -right-0.5 rounded-full"
+          style={{ outline: `${pad}px solid transparent` }}
         >
           <StatusIndicator status={user.status} size={dotSize} />
         </span>

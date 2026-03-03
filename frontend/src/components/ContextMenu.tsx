@@ -56,24 +56,24 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
     <div
       ref={menuRef}
       style={{ top: y, left: x }}
-      className="fixed z-[9999] min-w-[180px] bg-discord-bg border border-black/30 rounded-md shadow-xl py-1 text-sm"
+      className="fixed z-[9999] min-w-[180px] bg-sp-popup border border-sp-divider/60 rounded-sp-lg shadow-sp-3 py-1.5 text-sm"
     >
       {items.map((item, i) => (
         item.separator
-          ? <div key={`sep-${i}`} className="my-1 border-t border-white/10" />
+          ? <div key={`sep-${i}`} className="my-1.5 border-t border-sp-divider/60" />
           : <button
               key={item.label}
               onClick={() => { item.onClick?.(); onClose() }}
-              className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors
+              className={`flex items-center gap-2.5 px-3 py-1.5 mx-1 text-left transition-all rounded-full w-[calc(100%-8px)]
                 ${item.danger
-                  ? 'text-red-400 hover:bg-red-500 hover:text-white'
+                  ? 'text-red-400 hover:bg-red-500/15 hover:text-red-300'
                   : item.active
-                    ? 'text-discord-text bg-discord-mention/30'
-                    : 'text-discord-text hover:bg-discord-mention'}`}
+                    ? 'text-sp-mention bg-sp-mention/15'
+                    : 'text-sp-text hover:bg-sp-hover'}`}
             >
               {item.icon && <Icon name={item.icon} size={16} className="shrink-0" />}
               <span className="flex-1">{item.label}</span>
-              {item.active && <Icon name="checkmark" size={14} className="shrink-0 text-discord-mention" />}
+              {item.active && <Icon name="checkmark" size={14} className="shrink-0 text-sp-mention" />}
             </button>
       ))}
     </div>,

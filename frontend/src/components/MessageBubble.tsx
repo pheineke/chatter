@@ -130,11 +130,11 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
       <div className={`flex gap-3 px-4 py-0.5 ${compact ? 'mt-0' : 'mt-3'}`}>
         <div className="w-10 shrink-0" />
         <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          <span className="text-xs text-discord-muted italic">Blocked message</span>
-          <span className="text-discord-muted text-xs">—</span>
+          <span className="text-xs text-sp-muted italic">Blocked message</span>
+          <span className="text-sp-muted text-xs">—</span>
           <button
             onClick={() => setShowBlocked(true)}
-            className="text-xs text-discord-muted underline hover:text-discord-text transition-colors"
+            className="text-xs text-sp-muted underline hover:text-sp-text transition-colors"
           >
             Show message
           </button>
@@ -146,7 +146,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
   return (
     <>
     <div
-      className={`group flex gap-3 px-4 py-0.5 hover:bg-white/[0.03] relative ${compact ? 'mt-0' : 'mt-3'}`}
+      className={`group flex gap-3 px-4 py-0.5 hover:bg-sp-hover/40 relative ${compact ? 'mt-0' : 'mt-3'}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
@@ -154,7 +154,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
       {/* Avatar / timestamp column */}
       <div className="w-10 shrink-0 flex justify-center select-none cursor-pointer" onClick={handleUserClick}>
         {compact ? (
-          <span className="text-[10px] text-discord-muted opacity-0 group-hover:opacity-100 mt-1 leading-tight select-none">
+          <span className="text-[10px] text-sp-muted opacity-0 group-hover:opacity-100 mt-1 leading-tight select-none">
             {format(new Date(msg.created_at), 'HH:mm')}
           </span>
         ) : (
@@ -167,15 +167,15 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
         {/* Reply header - quoted reference */}
         {msg.reply_to_id && (
           <button
-            className="flex items-center gap-1.5 text-xs text-discord-muted mb-0.5 max-w-full hover:text-discord-text transition-colors cursor-pointer text-left"
+            className="flex items-center gap-1.5 text-xs text-sp-muted mb-0.5 max-w-full hover:text-sp-text transition-colors cursor-pointer text-left"
             onClick={() => msg.reply_to && onScrollToMessage?.(msg.reply_to.id)}
             title={msg.reply_to ? 'Jump to original message' : undefined}
           >
-            <Icon name="corner-up-left" size={11} className="shrink-0 text-discord-muted/70" />
+            <Icon name="corner-up-left" size={11} className="shrink-0 text-sp-muted/70" />
             {msg.reply_to && !msg.reply_to.is_deleted ? (
               <>
                 <UserAvatar user={msg.reply_to.author} size={16} className="rounded-full shrink-0" />
-                <span className="font-medium text-discord-text/80">{msg.reply_to.author.username}</span>
+                <span className="font-medium text-sp-text/80">{msg.reply_to.author.username}</span>
                 <span className="truncate italic opacity-70">
                   {msg.reply_to.content
                     ? (msg.reply_to.content.length > 80 ? msg.reply_to.content.slice(0, 80) + '…' : msg.reply_to.content)
@@ -191,12 +191,12 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
         {!compact && (
           <div className="flex items-baseline gap-2 mb-0.5">
             <span 
-              className="font-semibold text-white hover:underline cursor-pointer"
+              className="font-semibold text-sp-text hover:underline cursor-pointer"
               onClick={handleUserClick}
             >
               {msg.author_nickname ?? msg.author.username}
             </span>
-            <span className="text-xs text-discord-muted">{formatTime(msg.created_at)}</span>
+            <span className="text-xs text-sp-muted">{formatTime(msg.created_at)}</span>
           </div>
         )}
 
@@ -213,14 +213,19 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
               }}
               autoFocus
             />
-            <div className="text-xs text-discord-muted mt-1">
+            <div className="text-xs text-sp-muted mt-1">
               Enter to save · Esc to cancel
             </div>
           </div>
         ) : (
-          <div className="text-sm text-discord-text break-words leading-relaxed">
+          <div className={`text-sm break-words leading-relaxed inline-block px-3 py-2 shadow-sm max-w-full
+            ${isOwn 
+              ? 'bg-sp-primary-container text-sp-on-primary-container rounded-[12px_2px_12px_12px]' 
+              : 'bg-sp-surface-variant text-sp-on-surface rounded-[2px_12px_12px_12px]'
+            }`}
+          >
             {msg.is_encrypted && !decryptedContent && !decryptFailed && (
-              <span className="text-discord-muted italic text-xs flex items-center gap-1">
+              <span className="text-sp-muted italic text-xs flex items-center gap-1">
                 <Icon name="lock" size={11} />
                 Decrypting…
               </span>
@@ -235,10 +240,10 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
           </div>
         )}
         {msg.is_edited && (
-          <span className="text-[11px] text-discord-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
+          <span className="text-[11px] text-sp-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
         )}
         {msg.is_encrypted && decryptedContent && (
-          <span className="text-[10px] text-discord-online/60 ml-1 select-none flex items-center gap-0.5 inline-flex">
+          <span className="text-[10px] text-sp-online/60 ml-1 select-none flex items-center gap-0.5 inline-flex">
             <Icon name="lock" size={9} />
             E2EE
           </span>
@@ -286,12 +291,12 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
                   target="_blank"
                   rel="noreferrer"
                   download={displayName}
-                  className="inline-flex items-center gap-2 bg-discord-sidebar rounded px-3 py-2 text-sm hover:bg-white/10 transition"
+                  className="inline-flex items-center gap-2 bg-sp-input rounded-sp-sm px-3 py-2 text-sm hover:bg-sp-hover transition"
                 >
-                  <Icon name="file" size={18} className="text-discord-muted shrink-0" />
-                  <span className="text-discord-mention underline truncate max-w-[200px]">{displayName}</span>
+                  <Icon name="file" size={18} className="text-sp-muted shrink-0" />
+                  <span className="text-sp-mention underline truncate max-w-[200px]">{displayName}</span>
                   {att.file_size != null && (
-                    <span className="text-discord-muted text-xs shrink-0">{formatFileSize(att.file_size)}</span>
+                    <span className="text-sp-muted text-xs shrink-0">{formatFileSize(att.file_size)}</span>
                   )}
                 </a>
               )}
@@ -314,10 +319,10 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
                   key={emoji}
                   onClick={() => (me ? unreactMut.mutate(emoji) : reactMut.mutate(emoji))}
                   className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors
-                    ${me ? 'bg-discord-mention/20 border-discord-mention' : 'bg-discord-input border-transparent hover:border-discord-mention/50'}`}
+                    ${me ? 'bg-sp-mention/20 border-sp-mention' : 'bg-sp-input border-transparent hover:border-sp-mention/50'}`}
                 >
                   <span>{emoji}</span>
-                  <span className="text-discord-text">{count}</span>
+                  <span className="text-sp-text">{count}</span>
                 </button>
               ))}
             </div>
@@ -327,7 +332,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
 
       {/* Action toolbar on hover */}
       {hovered && (
-        <div className="absolute right-4 top-0 -translate-y-1/2 flex items-center gap-1 bg-discord-sidebar border border-discord-input rounded px-1 py-0.5 shadow-lg">
+        <div className="absolute right-4 top-0 -translate-y-1/2 flex items-center gap-1 bg-sp-popup border border-sp-divider/60 rounded-sp-sm px-1 py-0.5 shadow-sp-2">
           <ActionBtn
             title="Add Reaction"
             onClick={(e) => {
@@ -343,7 +348,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
           <ActionBtn
             title={isPinned ? 'Unpin' : 'Pin'}
             onClick={() => pinMut.mutate()}
-            className={isPinned ? 'text-discord-mention' : ''}
+            className={isPinned ? 'text-sp-mention' : ''}
           >
             <Icon name="pin" size={16} />
           </ActionBtn>
@@ -408,7 +413,7 @@ function ActionBtn({ title, onClick, className = '', children }: { title: string
     <button
       title={title}
       onClick={onClick}
-      className={`text-discord-muted hover:text-discord-text transition-colors text-sm px-1 ${className}`}
+      className={`text-sp-muted hover:text-sp-text transition-colors text-sm px-1 ${className}`}
     >
       {children}
     </button>

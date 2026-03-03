@@ -76,7 +76,7 @@ function ParticipantCard({
   return (
     <div
       className={`relative flex flex-col items-center justify-center rounded-xl overflow-hidden transition-all group
-        ${hasVideo ? 'bg-black' : 'bg-discord-sidebar'}
+        ${hasVideo ? 'bg-black' : 'bg-sp-sidebar'}
         ${isSpeaking ? 'border-2 border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.25)]' : 'border border-white/5'}
         ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}
       onClick={onClick}
@@ -126,25 +126,25 @@ function ParticipantCard({
         <>
           <AvatarWithStatus user={tile.user} size={compact ? 40 : 64} />
           {!compact && (
-            <span className="mt-2 text-sm font-semibold text-discord-text truncate max-w-full px-2">
+            <span className="mt-2 text-sm font-semibold text-sp-text truncate max-w-full px-2">
               {tile.user.username}{tile.isSelf ? ' (You)' : ''}
             </span>
           )}
           {/* Muted / deafened badges */}
           <div className={`absolute flex gap-1 ${compact ? 'bottom-1 right-1' : 'bottom-2 right-2'}`}>
             {tile.isMuted && (
-              <span className="w-5 h-5 rounded-full bg-discord-bg/80 flex items-center justify-center">
+              <span className="w-5 h-5 rounded-full bg-sp-bg/80 flex items-center justify-center">
                 <Icon name="mic-off" size={11} className="text-red-400" />
               </span>
             )}
             {tile.isDeafened && (
-              <span className="w-5 h-5 rounded-full bg-discord-bg/80 flex items-center justify-center">
+              <span className="w-5 h-5 rounded-full bg-sp-bg/80 flex items-center justify-center">
                 <Icon name="headphones-off" size={11} className="text-red-400" />
               </span>
             )}
           </div>
           {compact && (
-            <span className="mt-1 text-[10px] text-discord-muted truncate max-w-[88px] px-1 text-center leading-none">
+            <span className="mt-1 text-[10px] text-sp-muted truncate max-w-[88px] px-1 text-center leading-none">
               {tile.user.username}
             </span>
           )}
@@ -187,7 +187,7 @@ function VideoCard({
           </span>
         </div>
         {compact && (
-          <span className="mt-1 text-[10px] text-discord-muted truncate max-w-[88px] px-1 text-center leading-none">
+          <span className="mt-1 text-[10px] text-sp-muted truncate max-w-[88px] px-1 text-center leading-none">
             {tile.label}
           </span>
         )}
@@ -226,7 +226,7 @@ function VideoCard({
             <Icon name="x" size={10} />{!compact && 'Exit'}
           </button>
         )}
-        <span className="text-[10px] uppercase font-bold text-white bg-discord-mention/80 px-1.5 py-0.5 rounded">
+        <span className="text-[10px] uppercase font-bold text-white bg-sp-mention/80 px-1.5 py-0.5 rounded">
           {tile.tileType === 'screen' ? 'Screen' : 'Cam'}
         </span>
       </div>
@@ -316,6 +316,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
       id: p.user_id,
       username: p.username ?? `User ${p.user_id.slice(0, 4)}`,
       avatar: p.avatar ?? null,
+      avatar_decoration: null,
       description: null,
       status: 'offline' as const,
       preferred_status: 'offline' as const,
@@ -391,18 +392,18 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   const participantCount = state.participants.length + 1
 
   return (
-    <div className="flex flex-col h-full bg-discord-bg select-none">
+    <div className="flex flex-col h-full bg-sp-bg select-none">
       {/* Header */}
       <div className="h-12 flex items-center gap-2 px-4 border-b border-black/20 shrink-0">
-        <Icon name="headphones" size={16} className="text-discord-online shrink-0" />
+        <Icon name="headphones" size={16} className="text-sp-online shrink-0" />
         <span className="font-semibold truncate">{session.channelName}</span>
-        <span className="text-discord-muted text-xs ml-1 shrink-0">
+        <span className="text-sp-muted text-xs ml-1 shrink-0">
           {participantCount} participant{participantCount !== 1 ? 's' : ''}
         </span>
         {theaterTile && (
           <button
             onClick={clearFocused}
-            className="ml-auto flex items-center gap-1 text-xs text-discord-muted hover:text-discord-text transition-colors"
+            className="ml-auto flex items-center gap-1 text-xs text-sp-muted hover:text-sp-text transition-colors"
           >
             <Icon name="minimize-2" size={13} /> Exit Theater
           </button>

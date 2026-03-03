@@ -38,11 +38,11 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // Stub IntersectionObserver which jsdom doesn't implement
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+;(globalThis as typeof globalThis & { IntersectionObserver: unknown }).IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
-})) as unknown as typeof IntersectionObserver
+}))
 
 // Suppress noisy console.error from expected React/test errors
 const originalError = console.error.bind(console.error)

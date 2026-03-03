@@ -41,28 +41,28 @@ export default function InvitePage() {
   }
 
   return (
-    <div className="min-h-screen bg-discord-bg flex items-center justify-center">
-      <div className="bg-discord-sidebar rounded-xl p-8 w-full max-w-sm text-center shadow-2xl">
+    <div className="min-h-screen bg-sp-bg flex items-center justify-center">
+      <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-xl p-8 w-full max-w-sm text-center" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
         {error ? (
           <>
             <p className="text-red-400 font-semibold mb-4">{error}</p>
             <button className="btn" onClick={() => navigate('/channels/@me')}>Go Home</button>
           </>
         ) : !invite ? (
-          <p className="text-discord-muted">Loading invite…</p>
+          <p className="text-sp-muted">Loading invite…</p>
         ) : (
           <>
-            <div className="w-16 h-16 rounded-full bg-discord-input mx-auto mb-4 flex items-center justify-center text-2xl font-bold overflow-hidden">
+            <div className="w-16 h-16 rounded-full bg-sp-input mx-auto mb-4 flex items-center justify-center text-2xl font-bold overflow-hidden">
               {invite.server_image
                 ? <img src={invite.server_image} alt={invite.server_title} className="w-full h-full object-cover" />
                 : invite.server_title.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
             </div>
-            <p className="text-discord-muted text-sm mb-1">You've been invited to join</p>
+            <p className="text-sp-muted text-sm mb-1">You've been invited to join</p>
             <h1 className="text-xl font-bold mb-6">{invite.server_title}</h1>
             <button className="btn w-full" onClick={handleJoin} disabled={joining}>
               {joining ? 'Joining…' : 'Accept Invite'}
             </button>
-            <button className="mt-3 text-sm text-discord-muted hover:underline block w-full" onClick={() => navigate('/channels/@me')}>
+            <button className="mt-3 text-sm text-sp-muted hover:underline block w-full" onClick={() => navigate('/channels/@me')}>
               No thanks
             </button>
           </>

@@ -79,9 +79,9 @@ export function MemberSidebar({ serverId }: Props) {
   const offlineSorted = [...offline].sort((a, b) => a.user.username.localeCompare(b.user.username))
 
   return (
-    <div className="hidden md:flex flex-col w-60 shrink-0 bg-discord-bg h-full overflow-y-auto border-l-2 border-white/[0.03]">
-      <div className="px-3 flex items-center h-12 shrink-0 border-b border-white/[0.07] shadow-sm">
-        <span className="text-xs font-bold uppercase text-discord-muted tracking-wider">
+    <div className="hidden md:flex flex-col w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50">
+      <div className="px-3 flex items-center h-12 shrink-0 border-b border-sp-divider/50 shadow-sm">
+        <span className="text-xs font-bold uppercase text-sp-muted tracking-wider">
           Members — {members.length}
         </span>
       </div>
@@ -123,7 +123,7 @@ function Section({ label, color, members, onClickMember }: {
 }) {
   return (
     <div className="mb-2">
-      <div className="px-3 py-1 flex items-center gap-1.5 text-[11px] font-bold uppercase text-discord-muted tracking-wider">
+      <div className="px-3 py-1 flex items-center gap-1.5 text-[11px] font-bold uppercase text-sp-muted tracking-wider">
         {color && (
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
         )}
@@ -148,14 +148,14 @@ function MemberRow({ member, onClick }: { member: Member; onClick: (e: React.Mou
     <button
       onClick={onClick}
       data-avatar-ring
-      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded mx-1 hover:bg-discord-input/60 transition-colors text-left group"
+      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded mx-1 hover:bg-sp-input/60 transition-colors text-left group"
       style={{ width: 'calc(100% - 8px)', '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#2c2d32' } as React.CSSProperties}
     >
       <AvatarWithStatus user={member.user} size={32} />
       <span
         className={`text-sm font-medium truncate transition-colors ${
-          member.user.status === 'offline' ? 'text-discord-muted' : 'text-discord-text'
-        } group-hover:text-white`}
+          member.user.status === 'offline' ? 'text-sp-muted' : 'text-sp-text'
+        } group-hover:text-sp-text`}
         style={nameColor && member.user.status !== 'offline' ? { color: nameColor } : undefined}
       >
         {member.nickname ?? member.user.username}

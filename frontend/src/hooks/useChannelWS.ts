@@ -3,6 +3,7 @@ import { useState, useCallback, useRef } from 'react'
 import type { InfiniteData } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
 import type { Message } from '../api/types'
+import { cachePutMessage, deleteCachedMessage } from '../db/dmCache'
 
 type InfMessages = InfiniteData<Message[]>
 
@@ -30,8 +31,15 @@ function filterPages(data: InfMessages, pred: (m: Message) => boolean): InfMessa
  * Returns:
  *  - `typingUsers`: users currently typing in this channel
  *  - `sendTyping`:  call this when the local user is typing
+ *
+ * Options:
+ *  - `isDM`:         when true, WS message events are also mirrored to IndexedDB
+ *  - `onReconnect`:  called when the WS (re)connects — use for gap-sync / outbox flush
  */
-export function useChannelWS(channelId: string | null) {
+export function useChannelWS(
+  channelId: string | null,
+  { isDM = false, onReconnect }: { isDM?: boolean; onReconnect?: () => void } = {},
+) {
   const qc = useQueryClient()
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -42,8 +50,14 @@ export function useChannelWS(channelId: string | null) {
     setTypingUsers((prev) => prev.filter((u) => u.user_id !== userId))
   }, [])
 
+  const onReconnectRef = useRef(onReconnect)
+  onReconnectRef.current = onReconnect
+
   const { send } = useWebSocket(channelId ? `/ws/channels/${channelId}` : '', {
     enabled: channelId !== null,
+    onOpen() {
+      onReconnectRef.current?.()
+    },
     onMessage(msg) {
       const key = ['messages', channelId] as const
 
@@ -58,6 +72,8 @@ export function useChannelWS(channelId: string | null) {
             const [first, ...rest] = old.pages
             return { ...old, pages: [[...(first ?? []), newMsg], ...rest] }
           })
+          // Mirror to IndexedDB for offline read
+          if (isDM) cachePutMessage(newMsg).catch(() => {})
           break
         }
         case 'message.updated': {
@@ -66,6 +82,7 @@ export function useChannelWS(channelId: string | null) {
             if (!old) return old
             return mapPages(old, (m) => (m.id === updated.id ? updated : m))
           })
+          if (isDM) cachePutMessage(updated).catch(() => {})
           break
         }
         case 'message.deleted': {
@@ -74,6 +91,7 @@ export function useChannelWS(channelId: string | null) {
             if (!old) return old
             return filterPages(old, (m) => m.id !== message_id)
           })
+          if (isDM && channelId) deleteCachedMessage(channelId, message_id).catch(() => {})
           break
         }
         case 'reaction.added': {

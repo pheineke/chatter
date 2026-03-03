@@ -239,6 +239,7 @@ async def list_messages(
     current_user: CurrentUser,
     db: DB,
     before: uuid.UUID | None = Query(None, description="Cursor: return messages before this ID"),
+    after: uuid.UUID | None = Query(None, description="Cursor: return messages after this ID (gap-sync)"),
     limit: int = Query(50, ge=1, le=100),
     q: str | None = Query(None, description="Full-text search query"),
     author: str | None = Query(None, description="Filter by author username (partial match)"),
@@ -284,6 +285,11 @@ async def list_messages(
         bm = before_msg.scalar_one_or_none()
         if bm:
             query = query.where(Message.created_at < bm.created_at)
+    elif after:
+        after_msg = await db.execute(select(Message).where(Message.id == after))
+        am = after_msg.scalar_one_or_none()
+        if am:
+            query = query.where(Message.created_at > am.created_at)
 
     result = await db.execute(query)
     messages = list(reversed(result.scalars().all()))

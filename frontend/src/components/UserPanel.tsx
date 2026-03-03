@@ -18,7 +18,7 @@ export function UserPanel() {
     <>
     <div className="px-2 py-1.5 flex items-center gap-1 shrink-0">
       <div 
-        className="flex items-center gap-2 flex-1 min-w-0 hover:bg-white/10 p-1 pl-0.5 rounded cursor-pointer transition-colors group"
+        className="flex items-center gap-2 flex-1 min-w-0 hover:bg-sp-hover rounded-full px-2 py-1 cursor-pointer transition-all group"
         onClick={(e) => {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
           const statuses: { label: string; value: string; icon: string }[] = [
@@ -44,8 +44,8 @@ export function UserPanel() {
       >
         <AvatarWithStatus user={user} size={32} className="ml-1" />
         <div className="min-w-0 flex flex-col justify-center">
-          <div className="text-sm font-semibold truncate leading-4 text-discord-text">{user.username}</div>
-          <div className="text-xs text-discord-muted truncate capitalize leading-3 group-hover:text-discord-text/80 transition-colors">
+          <div className="text-sm font-semibold truncate leading-4 text-sp-text">{user.username}</div>
+          <div className="text-xs text-sp-muted truncate capitalize leading-3 group-hover:text-sp-text/80 transition-colors">
             {user.status === 'dnd' ? 'Do Not Disturb' : user.status}
           </div>
         </div>
@@ -55,7 +55,7 @@ export function UserPanel() {
         <button
           title="User Settings"
           onClick={() => navigate('/channels/settings')}
-          className="w-8 h-8 flex items-center justify-center rounded hover:bg-discord-input/60 text-discord-muted hover:text-discord-text transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-sp-hover text-sp-muted hover:text-sp-text transition-all"
         >
           <Icon name="settings" size={18} />
         </button>

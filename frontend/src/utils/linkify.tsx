@@ -73,7 +73,7 @@ export function Linkified({ text, noMentions = false, className }: Props): React
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className={`text-discord-mention hover:underline break-all ${className ?? ''}`}
+              className={`text-sp-mention hover:underline break-all ${className ?? ''}`}
               onClick={(e) => e.stopPropagation()}
             >
               {seg.value}

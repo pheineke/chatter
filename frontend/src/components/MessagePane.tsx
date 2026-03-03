@@ -163,7 +163,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
 
   if (!channelId) {
     return (
-      <div className="h-full flex items-center justify-center text-discord-muted">
+      <div className="h-full flex items-center justify-center text-sp-muted">
         Select a channel to start chatting.
       </div>
     )
@@ -178,7 +178,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
   // Still loading channel list — don't render a text-channel layout for a voice channel
   if (channelsLoading && !channel) {
     return (
-      <div className="h-full flex items-center justify-center text-discord-muted">
+      <div className="h-full flex items-center justify-center text-sp-muted">
         <Icon name="loader" size={24} className="animate-spin" />
       </div>
     )
@@ -186,9 +186,9 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
 
   if (channel?.type === 'voice') {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-4 text-discord-muted">
+      <div className="h-full flex flex-col items-center justify-center gap-4 text-sp-muted">
         <div className="text-5xl">🔊</div>
-        <h2 className="text-xl font-bold text-discord-text">{channel.title}</h2>
+        <h2 className="text-xl font-bold text-sp-text">{channel.title}</h2>
         <p className="text-sm">Voice Channel</p>
         <button
           onClick={() => onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId: serverId! })}
@@ -203,24 +203,24 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
   return (
     <div className="flex flex-col h-full">
       {/* Channel header */}
-      <div className="flex items-center gap-2 px-4 border-b border-white/[0.07] shrink-0 h-12 min-w-0">
+      <div className="flex items-center gap-2 px-4 border-b border-sp-divider/60 shrink-0 h-12 min-w-0">
         {/* Mobile: open left-panel drawer */}
         {onOpenNav && (
           <button
-            className="md:hidden p-1 -ml-1 mr-1 text-discord-muted hover:text-discord-text shrink-0"
+            className="md:hidden p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0"
             onClick={onOpenNav}
             aria-label="Open navigation"
           >
             <Icon name="menu" size={22} />
           </button>
         )}
-        <Icon name="hash" size={16} className="text-discord-muted shrink-0" />
+        <Icon name="hash" size={16} className="text-sp-muted shrink-0" />
         <span className="font-bold shrink-0 select-none leading-none">{channel?.title ?? channelId}</span>
         {channel?.description && (
           <>
-            <div className="w-px h-5 bg-white/20 shrink-0 mx-1" />
+            <div className="w-px h-5 bg-sp-divider/80 shrink-0 mx-1" />
             <span
-              className="text-sm text-discord-muted truncate"
+              className="text-sm text-sp-muted truncate"
               title={channel.description}
             >
               <Linkified text={channel.description} noMentions />
@@ -234,34 +234,34 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
             ref={notifBtnRef}
             onClick={() => setShowNotifMenu(v => !v)}
             title="Notification settings"
-            className={`p-1.5 rounded transition-colors shrink-0 ${showNotifMenu ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+            className={`p-1.5 rounded transition-colors shrink-0 ${showNotifMenu ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
           >
             <Icon name={notifLevel === 'nothing' ? 'bell-off' : 'bell'} size={20} />
           </button>
           {showNotifMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowNotifMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 w-56 bg-[#1e1f22] rounded-lg shadow-xl z-50 overflow-hidden py-1.5 border border-white/[0.07]">
+              <div className="absolute right-0 top-full mt-1 w-56 bg-sp-popup border border-sp-divider/60 rounded-sp-lg shadow-sp-3 z-50 overflow-hidden py-1.5">
                 {notifLevel === 'nothing'
-                  ? <button onClick={() => setNotif('default')} className="w-full text-left px-3 py-2 text-sm text-discord-text hover:bg-white/10 transition-colors">Unmute Channel</button>
-                  : <button onClick={() => setNotif('nothing')} className="w-full text-left px-3 py-2 text-sm text-discord-text hover:bg-white/10 transition-colors">Mute Channel</button>
+                  ? <button onClick={() => setNotif('default')} className="w-full text-left px-3 py-2 text-sm text-sp-text hover:bg-sp-hover transition-colors">Unmute Channel</button>
+                  : <button onClick={() => setNotif('nothing')} className="w-full text-left px-3 py-2 text-sm text-sp-text hover:bg-sp-hover transition-colors">Mute Channel</button>
                 }
-                <div className="my-1 border-t border-white/[0.07]" />
+                <div className="my-1 border-t border-sp-divider/50" />
                 {(['default','all','mentions','nothing'] as const).map(lvl => {
                   const labels = { default: 'Use Category Default', all: 'All Messages', mentions: 'Only @mentions', nothing: 'Nothing' }
                   const hints = { default: 'All Messages', all: '', mentions: '', nothing: '' }
                   return (
                     <button key={lvl} onClick={() => setNotif(lvl)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors flex items-center justify-between"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-sp-hover transition-colors flex items-center justify-between"
                     >
                       <span className="flex flex-col">
-                        <span className={notifLevel === lvl ? 'text-discord-text font-medium' : 'text-discord-text'}>{labels[lvl]}</span>
-                        {hints[lvl] && <span className="text-xs text-discord-muted">{hints[lvl]}</span>}
+                        <span className={notifLevel === lvl ? 'text-sp-text font-medium' : 'text-sp-text'}>{labels[lvl]}</span>
+                        {hints[lvl] && <span className="text-xs text-sp-muted">{hints[lvl]}</span>}
                       </span>
                       <span className={`w-4 h-4 rounded-full border-2 shrink-0 ml-3 flex items-center justify-center ${
-                        notifLevel === lvl ? 'border-blue-500 bg-blue-500' : 'border-discord-muted'
+                        notifLevel === lvl ? 'border-blue-500 bg-blue-500' : 'border-sp-muted'
                       }`}>
-                        {notifLevel === lvl && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        {notifLevel === lvl && <span className="w-1.5 h-1.5 rounded-full bg-sp-mention" />}
                       </span>
                     </button>
                   )
@@ -274,18 +274,18 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
         <button
           onClick={() => setShowPins(v => !v)}
           title={showPins ? 'Close pins' : 'Pinned messages'}
-          className={`p-1.5 rounded transition-colors shrink-0 ${showPins ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+          className={`p-1.5 rounded transition-colors shrink-0 ${showPins ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
         >
           <Icon name="pin" size={20} />
           {pinnedIds.size > 0 && (
-            <span className="ml-0.5 text-xs text-discord-muted">{pinnedIds.size}</span>
+            <span className="ml-0.5 text-xs text-sp-muted">{pinnedIds.size}</span>
           )}
         </button>
         {/* Members toggle — hidden on mobile (member list has no space) */}
         <button
           onClick={() => setShowMembers(v => !v)}
           title="Toggle member list"
-          className={`hidden md:block p-1.5 rounded transition-colors shrink-0 ${showMembers ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+          className={`hidden md:block p-1.5 rounded transition-colors shrink-0 ${showMembers ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
         >
           <Icon name="people" size={20} />
         </button>
@@ -304,14 +304,14 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
               }}
               onKeyDown={e => { if (e.key === 'Escape') { closeSearch() } }}
               placeholder={`Search ${channel?.title ?? ''}…`}
-              className="bg-discord-input/60 border border-white/[0.07] rounded px-2.5 h-7 text-sm text-discord-text placeholder:text-discord-muted outline-none mr-1"
+              className="bg-sp-input/60 border border-white/[0.07] rounded px-2.5 h-7 text-sm text-sp-text placeholder:text-sp-muted outline-none mr-1"
               style={{ width: 220 }}
             />
           )}
           <button
             onClick={() => { if (searchFocused) { closeSearch() } else { setSearchFocused(true) } }}
             title={searchFocused ? 'Close search (Esc)' : 'Search messages'}
-            className={`p-1.5 rounded transition-colors shrink-0 ${searchFocused ? 'text-discord-text' : 'text-discord-muted hover:text-discord-text'}`}
+            className={`p-1.5 rounded transition-colors shrink-0 ${searchFocused ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
           >
             <Icon name="search" size={20} />
           </button>
@@ -323,7 +323,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
             >
               {!searchQuery.trim() ? (
                 <>
-                  <div className="px-3 pt-3 pb-1 text-xs font-bold text-discord-muted uppercase tracking-wider">Filters</div>
+                  <div className="px-3 pt-3 pb-1 text-xs font-bold text-sp-muted uppercase tracking-wider">Filters</div>
                   {[
                     { icon: 'person', label: 'From a specific user', hint: 'from: username', prefix: 'from: ' },
                     { icon: 'attach-2', label: 'Has a link, file or image', hint: 'has: link  or  has: file', prefix: 'has: ' },
@@ -332,38 +332,38 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
                     <button key={f.icon}
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => { setSearchQuery(f.prefix); setTimeout(() => searchInputRef.current?.focus(), 0) }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-sp-hover transition-colors text-left"
                     >
-                      <Icon name={f.icon} size={20} className="text-discord-muted shrink-0" />
+                      <Icon name={f.icon} size={20} className="text-sp-muted shrink-0" />
                       <span className="flex flex-col">
-                        <span className="text-sm text-discord-text">{f.label}</span>
-                        <span className="text-xs text-discord-muted">{f.hint}</span>
+                        <span className="text-sm text-sp-text">{f.label}</span>
+                        <span className="text-xs text-sp-muted">{f.hint}</span>
                       </span>
                     </button>
                   ))}
                   <div className="pb-1" />
                 </>
               ) : searchLoading ? (
-                <div className="px-4 py-6 text-sm text-discord-muted text-center">Searching…</div>
+                <div className="px-4 py-6 text-sm text-sp-muted text-center">Searching…</div>
               ) : searchResults.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-discord-muted text-center">No results for <strong className="text-discord-text">{searchQuery}</strong></div>
+                <div className="px-4 py-6 text-sm text-sp-muted text-center">No results for <strong className="text-sp-text">{searchQuery}</strong></div>
               ) : (
                 <>
-                  <div className="px-3 pt-3 pb-1 text-xs font-bold text-discord-muted uppercase tracking-wider">{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</div>
+                  <div className="px-3 pt-3 pb-1 text-xs font-bold text-sp-muted uppercase tracking-wider">{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</div>
                   <div className="max-h-72 overflow-y-auto">
                     {searchResults.map(msg => (
                       <button key={msg.id}
                         onMouseDown={e => e.preventDefault()}
                         onClick={() => { scrollToMessageRef.current?.(msg.id); closeSearch() }}
-                        className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/[0.04] last:border-0"
+                        className="w-full text-left px-3 py-2 hover:bg-sp-hover transition-colors border-b border-sp-divider/40 last:border-0"
                       >
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-semibold text-discord-text truncate">{msg.author.username}</span>
-                          <span className="text-[10px] text-discord-muted ml-auto shrink-0">
+                          <span className="text-xs font-semibold text-sp-text truncate">{msg.author.username}</span>
+                          <span className="text-[10px] text-sp-muted ml-auto shrink-0">
                             {new Date(msg.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <p className="text-xs text-discord-muted leading-snug line-clamp-2">{msg.content ?? <em>No text</em>}</p>
+                        <p className="text-xs text-sp-muted leading-snug line-clamp-2">{msg.content ?? <em>No text</em>}</p>
                       </button>
                     ))}
                   </div>
@@ -387,11 +387,11 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
 
           {/* Typing indicator */}
           {typingUsers.length > 0 && (
-            <div className="px-4 py-1 text-xs text-discord-muted flex items-center gap-1 select-none shrink-0">
+            <div className="px-4 py-1 text-xs text-sp-muted flex items-center gap-1 select-none shrink-0">
               <span className="flex gap-0.5 items-center">
-                <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:0ms]" />
-                <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:150ms]" />
-                <span className="w-1 h-1 bg-discord-muted rounded-full animate-bounce [animation-delay:300ms]" />
+                <span className="w-1 h-1 bg-sp-muted rounded-full animate-bounce [animation-delay:0ms]" />
+                <span className="w-1 h-1 bg-sp-muted rounded-full animate-bounce [animation-delay:150ms]" />
+                <span className="w-1 h-1 bg-sp-muted rounded-full animate-bounce [animation-delay:300ms]" />
               </span>
               <span>
                 {typingUsers.length === 1

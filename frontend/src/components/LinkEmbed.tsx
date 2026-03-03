@@ -94,8 +94,8 @@ function OGCard({
 
   if (isLoading) {
     return (
-      <div className="mt-1.5 w-80 h-20 bg-discord-sidebar rounded flex items-center justify-center">
-        <Icon name="loader" size={16} className="animate-spin text-discord-muted" />
+      <div className="mt-1.5 w-80 h-20 bg-sp-sidebar rounded flex items-center justify-center">
+        <Icon name="loader" size={16} className="animate-spin text-sp-muted" />
       </div>
     )
   }
@@ -108,7 +108,7 @@ function OGCard({
   })()
 
   return (
-    <div className="relative group/embed mt-1.5 max-w-[440px] border-l-4 border-discord-mention/60 bg-discord-sidebar rounded-r overflow-hidden">
+    <div className="relative group/embed mt-1.5 max-w-[440px] border-l-4 border-sp-mention/60 bg-sp-sidebar rounded-r overflow-hidden">
       <a
         href={url}
         target="_blank"
@@ -116,18 +116,18 @@ function OGCard({
         className="block p-3 hover:bg-white/5 transition"
       >
         {data.site_name && (
-          <p className="text-[11px] text-discord-muted uppercase tracking-wide mb-0.5">{data.site_name}</p>
+          <p className="text-[11px] text-sp-muted uppercase tracking-wide mb-0.5">{data.site_name}</p>
         )}
         {data.title && (
-          <p className="text-sm font-semibold text-discord-mention hover:underline leading-snug mb-1 line-clamp-2">
+          <p className="text-sm font-semibold text-sp-mention hover:underline leading-snug mb-1 line-clamp-2">
             {data.title}
           </p>
         )}
         {data.description && (
-          <p className="text-xs text-discord-muted leading-relaxed line-clamp-3 mb-2">{data.description}</p>
+          <p className="text-xs text-sp-muted leading-relaxed line-clamp-3 mb-2">{data.description}</p>
         )}
         {!data.site_name && (
-          <p className="text-[11px] text-discord-muted">{hostname}</p>
+          <p className="text-[11px] text-sp-muted">{hostname}</p>
         )}
 
         {data.image && (

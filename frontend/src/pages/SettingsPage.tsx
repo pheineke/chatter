@@ -16,6 +16,7 @@ import { AVATAR_FRAMES } from '../utils/avatarFrames'
 import { getMyDecorations, redeemDecorationCode } from '../api/decorations'
 import { useE2EE } from '../contexts/E2EEContext'
 import { QRScanner } from '../components/QRScanner'
+import { clearDMCache } from '../db/dmCache'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications' | 'tokens'
 
@@ -124,10 +125,10 @@ function AccountTab() {
   }
 
   const statusColors: Record<string, string> = {
-    online: 'bg-discord-online',
-    away: 'bg-discord-idle',
-    dnd: 'bg-discord-dnd',
-    offline: 'bg-discord-offline',
+    online: 'bg-sp-online',
+    away: 'bg-sp-idle',
+    dnd: 'bg-sp-dnd',
+    offline: 'bg-sp-offline',
   }
   const statusLabels: Record<string, string> = {
     online: 'Online', away: 'Away', dnd: 'Do Not Disturb', offline: 'Offline',
@@ -138,12 +139,12 @@ function AccountTab() {
       <h2 className="text-xl font-bold mb-6">My Account</h2>
 
       {/* Profile preview */}
-      <div className="bg-discord-sidebar rounded-lg mb-6">
+      <div className="bg-sp-sidebar rounded-lg mb-6">
         {/* Banner */}
         <div
           className="h-24 rounded-t-lg relative bg-cover bg-center group cursor-pointer"
           style={{
-            backgroundColor: user?.banner ? undefined : '#5865F2',
+            backgroundColor: user?.banner ? undefined : '#3F51B5',
             backgroundImage: user?.banner ? `url(/api/static/${user.banner})` : undefined,
           }}
           onClick={() => bannerInput.current?.click()}
@@ -158,7 +159,7 @@ function AccountTab() {
         {/* Avatar row — negative margin pulls it up over the banner */}
         <div className="px-4 pb-4">
           <div className="flex items-end gap-4 -mt-9">
-            <div className="rounded-full p-1.5 bg-discord-sidebar shrink-0">
+            <div className="rounded-full p-1.5 bg-sp-sidebar shrink-0">
               <div className="relative group rounded-full">
                 <UserAvatar user={user} size={72} className="rounded-full" />
                 <div
@@ -168,21 +169,21 @@ function AccountTab() {
                   <span className="text-[10px] font-bold text-white text-center leading-tight">CHANGE{'\n'}AVATAR</span>
                 </div>
                 <input ref={avatarInput} type="file" className="hidden" accept="image/*" onChange={e => handleFile(e, 'avatar')} />
-                <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-[3px] border-discord-sidebar ${statusColors[user?.status ?? 'offline']}`} />
+                <div className={`absolute bottom-1 right-1 w-5 h-5 rounded-full border-[3px] border-sp-sidebar ${statusColors[user?.status ?? 'offline']}`} />
               </div>
             </div>
             {/* Name sits at the bottom of the avatar row */}
             <div className="pb-1">
               <p className="font-bold text-lg leading-tight">{user?.username}</p>
-              {user?.pronouns && <p className="text-discord-muted text-sm">{user.pronouns}</p>}
+              {user?.pronouns && <p className="text-sp-muted text-sm">{user.pronouns}</p>}
             </div>
           </div>
         </div>
       </div>
 
       {/* Status selector */}
-      <div className="bg-discord-sidebar rounded-lg p-4 mb-6">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Online Status</div>
+      <div className="bg-sp-sidebar rounded-lg p-4 mb-6">
+        <div className="text-xs font-bold text-sp-muted uppercase mb-3">Online Status</div>
         <div className="grid grid-cols-2 gap-2">
           {(['online', 'away', 'dnd', 'offline'] as const).map(s => (
             <button
@@ -190,8 +191,8 @@ function AccountTab() {
               onClick={() => updateMut.mutate({ status: s as UserStatus })}
               className={`py-2 px-3 rounded text-sm font-medium flex items-center gap-2 transition-colors
                 ${user?.status === s
-                  ? 'bg-discord-mention/20 text-discord-mention ring-1 ring-discord-mention/50'
-                  : 'bg-discord-bg hover:bg-discord-input text-discord-text'}`}
+                  ? 'bg-sp-mention/20 text-sp-mention ring-1 ring-sp-mention/50'
+                  : 'bg-sp-bg hover:bg-sp-input text-sp-text'}`}
             >
               <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColors[s]}`} />
               {statusLabels[s]}
@@ -204,8 +205,8 @@ function AccountTab() {
       <AvatarDecorationSection user={user} updateMut={updateMut} />
 
       {/* Editable fields */}
-      <div className="bg-discord-sidebar rounded-lg p-4 space-y-2 divide-y divide-discord-input">
-        <div className="text-xs font-bold text-discord-muted uppercase pb-2">Account Information</div>
+      <div className="bg-sp-sidebar rounded-lg p-4 space-y-2 divide-y divide-sp-input">
+        <div className="text-xs font-bold text-sp-muted uppercase pb-2">Account Information</div>
         <EditableField label="Username" value={user?.username} readOnly />
         <div className="pt-2">
           <EditableField
@@ -233,8 +234,8 @@ function AccountTab() {
       )}
 
       {/* Change Password */}
-      <div className="bg-discord-sidebar rounded-lg p-4 mt-6">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-4">Change Password</div>
+      <div className="bg-sp-sidebar rounded-lg p-4 mt-6">
+        <div className="text-xs font-bold text-sp-muted uppercase mb-4">Change Password</div>
         <div className="space-y-2">
           <input
             type="password" className="input w-full" placeholder="Current password"
@@ -304,8 +305,8 @@ function AvatarDecorationSection({ user, updateMut }: { user: User | null; updat
   }
 
   return (
-    <div className="bg-discord-sidebar rounded-lg p-4 mb-6">
-      <div className="text-xs font-bold text-discord-muted uppercase mb-3">Avatar Decoration</div>
+    <div className="bg-sp-sidebar rounded-lg p-4 mb-6">
+      <div className="text-xs font-bold text-sp-muted uppercase mb-3">Avatar Decoration</div>
 
       {/* Frame selector — only unlocked frames */}
       <div className="flex items-center gap-3 flex-wrap mb-4">
@@ -314,12 +315,12 @@ function AvatarDecorationSection({ user, updateMut }: { user: User | null; updat
           onClick={() => updateMut.mutate({ avatar_decoration: '' } as any)}
           className={`w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
             !user?.avatar_decoration
-              ? 'border-discord-mention bg-discord-mention/10'
-              : 'border-discord-input bg-discord-bg hover:border-discord-muted'
+              ? 'border-sp-mention bg-sp-mention/10'
+              : 'border-sp-input bg-sp-bg hover:border-sp-muted'
           }`}
           title="None"
         >
-          <Icon name="close" size={20} className="text-discord-muted" />
+          <Icon name="close" size={20} className="text-sp-muted" />
         </button>
         {unlockedFrames.map(frame => {
           const active = user?.avatar_decoration === frame.id
@@ -329,8 +330,8 @@ function AvatarDecorationSection({ user, updateMut }: { user: User | null; updat
               onClick={() => updateMut.mutate({ avatar_decoration: frame.id } as any)}
               className={`relative w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
                 active
-                  ? 'border-discord-mention bg-discord-mention/10'
-                  : 'border-discord-input bg-discord-bg hover:border-discord-muted'
+                  ? 'border-sp-mention bg-sp-mention/10'
+                  : 'border-sp-input bg-sp-bg hover:border-sp-muted'
               }`}
               title={frame.label}
             >
@@ -342,7 +343,7 @@ function AvatarDecorationSection({ user, updateMut }: { user: User | null; updat
           )
         })}
         {unlockedFrames.length === 0 && (
-          <span className="text-xs text-discord-muted italic">No decorations unlocked yet</span>
+          <span className="text-xs text-sp-muted italic">No decorations unlocked yet</span>
         )}
       </div>
 
@@ -418,9 +419,9 @@ function SessionsSection() {
   }
 
   return (
-    <div className="bg-discord-sidebar rounded-lg p-4 mt-6">
+    <div className="bg-sp-sidebar rounded-lg p-4 mt-6">
       <div className="flex items-center justify-between mb-4">
-        <div className="text-xs font-bold text-discord-muted uppercase">Active Sessions</div>
+        <div className="text-xs font-bold text-sp-muted uppercase">Active Sessions</div>
         {sessions.length > 1 && (
           <button
             onClick={() => revokeAllMut.mutate()}
@@ -433,9 +434,9 @@ function SessionsSection() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-discord-muted">Loading sessions…</p>
+        <p className="text-sm text-sp-muted">Loading sessions…</p>
       ) : sessions.length === 0 ? (
-        <p className="text-sm text-discord-muted">No active sessions found.</p>
+        <p className="text-sm text-sp-muted">No active sessions found.</p>
       ) : (
         <div className="space-y-2">
           {sessions.map((s: Session, i: number) => {
@@ -443,9 +444,9 @@ function SessionsSection() {
             return (
               <div
                 key={s.id}
-                className="flex items-center gap-3 p-3 rounded-lg bg-discord-bg"
+                className="flex items-center gap-3 p-3 rounded-lg bg-sp-bg"
               >
-                <Icon name="monitor" size={20} className="shrink-0 text-discord-muted" />
+                <Icon name="monitor" size={20} className="shrink-0 text-sp-muted" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium truncate">{formatUA(s.user_agent)}</span>
@@ -455,7 +456,7 @@ function SessionsSection() {
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-discord-muted">
+                  <div className="text-xs text-sp-muted">
                     Last active: {formatDate(s.last_used_at)}
                   </div>
                 </div>
@@ -481,12 +482,11 @@ function SessionsSection() {
 // ─── Appearance tab ──────────────────────────────────────────────────────────
 
 const PRESETS: { id: string; label: string; accent: string; bg: string; sidebar: string; servers: string; input: string; text: string; muted: string }[] = [
-  { id: 'default', label: 'Default', accent: '#7289da', bg: '#36393f', sidebar: '#2f3136', servers: '#202225', input: '#40444b', text: '#dcddde', muted: '#72767d' },
-  { id: 'light',   label: 'Light',   accent: '#5865f2', bg: '#ffffff', sidebar: '#f2f3f5', servers: '#e3e5e8', input: '#e9eaed', text: '#2e3338', muted: '#747f8d' },
-  { id: 'red',     label: 'Ruby',    accent: '#ed4245', bg: '#2e2323', sidebar: '#261d1d', servers: '#1a1414', input: '#3a2e2e', text: '#dcddde', muted: '#72767d' },
-  { id: 'blue',    label: 'Ocean',   accent: '#00b0f4', bg: '#1e2733', sidebar: '#1a2234', servers: '#131822', input: '#263445', text: '#dcddde', muted: '#72767d' },
-  { id: 'purple',  label: 'Violet',  accent: '#9b59b6', bg: '#1e1028', sidebar: '#260d3b', servers: '#180a26', input: '#2e1545', text: '#dcddde', muted: '#72767d' },
-  { id: 'green',   label: 'Forest',  accent: '#3ba55c', bg: '#1a2318', sidebar: '#1a2d1f', servers: '#111a12', input: '#243329', text: '#dcddde', muted: '#72767d' },
+  { id: 'default', label: 'Default Dark', accent: '#a78bfa', bg: '#1c1c22', sidebar: '#141418', servers: '#0e0e12', input: '#28282f', text: '#e4e3eb', muted: '#7e7d91' },
+  { id: 'softpop', label: 'Soft Pop',     accent: '#7C4DFF', bg: '#fbf8fb', sidebar: '#f0eef4', servers: '#e6e3ec', input: '#e1dce8', text: '#211e26', muted: '#7a7682' },
+  { id: 'swiss',   label: 'Swiss Intl.',  accent: '#FF3B00', bg: '#FFFFFF', sidebar: '#f0f0f0', servers: '#e0e0e0', input: '#f7f7f7', text: '#000000', muted: '#666666' },
+  { id: 'android', label: 'Material 5',   accent: '#006A60', bg: '#FAFDFB', sidebar: '#EAEFEA', servers: '#DBE5E0', input: '#F0F5F1', text: '#191C1B', muted: '#707975' },
+  { id: 'midnight',label: 'Midnight',     accent: '#9b59b6', bg: '#120518', sidebar: '#1a0b24', servers: '#100517', input: '#2a1538', text: '#f0e6f5', muted: '#8d789e' },
 ]
 
 
@@ -576,35 +576,72 @@ function AppearanceTab() {
       <h2 className="text-xl font-bold">Appearance</h2>
 
       {/* Preset themes */}
-      <div className="bg-discord-sidebar rounded-lg p-4">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Preset Themes</div>
-        <div className="grid grid-cols-6 gap-3">
+      <div className="bg-sp-sidebar rounded-xl p-6 shadow-sm">
+        <h3 className="text-sm font-bold text-sp-muted uppercase tracking-wider mb-4">Preset Themes</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {PRESETS.map(preset => (
             <button
               key={preset.id}
               onClick={() => handlePreset(preset)}
-              className={`flex flex-col items-center gap-2 p-2 rounded-lg border-2 transition-all
-                ${pendingPreset === preset.id ? 'border-discord-mention' : 'border-transparent hover:border-white/10'}`}
+              className={`group flex flex-col gap-3 p-3 rounded-2xl border-2 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg
+                ${pendingPreset === preset.id 
+                  ? 'border-sp-mention bg-sp-bg shadow-md' 
+                  : 'border-transparent bg-sp-input hover:bg-sp-hover'}`}
             >
-              {/* Mini preview */}
-              <div className="w-full h-10 rounded flex overflow-hidden shadow-md" style={{ backgroundColor: preset.bg }}>
-                <div className="w-2.5 h-full shrink-0" style={{ backgroundColor: preset.servers }} />
-                <div className="w-4 h-full shrink-0" style={{ backgroundColor: preset.sidebar }} />
-                <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: preset.bg }}>
-                  <div className="w-4 h-1.5 rounded-full" style={{ backgroundColor: preset.accent }} />
+              {/* Theme Preview Card */}
+              <div 
+                className="w-full h-24 rounded-xl flex overflow-hidden shadow-inner ring-1 ring-black/5 relative isolation-isolate" 
+                style={{ backgroundColor: preset.bg }}
+              >
+                {/* Sidebar */}
+                <div className="w-[20%] h-full shrink-0 flex flex-col items-center py-2 gap-1.5" style={{ backgroundColor: preset.servers }}>
+                  <div className="w-5 h-5 rounded-[8px]" style={{ backgroundColor: preset.accent }} />
+                  <div className="w-5 h-5 rounded-[10px] opacity-40" style={{ backgroundColor: preset.muted }} />
+                  <div className="w-5 h-5 rounded-[10px] opacity-40" style={{ backgroundColor: preset.muted }} />
                 </div>
+                {/* Channel List */}
+                <div className="w-[25%] h-full shrink-0 flex flex-col py-3 px-1.5 gap-2" style={{ backgroundColor: preset.sidebar }}>
+                   <div className="h-1.5 w-12 rounded-full opacity-30" style={{ backgroundColor: preset.text }} />
+                   <div className="h-1.5 w-16 rounded-full opacity-30" style={{ backgroundColor: preset.text }} />
+                   <div className="h-3 w-full rounded-md opacity-20" style={{ backgroundColor: preset.accent }} />
+                </div>
+                {/* Chat Area */}
+                <div className="flex-1 flex flex-col p-3 gap-2" style={{ backgroundColor: preset.bg }}>
+                  <div className="flex gap-2 items-end">
+                    <div className="w-6 h-6 rounded-lg shrink-0 opacity-20" style={{ backgroundColor: preset.text }} />
+                    <div className="h-8 rounded-2xl rounded-bl-sm flex-1 opacity-10" style={{ backgroundColor: preset.text }} />
+                  </div>
+                  <div className="flex gap-2 items-end flex-row-reverse mt-auto">
+                    <div className="h-8 rounded-2xl rounded-br-sm w-3/4" style={{ backgroundColor: preset.accent, opacity: 0.2 }} />
+                  </div>
+                </div>
+                
+                {/* Active Checkmark */}
+                {pendingPreset === preset.id && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-opacity">
+                    <div className="bg-white text-sp-mention rounded-full p-1 shadow-lg transform scale-125">
+                      <Icon name="check" size={24} className="stroke-[3]" />
+                    </div>
+                  </div>
+                )}
               </div>
-              <span className="text-xs text-discord-muted">{preset.label}</span>
+              
+              <div className="flex items-center justify-between px-1">
+                <span className={`font-semibold text-sm ${pendingPreset === preset.id ? 'text-sp-mention' : 'text-sp-text'}`}>
+                  {preset.label}
+                </span>
+                <div className="w-3 h-3 rounded-full ring-2 ring-black/5" style={{ backgroundColor: preset.accent }} />
+              </div>
             </button>
           ))}
         </div>
       </div>
 
       {/* Color swatches */}
-      <div className="bg-discord-sidebar rounded-lg p-4">
+      <div className="bg-sp-sidebar rounded-lg p-4">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-xs font-bold text-discord-muted uppercase">Custom Colors</div>
-          <button onClick={resetColors} className="text-xs text-discord-muted hover:text-discord-text transition-colors">
+          <div className="text-xs font-bold text-sp-muted uppercase">Custom Colors</div>
+          <button onClick={resetColors} className="text-xs text-sp-muted hover:text-sp-text transition-colors">
             Reset all
           </button>
         </div>
@@ -622,7 +659,7 @@ function AppearanceTab() {
                     className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                   />
                 </label>
-                <span className="text-[11px] text-discord-muted text-center leading-tight">{swatch.label}</span>
+                <span className="text-[11px] text-sp-muted text-center leading-tight">{swatch.label}</span>
               </div>
             )
           })}
@@ -630,10 +667,10 @@ function AppearanceTab() {
       </div>
 
       {/* Advanced: Custom CSS */}
-      <div className="bg-discord-sidebar rounded-lg p-4">
+      <div className="bg-sp-sidebar rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-bold text-discord-muted uppercase">Advanced — Custom CSS</div>
-          <button onClick={() => fileRef.current?.click()} className="text-xs text-discord-muted hover:text-discord-text flex items-center gap-1">
+          <div className="text-xs font-bold text-sp-muted uppercase">Advanced — Custom CSS</div>
+          <button onClick={() => fileRef.current?.click()} className="text-xs text-sp-muted hover:text-sp-text flex items-center gap-1">
             <Icon name="document" size={13} /> Upload .css file
           </button>
           <input ref={fileRef} type="file" accept=".css,text/css" className="hidden" onChange={loadFile} />
@@ -651,18 +688,18 @@ function AppearanceTab() {
         />
         <div className="flex gap-2 mt-3">
           <button className="btn" onClick={applyCSS}>{cssApplied ? '✓ Applied' : 'Apply'}</button>
-          <button className="px-4 py-2 rounded bg-discord-input hover:bg-discord-input/70 text-discord-text text-sm font-semibold transition-colors" onClick={resetCSS}>Reset</button>
+          <button className="px-4 py-2 rounded bg-sp-input hover:bg-sp-input/70 text-sp-text text-sm font-semibold transition-colors" onClick={resetCSS}>Reset</button>
         </div>
       </div>
 
       {/* Save / Discard bar */}
       {isDirty && (
-        <div className="sticky bottom-0 flex items-center justify-between bg-discord-servers border border-white/10 rounded-lg px-4 py-3 shadow-xl">
-          <span className="text-sm text-discord-muted">You have unsaved changes</span>
+        <div className="sticky bottom-0 flex items-center justify-between bg-sp-servers border border-white/10 rounded-lg px-4 py-3 shadow-xl">
+          <span className="text-sm text-sp-muted">You have unsaved changes</span>
           <div className="flex gap-2">
             <button
               onClick={handleDiscard}
-              className="px-4 py-1.5 rounded bg-discord-input hover:bg-discord-input/70 text-discord-text text-sm font-semibold transition-colors"
+              className="px-4 py-1.5 rounded bg-sp-input hover:bg-sp-input/70 text-sp-text text-sm font-semibold transition-colors"
             >Discard</button>
             <button
               onClick={handleSave}
@@ -765,45 +802,45 @@ function VoiceTab() {
       <h2 className="text-xl font-bold">Voice & Video</h2>
 
       {/* Input */}
-      <div className="bg-discord-sidebar rounded-lg p-4 space-y-4">
-        <div className="text-xs font-bold text-discord-muted uppercase">Input Device</div>
+      <div className="bg-sp-sidebar rounded-lg p-4 space-y-4">
+        <div className="text-xs font-bold text-sp-muted uppercase">Input Device</div>
         <select className="input w-full" value={inputId} onChange={e => { setInputId(e.target.value); saveLocal('voiceInputId', e.target.value) }}>
           <option value="">Default</option>
           {audioInputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Microphone'}</option>)}
         </select>
         <div>
-          <div className="flex justify-between text-xs text-discord-muted mb-1"><span>Input Volume</span><span>{inputVol}%</span></div>
-          <input type="range" min={0} max={100} value={inputVol} onChange={e => { setInputVol(+e.target.value); saveLocal('voiceInputVol', e.target.value) }} className="w-full accent-discord-mention" />
+          <div className="flex justify-between text-xs text-sp-muted mb-1"><span>Input Volume</span><span>{inputVol}%</span></div>
+          <input type="range" min={0} max={100} value={inputVol} onChange={e => { setInputVol(+e.target.value); saveLocal('voiceInputVol', e.target.value) }} className="w-full accent-sp-mention" />
         </div>
         <div>
-          <div className="text-xs text-discord-muted mb-2">Mic Test</div>
+          <div className="text-xs text-sp-muted mb-2">Mic Test</div>
           <div className="flex items-center gap-3">
             <button className="btn py-1 px-3 text-xs shrink-0" onClick={testing ? stopTestRef.current : startMicTest}>
               {testing ? 'Stop' : "Let's Check"}
             </button>
-            <div className="flex-1 h-3 bg-discord-bg rounded-full overflow-hidden">
-              <div className="h-full bg-discord-mention rounded-full transition-all duration-75" style={{ width: `${micLevel * 100}%` }} />
+            <div className="flex-1 h-3 bg-sp-bg rounded-full overflow-hidden">
+              <div className="h-full bg-sp-mention rounded-full transition-all duration-75" style={{ width: `${micLevel * 100}%` }} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Output */}
-      <div className="bg-discord-sidebar rounded-lg p-4 space-y-4">
-        <div className="text-xs font-bold text-discord-muted uppercase">Output Device</div>
+      <div className="bg-sp-sidebar rounded-lg p-4 space-y-4">
+        <div className="text-xs font-bold text-sp-muted uppercase">Output Device</div>
         <select className="input w-full" value={outputId} onChange={e => { setOutputId(e.target.value); saveLocal('voiceOutputId', e.target.value) }}>
           <option value="">Default (System)</option>
           {audioOutputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Speaker'}</option>)}
         </select>
         <div>
-          <div className="flex justify-between text-xs text-discord-muted mb-1"><span>Output Volume</span><span>{outputVol}%</span></div>
-          <input type="range" min={0} max={100} value={outputVol} onChange={e => { setOutputVol(+e.target.value); saveLocal('voiceOutputVol', e.target.value) }} className="w-full accent-discord-mention" />
+          <div className="flex justify-between text-xs text-sp-muted mb-1"><span>Output Volume</span><span>{outputVol}%</span></div>
+          <input type="range" min={0} max={100} value={outputVol} onChange={e => { setOutputVol(+e.target.value); saveLocal('voiceOutputVol', e.target.value) }} className="w-full accent-sp-mention" />
         </div>
       </div>
 
       {/* Camera */}
-      <div className="bg-discord-sidebar rounded-lg p-4 space-y-4">
-        <div className="text-xs font-bold text-discord-muted uppercase">Camera</div>
+      <div className="bg-sp-sidebar rounded-lg p-4 space-y-4">
+        <div className="text-xs font-bold text-sp-muted uppercase">Camera</div>
         <select className="input w-full" value={cameraId} onChange={e => {
           setCameraId(e.target.value); saveLocal('voiceCameraId', e.target.value)
           if (cameraOn) { stopCameraRef.current(); setTimeout(startCamera, 150) }
@@ -825,17 +862,17 @@ function VoiceTab() {
       </div>
 
       {/* Sound effects */}
-      <div className="bg-discord-sidebar rounded-lg p-4">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Sound Effects</div>
+      <div className="bg-sp-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-sp-muted uppercase mb-3">Sound Effects</div>
 
         {/* Volume slider */}
-        <div className="px-3 pb-3 border-b border-discord-bg mb-2">
-          <div className="flex justify-between text-xs text-discord-muted mb-1">
+        <div className="px-3 pb-3 border-b border-sp-bg mb-2">
+          <div className="flex justify-between text-xs text-sp-muted mb-1">
             <span>Volume</span>
             <span>{soundVolume}%</span>
           </div>
           <div className="flex items-center gap-3">
-            <Icon name="volume-off" size={14} className="text-discord-muted shrink-0" />
+            <Icon name="volume-off" size={14} className="text-sp-muted shrink-0" />
             <input
               type="range" min={0} max={100} value={soundVolume}
               onChange={e => {
@@ -843,11 +880,11 @@ function VoiceTab() {
                 setSoundVolume(v)
                 localStorage.setItem('soundVolume', String(v))
               }}
-              className="flex-1 accent-discord-mention"
+              className="flex-1 accent-sp-mention"
             />
-            <Icon name="volume-up" size={14} className="text-discord-muted shrink-0" />
+            <Icon name="volume-up" size={14} className="text-sp-muted shrink-0" />
             <button
-              className="shrink-0 text-xs px-2 py-1 rounded bg-discord-bg hover:bg-discord-input transition-colors"
+              className="shrink-0 text-xs px-2 py-1 rounded bg-sp-bg hover:bg-sp-input transition-colors"
               onClick={() => playSound('notificationSound')}
             >
               Preview
@@ -857,9 +894,9 @@ function VoiceTab() {
 
         <div className="space-y-1">
           {SOUND_KEYS.map(k => (
-            <label key={k} className="flex items-center justify-between py-2.5 px-3 rounded hover:bg-discord-bg transition-colors cursor-pointer select-none">
+            <label key={k} className="flex items-center justify-between py-2.5 px-3 rounded hover:bg-sp-bg transition-colors cursor-pointer select-none">
               <span className="text-sm">{SOUND_LABELS[k]}</span>
-              <div className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${sounds[k] ? 'bg-discord-mention' : 'bg-discord-input'}`} onClick={() => toggleSound(k, !sounds[k])}>
+              <div className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ${sounds[k] ? 'bg-sp-mention' : 'bg-sp-input'}`} onClick={() => toggleSound(k, !sounds[k])}>
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${sounds[k] ? 'left-5' : 'left-0.5'}`} />
               </div>
             </label>
@@ -887,6 +924,7 @@ function PrivacyTab() {
   const [importError, setImportError] = useState<string | null>(null)
   const [rotateConfirm, setRotateConfirm] = useState(false)
   const [rotateLoading, setRotateLoading] = useState(false)
+  const [cacheCleared, setCacheCleared] = useState(false)
   const backupImportRef = useRef<HTMLInputElement>(null)
 
   const updateMut = useMutation({
@@ -902,15 +940,15 @@ function PrivacyTab() {
       <h2 className="text-xl font-bold">Privacy &amp; Safety</h2>
 
       {/* Hide online status */}
-      <div className="bg-discord-sidebar rounded-lg p-4">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Presence</div>
-        <label className="flex items-center justify-between cursor-pointer py-2 px-3 rounded hover:bg-discord-bg transition-colors select-none">
+      <div className="bg-sp-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-sp-muted uppercase mb-3">Presence</div>
+        <label className="flex items-center justify-between cursor-pointer py-2 px-3 rounded hover:bg-sp-bg transition-colors select-none">
           <div>
             <div className="text-sm font-medium">Hide my online status</div>
-            <div className="text-xs text-discord-muted mt-0.5">You will appear offline to all other users</div>
+            <div className="text-xs text-sp-muted mt-0.5">You will appear offline to all other users</div>
           </div>
           <div
-            className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ml-4 shrink-0 ${user?.hide_status ? 'bg-discord-mention' : 'bg-discord-input'}`}
+            className={`w-10 h-5 rounded-full relative transition-colors cursor-pointer ml-4 shrink-0 ${user?.hide_status ? 'bg-sp-mention' : 'bg-sp-input'}`}
             onClick={() => updateMut.mutate({ hide_status: !user?.hide_status })}
           >
             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${user?.hide_status ? 'left-5' : 'left-0.5'}`} />
@@ -919,13 +957,13 @@ function PrivacyTab() {
       </div>
 
       {/* DM permissions */}
-      <div className="bg-discord-sidebar rounded-lg p-4">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-3">Who can message you</div>
+      <div className="bg-sp-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-sp-muted uppercase mb-3">Who can message you</div>
         <div className="space-y-1">
           {DM_PERM_OPTIONS.map(opt => (
             <label
               key={opt.value}
-              className="flex items-start gap-3 cursor-pointer py-2.5 px-3 rounded hover:bg-discord-bg transition-colors"
+              className="flex items-start gap-3 cursor-pointer py-2.5 px-3 rounded hover:bg-sp-bg transition-colors"
             >
               <input
                 type="radio"
@@ -933,11 +971,11 @@ function PrivacyTab() {
                 value={opt.value}
                 checked={(user?.dm_permission ?? 'everyone') === opt.value}
                 onChange={() => updateMut.mutate({ dm_permission: opt.value })}
-                className="mt-0.5 accent-discord-mention shrink-0"
+                className="mt-0.5 accent-sp-mention shrink-0"
               />
               <div>
                 <div className="text-sm font-medium">{opt.label}</div>
-                <div className="text-xs text-discord-muted">{opt.desc}</div>
+                <div className="text-xs text-sp-muted">{opt.desc}</div>
               </div>
             </label>
           ))}
@@ -945,23 +983,23 @@ function PrivacyTab() {
       </div>
 
       {/* Blocked users */}
-      <div className="bg-discord-sidebar rounded-lg p-4">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-3">
+      <div className="bg-sp-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-sp-muted uppercase mb-3">
           Blocked Users{blockedUsers.length > 0 && ` (${blockedUsers.length})`}
         </div>
         {blockedUsers.length === 0 ? (
-          <p className="text-sm text-discord-muted italic">You haven't blocked anyone.</p>
+          <p className="text-sm text-sp-muted italic">You haven't blocked anyone.</p>
         ) : (
           <div className="space-y-1">
             {blockedUsers.map(u => (
-              <div key={u.id} className="flex items-center justify-between py-2 px-2 rounded hover:bg-discord-bg">
+              <div key={u.id} className="flex items-center justify-between py-2 px-2 rounded hover:bg-sp-bg">
                 <div className="flex items-center gap-3">
                   <UserAvatar user={u} size={32} />
                   <span className="text-sm font-medium">{u.username}</span>
                 </div>
                 <button
                   onClick={() => unblock(u.id)}
-                  className="text-xs px-3 py-1 rounded bg-discord-input hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                  className="text-xs px-3 py-1 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors"
                 >
                   Unblock
                 </button>
@@ -972,20 +1010,20 @@ function PrivacyTab() {
       </div>
 
       {/* E2EE section */}
-      <div className="bg-discord-sidebar rounded-lg p-4">
-        <div className="text-xs font-bold text-discord-muted uppercase mb-3">End-to-End Encryption</div>
+      <div className="bg-sp-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-sp-muted uppercase mb-3">End-to-End Encryption</div>
 
         {e2ee.initialising ? (
-          <p className="text-sm text-discord-muted">Initialising encryption keys…</p>
+          <p className="text-sm text-sp-muted">Initialising encryption keys…</p>
         ) : !e2ee.isEnabled ? (
-          <p className="text-sm text-discord-muted">Encryption keys not available on this device.</p>
+          <p className="text-sm text-sp-muted">Encryption keys not available on this device.</p>
         ) : (
           <div className="space-y-4">
             {/* Fingerprint */}
-            <div className="rounded bg-discord-bg p-3">
-              <div className="text-xs text-discord-muted mb-1">Your key fingerprint</div>
+            <div className="rounded bg-sp-bg p-3">
+              <div className="text-xs text-sp-muted mb-1">Your key fingerprint</div>
               <code className="text-xs font-mono text-green-400 break-all select-all">{e2ee.fingerprint ?? '—'}</code>
-              <p className="text-xs text-discord-muted mt-1">Compare this with the other person's view in a DM to verify your connection.</p>
+              <p className="text-xs text-sp-muted mt-1">Compare this with the other person's view in a DM to verify your connection.</p>
             </div>
 
             {/* Actions */}
@@ -993,7 +1031,7 @@ function PrivacyTab() {
               {/* Download backup */}
               <button
                 onClick={() => e2ee.downloadBackup(user?.username ?? 'chatter')}
-                className="flex items-center gap-2 px-3 py-2 rounded bg-discord-input hover:bg-discord-muted/20 transition-colors text-sm"
+                className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-sp-muted/20 transition-colors text-sm"
               >
                 <Icon name="download" size={16} />
                 Download key backup
@@ -1002,7 +1040,7 @@ function PrivacyTab() {
               {/* Import backup */}
               <button
                 onClick={() => { setImportError(null); backupImportRef.current?.click() }}
-                className="flex items-center gap-2 px-3 py-2 rounded bg-discord-input hover:bg-discord-muted/20 transition-colors text-sm"
+                className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-sp-muted/20 transition-colors text-sm"
               >
                 <Icon name="cloud-upload" size={16} />
                 Import key backup
@@ -1030,7 +1068,7 @@ function PrivacyTab() {
               {/* Scan QR (trust transfer) */}
               <button
                 onClick={() => setShowQRScanner(true)}
-                className="flex items-center gap-2 px-3 py-2 rounded bg-discord-input hover:bg-discord-muted/20 transition-colors text-sm"
+                className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-sp-muted/20 transition-colors text-sm"
               >
                 <Icon name="qr-code" size={16} />
                 Approve QR login
@@ -1040,7 +1078,7 @@ function PrivacyTab() {
               {!rotateConfirm ? (
                 <button
                   onClick={() => setRotateConfirm(true)}
-                  className="flex items-center gap-2 px-3 py-2 rounded bg-discord-input hover:bg-red-500/20 hover:text-red-400 transition-colors text-sm"
+                  className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors text-sm"
                 >
                   <Icon name="refresh" size={16} />
                   Rotate key pair
@@ -1060,7 +1098,7 @@ function PrivacyTab() {
                   >
                     {rotateLoading ? 'Rotating…' : 'Confirm'}
                   </button>
-                  <button onClick={() => setRotateConfirm(false)} className="px-3 py-1 rounded bg-discord-input hover:bg-discord-muted/20 text-xs transition-colors">
+                  <button onClick={() => setRotateConfirm(false)} className="px-3 py-1 rounded bg-sp-input hover:bg-sp-muted/20 text-xs transition-colors">
                     Cancel
                   </button>
                 </div>
@@ -1072,6 +1110,24 @@ function PrivacyTab() {
             )}
           </div>
         )}
+      </div>
+
+      {/* DM Cache */}
+      <div className="bg-sp-sidebar rounded-lg p-4">
+        <div className="text-xs font-bold text-sp-muted uppercase mb-3">DM Cache</div>
+        <p className="text-xs text-sp-muted mb-3">Recent DM messages are cached locally so you can read them while offline. Clearing the cache removes all stored messages and conversations from this device.</p>
+        <button
+          onClick={async () => {
+            await clearDMCache()
+            setCacheCleared(true)
+            setTimeout(() => setCacheCleared(false), 3000)
+          }}
+          className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors text-sm"
+        >
+          <Icon name="trash" size={15} />
+          Clear DM cache
+        </button>
+        {cacheCleared && <p className="text-xs text-green-400 mt-2">Cache cleared.</p>}
       </div>
 
       {/* QR Scanner modal */}
@@ -1096,14 +1152,14 @@ function NotificationsTab() {
   return (
     <div>
       <h2 className="text-xl font-bold mb-1">Notifications</h2>
-      <p className="text-discord-muted text-sm mb-6">Control how you receive desktop push notifications.</p>
+      <p className="text-sp-muted text-sm mb-6">Control how you receive desktop push notifications.</p>
 
       {/* Enable toggle */}
-      <div className="bg-discord-sidebar rounded-lg p-4 mb-4">
+      <div className="bg-sp-sidebar rounded-lg p-4 mb-4">
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="font-semibold text-sm mb-0.5">Enable Desktop Notifications</div>
-            <div className="text-xs text-discord-muted">
+            <div className="text-xs text-sp-muted">
               Show a system notification when you receive a message while away.
             </div>
           </div>
@@ -1111,7 +1167,7 @@ function NotificationsTab() {
             role="switch"
             aria-checked={isEnabled}
             onClick={handleToggle}
-            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${isEnabled ? 'bg-green-500' : 'bg-discord-input'}`}
+            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${isEnabled ? 'bg-green-500' : 'bg-sp-input'}`}
           >
             <span
               className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}
@@ -1135,7 +1191,7 @@ function NotificationsTab() {
       )}
 
       {permission === 'default' && isEnabled && (
-        <div className="rounded-lg bg-discord-sidebar border border-white/10 px-4 py-3 text-sm text-discord-muted">
+        <div className="rounded-lg bg-sp-sidebar border border-white/10 px-4 py-3 text-sm text-sp-muted">
           <p className="mb-2">Browser permission is required before notifications can be shown.</p>
           <button onClick={enable} className="btn py-1 px-4 text-sm">
             Request Permission
@@ -1159,7 +1215,7 @@ function EditableField({ label, value, placeholder, readOnly, multiline, isEditi
     <div className="flex flex-col gap-1 py-2">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-bold text-discord-muted uppercase mb-1">{label}</div>
+          <div className="text-xs font-bold text-sp-muted uppercase mb-1">{label}</div>
           {isEditing ? (
             <div className="mt-1">
               {multiline ? (
@@ -1168,18 +1224,18 @@ function EditableField({ label, value, placeholder, readOnly, multiline, isEditi
                 <input className="input w-full" value={editValue} placeholder={placeholder} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => { if (e.key === 'Enter') onSave() }} />
               )}
               <div className="flex gap-2 mt-2 justify-end">
-                <button onClick={onCancel} className="text-sm px-3 py-1 hover:underline text-discord-muted">Cancel</button>
+                <button onClick={onCancel} className="text-sm px-3 py-1 hover:underline text-sp-muted">Cancel</button>
                 <button onClick={onSave} disabled={disabled} className="btn py-1 px-4">Save</button>
               </div>
             </div>
           ) : (
-            <div className="text-sm text-discord-text whitespace-pre-wrap break-words">
-              {value || <span className="italic text-discord-muted">{placeholder ?? 'Not set'}</span>}
+            <div className="text-sm text-sp-text whitespace-pre-wrap break-words">
+              {value || <span className="italic text-sp-muted">{placeholder ?? 'Not set'}</span>}
             </div>
           )}
         </div>
         {!isEditing && !readOnly && (
-          <button onClick={onEdit} className="shrink-0 bg-discord-bg hover:bg-discord-input px-3 py-1 rounded text-sm transition-colors">Edit</button>
+          <button onClick={onEdit} className="shrink-0 bg-sp-bg hover:bg-sp-input px-3 py-1 rounded text-sm transition-colors">Edit</button>
         )}
       </div>
     </div>
@@ -1240,8 +1296,8 @@ function TokensTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-discord-text mb-1">API Tokens</h2>
-        <p className="text-sm text-discord-muted">
+        <h2 className="text-xl font-semibold text-sp-text mb-1">API Tokens</h2>
+        <p className="text-sm text-sp-muted">
           Personal API tokens let scripts and bots act on your behalf.
           Tokens are shown only once at creation.
         </p>
@@ -1249,23 +1305,23 @@ function TokensTab() {
 
       {/* Token list */}
       <div className="space-y-2">
-        {isLoading && <p className="text-discord-muted text-sm">Loading…</p>}
+        {isLoading && <p className="text-sp-muted text-sm">Loading…</p>}
         {!isLoading && tokens.length === 0 && (
-          <p className="text-discord-muted text-sm">No active tokens.</p>
+          <p className="text-sp-muted text-sm">No active tokens.</p>
         )}
         {tokens.map((t) => (
-          <div key={t.id} className="flex items-center gap-3 px-4 py-3 rounded-md bg-discord-input">
-            <Icon name="key" size={16} className="shrink-0 text-discord-muted" />
+          <div key={t.id} className="flex items-center gap-3 px-4 py-3 rounded-md bg-sp-input">
+            <Icon name="key" size={16} className="shrink-0 text-sp-muted" />
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-discord-text truncate">{t.name}</div>
-              <div className="text-xs text-discord-muted font-mono">
+              <div className="font-medium text-sp-text truncate">{t.name}</div>
+              <div className="text-xs text-sp-muted font-mono">
                 {t.token_prefix}{'·'.repeat(8)}
                 <span className="ml-3 font-sans">Last used: {fmtDate(t.last_used_at)}</span>
               </div>
             </div>
             {revokeId === t.id ? (
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-discord-muted">Revoke?</span>
+                <span className="text-sp-muted">Revoke?</span>
                 <button
                   onClick={() => revokeMut.mutate(t.id)}
                   disabled={revokeMut.isPending}
@@ -1273,7 +1329,7 @@ function TokensTab() {
                 >
                   Yes
                 </button>
-                <button onClick={() => setRevokeId(null)} className="px-2 py-0.5 rounded bg-discord-muted/20 hover:bg-discord-muted/30 text-discord-text text-xs">
+                <button onClick={() => setRevokeId(null)} className="px-2 py-0.5 rounded bg-sp-muted/20 hover:bg-sp-muted/30 text-sp-text text-xs">
                   Cancel
                 </button>
               </div>
@@ -1281,7 +1337,7 @@ function TokensTab() {
               <button
                 onClick={() => setRevokeId(t.id)}
                 title="Revoke token"
-                className="p-1.5 rounded hover:bg-red-500/20 text-discord-muted hover:text-red-400 transition-colors"
+                className="p-1.5 rounded hover:bg-red-500/20 text-sp-muted hover:text-red-400 transition-colors"
               >
                 <Icon name="trash" size={15} />
               </button>
@@ -1294,7 +1350,7 @@ function TokensTab() {
       <button
         onClick={() => { setShowCreate(true); setNewName('') }}
         disabled={atCap}
-        className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+        className="px-4 py-2 rounded-m3-sm bg-sp-mention hover:bg-sp-mention/85 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
         title={atCap ? `Maximum of ${MAX_TOKENS} active tokens` : undefined}
       >
         Create Token ({activeCount}/{MAX_TOKENS})
@@ -1303,26 +1359,26 @@ function TokensTab() {
       {/* Create modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowCreate(false)}>
-          <div className="bg-discord-sidebar rounded-lg shadow-xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-discord-text">New API Token</h3>
+          <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-lg w-full max-w-sm p-6 space-y-4" style={{ boxShadow: 'var(--m3-shadow-3)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-sp-text">New API Token</h3>
             <div>
-              <label className="block text-xs font-semibold text-discord-muted uppercase mb-1">Token Name</label>
+              <label className="block text-xs font-semibold text-sp-muted uppercase mb-1">Token Name</label>
               <input
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && newName.trim()) createMut.mutate(newName.trim()) }}
                 placeholder="e.g. My bot"
-                className="w-full px-3 py-2 rounded bg-discord-input border border-discord-border text-discord-text placeholder:text-discord-muted text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 rounded-m3-sm bg-sp-input border border-sp-divider/50 text-sp-text placeholder:text-sp-muted text-sm focus:outline-none focus:ring-2 focus:ring-sp-mention/60"
               />
             </div>
             {createMut.isError && <p className="text-red-400 text-sm">{(createMut.error as Error)?.message ?? 'Failed to create token.'}</p>}
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded text-discord-muted hover:text-discord-text text-sm">Cancel</button>
+              <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded text-sp-muted hover:text-sp-text text-sm">Cancel</button>
               <button
                 onClick={() => { if (newName.trim()) createMut.mutate(newName.trim()) }}
                 disabled={!newName.trim() || createMut.isPending}
-                className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium"
+                className="px-4 py-2 rounded-m3-sm bg-sp-mention hover:bg-sp-mention/85 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium"
               >
                 {createMut.isPending ? 'Creating…' : 'Create'}
               </button>
@@ -1334,8 +1390,8 @@ function TokensTab() {
       {/* One-time token reveal modal */}
       {revealed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-discord-sidebar rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-discord-text">Token Created</h3>
+          <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-lg w-full max-w-md p-6 space-y-4" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
+            <h3 className="text-lg font-semibold text-sp-text">Token Created</h3>
             <p className="text-sm text-yellow-400 font-medium">
               Copy your token now. It will not be shown again.
             </p>
@@ -1343,13 +1399,13 @@ function TokensTab() {
               <input
                 readOnly
                 value={revealed.token}
-                className="flex-1 px-3 py-2 rounded bg-discord-input border border-discord-border text-discord-text font-mono text-xs focus:outline-none select-all"
+                className="flex-1 px-3 py-2 rounded-m3-sm bg-sp-input border border-sp-divider/50 text-sp-text font-mono text-xs focus:outline-none select-all"
                 onFocus={(e) => e.target.select()}
               />
               <button
                 onClick={handleCopy}
                 title="Copy to clipboard"
-                className="p-2 rounded bg-discord-input hover:bg-discord-muted/30 text-discord-muted hover:text-discord-text transition-colors"
+                className="p-2 rounded bg-sp-input hover:bg-sp-muted/30 text-sp-muted hover:text-sp-text transition-colors"
               >
                 <Icon name={copied ? 'checkmark' : 'copy'} size={16} />
               </button>
@@ -1358,7 +1414,7 @@ function TokensTab() {
             <div className="flex justify-end">
               <button
                 onClick={() => { setRevealed(null); setCopied(false) }}
-                className="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium"
+                className="px-4 py-2 rounded-m3-sm bg-sp-mention hover:bg-sp-mention/85 text-white text-sm font-medium"
               >
                 Done
               </button>
@@ -1384,19 +1440,19 @@ export function SettingsPage() {
   }, [navigate])
 
   return (
-    <div className="flex h-screen w-full bg-discord-bg text-discord-text overflow-hidden">
+    <div className="flex h-screen w-full bg-sp-bg text-sp-text overflow-hidden">
 
       {/* Nav sidebar */}
-      <div className="flex flex-col w-[218px] shrink-0 bg-discord-sidebar px-2 py-6 overflow-y-auto">
+      <div className="flex flex-col w-[218px] shrink-0 bg-sp-sidebar px-2 py-6 overflow-y-auto">
         {NAV.map(group => (
           <div key={group.group} className="mb-4">
-            <div className="px-2 mb-1 text-[11px] font-bold text-discord-muted uppercase tracking-wide">{group.group}</div>
+            <div className="px-2 mb-1 text-[11px] font-bold text-sp-muted uppercase tracking-wide">{group.group}</div>
             {group.items.map(item => (
               <button
                 key={item.id}
                 onClick={() => setTab(item.id)}
                 className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium transition-colors
-                  ${tab === item.id ? 'bg-discord-input text-discord-text' : 'text-discord-muted hover:bg-discord-input/50 hover:text-discord-text'}`}
+                  ${tab === item.id ? 'bg-sp-input text-sp-text' : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
               >
                 <Icon name={item.icon} size={16} className="shrink-0" />
                 {item.label}
@@ -1426,10 +1482,10 @@ export function SettingsPage() {
         </div>
         {/* Close button */}
         <div className="p-4 shrink-0 flex flex-col items-center gap-1">
-          <button onClick={() => navigate(-1)} title="Close (Esc)" className="w-9 h-9 rounded-full bg-discord-input hover:bg-discord-muted/30 flex items-center justify-center transition-colors group">
-            <Icon name="close" size={20} className="text-discord-muted group-hover:text-discord-text" />
+          <button onClick={() => navigate(-1)} title="Close (Esc)" className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-muted/30 flex items-center justify-center transition-colors group">
+            <Icon name="close" size={20} className="text-sp-muted group-hover:text-sp-text" />
           </button>
-          <span className="text-[10px] text-discord-muted">ESC</span>
+          <span className="text-[10px] text-sp-muted">ESC</span>
         </div>
       </div>
     </div>

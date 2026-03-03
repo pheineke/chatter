@@ -63,15 +63,15 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
   }, [onClose])
 
   return (
-    <div className="w-72 flex flex-col bg-discord-sidebar border-l-2 border-white/[0.07] h-full">
+    <div className="w-72 flex flex-col bg-sp-sidebar border-l border-sp-divider/50 h-full">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 h-12 border-b border-white/[0.07] shrink-0">
-        <span className="text-discord-muted text-xs font-semibold uppercase tracking-wide">
+        <span className="text-sp-muted text-xs font-semibold uppercase tracking-wide">
           {results.length > 0 ? `${results.length} result${results.length !== 1 ? 's' : ''}` : 'Search Results'}
         </span>
         <button
           onClick={onClose}
-          className="ml-auto text-discord-muted hover:text-discord-text transition-colors shrink-0"
+          className="ml-auto text-sp-muted hover:text-sp-text transition-colors shrink-0"
           title="Close search"
         >
           <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -83,19 +83,19 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
       {/* Results */}
       <div className="flex-1 overflow-y-auto">
         {loading && (
-          <p className="text-discord-muted text-xs text-center py-6">Searching…</p>
+          <p className="text-sp-muted text-xs text-center py-6">Searching…</p>
         )}
         {error && (
           <p className="text-red-400 text-xs text-center py-6">{error}</p>
         )}
         {!loading && !error && query.trim() && results.length === 0 && (
-          <p className="text-discord-muted text-xs text-center py-6">No results found.</p>
+          <p className="text-sp-muted text-xs text-center py-6">No results found.</p>
         )}
         {!loading && results.map(msg => (
           <button
             key={msg.id}
             onClick={() => { onJump(msg.id); onClose() }}
-            className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-black/10"
+            className="w-full text-left px-3 py-2 hover:bg-sp-hover transition-colors border-b border-sp-divider/40"
           >
             <div className="flex items-center gap-2 mb-0.5">
               {/* Avatar */}
@@ -106,20 +106,20 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
                   className="w-5 h-5 rounded-full object-cover shrink-0"
                 />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-discord-primary flex items-center justify-center shrink-0">
+                <div className="w-5 h-5 rounded-full bg-sp-primary flex items-center justify-center shrink-0">
                   <span className="text-white text-[10px] font-bold">
                     {msg.author.username[0]?.toUpperCase()}
                   </span>
                 </div>
               )}
-              <span className="text-xs font-semibold text-discord-text truncate">
+              <span className="text-xs font-semibold text-sp-text truncate">
                 {msg.author.username}
               </span>
-              <span className="text-[10px] text-discord-muted ml-auto shrink-0">
+              <span className="text-[10px] text-sp-muted ml-auto shrink-0">
                 {formatDate(msg.created_at)}
               </span>
             </div>
-            <p className="text-xs text-discord-muted leading-snug line-clamp-2 pl-7">
+            <p className="text-xs text-sp-muted leading-snug line-clamp-2 pl-7">
               {msg.content ?? <em>No text content</em>}
             </p>
           </button>

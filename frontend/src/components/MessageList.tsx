@@ -4,6 +4,7 @@ import { getMessages } from '../api/messages'
 import { MessageBubble } from './MessageBubble'
 import { Icon } from './Icon'
 import type { Message } from '../api/types'
+import { cachePutMessages } from '../db/dmCache'
 
 const COMPACT_THRESHOLD_MS = 7 * 60 * 1000 // 7 minutes
 const PAGE_SIZE = 50
@@ -55,6 +56,20 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
   // Flatten pages: pages[0] = latest batch, pages[1] = older batch, etc.
   // Render order: oldest first → reverse the pages array then flat
   const messages: Message[] = data ? data.pages.slice().reverse().flat() : []
+
+  // Mirror DM pages to IndexedDB for offline reading.
+  // We track how many pages have been persisted so we only write new ones.
+  const cachedPageCount = useRef(0)
+  useEffect(() => {
+    if (!partnerId || !data) return
+    const total = data.pages.length
+    if (total <= cachedPageCount.current) return
+    const newMsgs = data.pages.slice(cachedPageCount.current).flat()
+    if (newMsgs.length) {
+      cachePutMessages(newMsgs).catch(() => {})
+      cachedPageCount.current = total
+    }
+  }, [data, partnerId])
 
   // Auto-scroll to bottom on initial load and on new messages (last page grows)
   const lastPageLength = data?.pages[0]?.length ?? 0
@@ -140,7 +155,7 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-discord-muted">
+      <div className="flex-1 flex items-center justify-center text-sp-muted">
         Loading messages…
       </div>
     )
@@ -148,9 +163,9 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col justify-end pb-4 px-4 text-discord-muted">
+      <div className="flex-1 flex flex-col justify-end pb-4 px-4 text-sp-muted">
         <Icon name="hash" size={72} className="mb-4 opacity-20" />
-        <p className="text-2xl font-bold text-discord-text mb-1">This is the beginning of the channel.</p>
+        <p className="text-2xl font-bold text-sp-text mb-1">This is the beginning of the channel.</p>
         <p className="text-sm">Send a message to get things started.</p>
       </div>
     )
@@ -164,13 +179,13 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
 
       {/* Spinner / beginning-of-channel indicator */}
       {isFetchingNextPage ? (
-        <div className="flex justify-center py-3 text-discord-muted text-sm">
+        <div className="flex justify-center py-3 text-sp-muted text-sm">
           Loading older messages…
         </div>
       ) : !hasNextPage ? (
-        <div className="flex flex-col py-6 px-4 text-discord-muted select-none">
+        <div className="flex flex-col py-6 px-4 text-sp-muted select-none">
           <Icon name="hash" size={72} className="mb-4 opacity-20" />
-          <p className="text-2xl font-bold text-discord-text mb-1">You've reached the beginning.</p>
+          <p className="text-2xl font-bold text-sp-text mb-1">You've reached the beginning.</p>
           <p className="text-sm">That's everything in this channel.</p>
         </div>
       ) : null}
@@ -199,7 +214,7 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
       {showScrollDown && (
         <button
           onClick={() => scrollToBottom()}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-discord-sidebar border border-white/10 text-discord-text text-sm font-semibold px-4 py-1.5 rounded-full shadow-xl hover:bg-discord-input transition-colors z-10 whitespace-nowrap"
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-sp-popup border border-sp-divider/60 text-sp-text text-sm font-semibold px-4 py-1.5 rounded-full shadow-sp-2 hover:bg-sp-hover transition-colors z-10 whitespace-nowrap"
         >
           <span>Jump to bottom</span>
           <Icon name="arrow-down" size={14} />

@@ -194,12 +194,12 @@ export default function QRLoginPage() {
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen items-center justify-center bg-discord-bg">
-      <div className="flex w-full max-w-4xl overflow-hidden rounded-2xl bg-discord-sidebar shadow-2xl">
+    <div className="flex h-screen items-center justify-center bg-sp-bg">
+      <div className="flex w-full max-w-4xl overflow-hidden rounded-2xl bg-sp-sidebar shadow-2xl">
         {/* Left panel */}
-        <div className="flex w-1/2 flex-col items-center justify-center gap-6 bg-discord-bg px-8 py-12">
+        <div className="flex w-1/2 flex-col items-center justify-center gap-6 bg-sp-bg px-8 py-12">
           <h2 className="text-2xl font-bold text-white text-center">Log in with QR Code</h2>
-          <p className="text-center text-sm text-discord-muted leading-relaxed">
+          <p className="text-center text-sm text-sp-muted leading-relaxed">
             Scan this code with your phone.<br />
             Logging in this way gives the new device your E2EE key — no password needed.
           </p>
@@ -207,8 +207,8 @@ export default function QRLoginPage() {
           {/* QR code area */}
           <div className="relative flex items-center justify-center rounded-2xl bg-white p-4 shadow-md w-56 h-56">
             {phase === 'initialising' && (
-              <div className="flex flex-col items-center gap-3 text-discord-muted text-sm">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-discord-mention border-t-transparent" />
+              <div className="flex flex-col items-center gap-3 text-sp-muted text-sm">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-sp-mention border-t-transparent" />
                 Generating…
               </div>
             )}
@@ -224,21 +224,21 @@ export default function QRLoginPage() {
             )}
 
             {phase === 'expired' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-discord-bg/90 backdrop-blur-sm">
-                <Icon name="clock" size={32} className="text-discord-muted" />
-                <span className="text-sm text-discord-muted">Expired</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-sp-bg/90 backdrop-blur-sm">
+                <Icon name="clock" size={32} className="text-sp-muted" />
+                <span className="text-sm text-sp-muted">Expired</span>
               </div>
             )}
 
             {phase === 'approved' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-discord-online/20 backdrop-blur-sm">
-                <Icon name="check-circle" size={32} className="text-discord-online" />
-                <span className="text-sm text-discord-online font-semibold">Approved!</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-sp-online/20 backdrop-blur-sm">
+                <Icon name="check-circle" size={32} className="text-sp-online" />
+                <span className="text-sm text-sp-online font-semibold">Approved!</span>
               </div>
             )}
 
             {phase === 'error' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-discord-dnd/20 backdrop-blur-sm">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-sp-dnd/20 backdrop-blur-sm">
                 <Icon name="alert-circle" size={32} className="text-red-400" />
                 <span className="text-xs text-red-400 text-center px-2">{errorMsg}</span>
               </div>
@@ -250,13 +250,13 @@ export default function QRLoginPage() {
             <div className="flex items-center gap-2 text-sm">
               {phase === 'scanned' ? (
                 <>
-                  <Icon name="smartphone" size={16} className="text-discord-online" />
-                  <span className="text-discord-online font-medium">Phone connected — awaiting approval…</span>
+                  <Icon name="smartphone" size={16} className="text-sp-online" />
+                  <span className="text-sp-online font-medium">Phone connected — awaiting approval…</span>
                 </>
               ) : (
                 <>
-                  <div className="h-2 w-2 animate-pulse rounded-full bg-discord-mention" />
-                  <span className="text-discord-muted">Waiting for scan — expires in {secondsLeft}s</span>
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-sp-mention" />
+                  <span className="text-sp-muted">Waiting for scan — expires in {secondsLeft}s</span>
                 </>
               )}
             </div>
@@ -265,7 +265,7 @@ export default function QRLoginPage() {
           {(phase === 'expired' || phase === 'error') && (
             <button
               onClick={startSession}
-              className="rounded bg-discord-mention px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition flex items-center gap-2"
+              className="rounded-m3-sm bg-sp-mention px-4 py-2 text-sm font-semibold text-white hover:bg-sp-mention/85 transition flex items-center gap-2"
             >
               <Icon name="refresh-cw" size={16} />
               Generate New Code
@@ -276,7 +276,7 @@ export default function QRLoginPage() {
         {/* Right panel — instructions */}
         <div className="flex w-1/2 flex-col justify-center gap-6 px-10 py-12">
           <h3 className="text-lg font-bold text-white">How to use</h3>
-          <ol className="space-y-4 text-sm text-discord-muted">
+          <ol className="space-y-4 text-sm text-sp-muted">
             {[
               { icon: 'smartphone', text: 'Open Chatter on your phone (or another trusted device where you\'re already logged in).' },
               { icon: 'settings', text: 'Go to Settings →  Scan QR Code.' },
@@ -284,7 +284,7 @@ export default function QRLoginPage() {
               { icon: 'check-circle', text: 'Tap Approve to log in instantly. Your E2EE keys will be transferred securely.' },
             ].map((step, i) => (
               <li key={i} className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-discord-mention/20 text-xs font-bold text-discord-mention">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sp-mention/20 text-xs font-bold text-sp-mention">
                   {i + 1}
                 </span>
                 <span className="leading-relaxed">{step.text}</span>
@@ -292,15 +292,15 @@ export default function QRLoginPage() {
             ))}
           </ol>
 
-          <div className="mt-2 rounded-lg bg-discord-bg px-4 py-3 text-xs text-discord-muted border border-discord-input">
-            <Icon name="shield" size={12} className="inline mr-1 text-discord-online" />
+          <div className="mt-2 rounded-lg bg-sp-bg px-4 py-3 text-xs text-sp-muted border border-sp-input">
+            <Icon name="shield" size={12} className="inline mr-1 text-sp-online" />
             Your password is never transmitted. Keys are exchanged using{' '}
             <strong className="text-white">ECDH P-256</strong> — even the server cannot read them.
           </div>
 
           <Link
             to="/login"
-            className="text-sm text-discord-mention hover:underline"
+            className="text-sm text-sp-mention hover:underline"
           >
             ← Back to password login
           </Link>

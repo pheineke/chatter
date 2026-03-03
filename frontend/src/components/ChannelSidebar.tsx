@@ -327,14 +327,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-discord-channels">
+    <div className="flex flex-col h-full overflow-hidden bg-sp-channels">
       {/* Server name header */}
       <div
-        className="px-4 font-bold border-b border-white/[0.07] flex items-center justify-between cursor-pointer hover:bg-discord-input/30 transition-colors select-none h-12 shrink-0"
+        className="px-4 font-bold border-b border-sp-divider/50 flex items-center justify-between cursor-pointer hover:bg-sp-hover/60 transition-colors select-none h-12 shrink-0"
         onClick={handleHeaderClick}
       >
         <span className="truncate">{server?.title ?? 'Server'}</span>
-        <Icon name="chevron-down" size={16} className="text-discord-muted shrink-0" />
+        <Icon name="chevron-down" size={16} className="text-sp-muted shrink-0" />
       </div>
 
       {/* Channel list */}
@@ -384,7 +384,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   const ch = channels.find(c => c.id === dragId.replace('ch:', ''))
                   if (!ch) return null
                   return (
-                    <div className="bg-discord-input/90 rounded px-2 py-1 mx-1 flex items-center gap-1.5 text-sm text-discord-text shadow-xl cursor-grabbing">
+                    <div className="bg-sp-input/90 rounded px-2 py-1 mx-1 flex items-center gap-1.5 text-sm text-sp-text shadow-xl cursor-grabbing">
                       <Icon name={ch.type === 'voice' ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
                       <span className="truncate">{ch.title}</span>
                     </div>
@@ -394,7 +394,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   const cat = categories.find(c => c.id === dragId.replace('cat:', ''))
                   if (!cat) return null
                   return (
-                    <div className="px-3 py-1 text-xs font-semibold uppercase text-discord-muted tracking-wider bg-discord-sidebar shadow-xl rounded cursor-grabbing">
+                    <div className="px-3 py-1 text-xs font-semibold uppercase text-sp-mention tracking-wider bg-sp-hover rounded-full shadow-sp-2 cursor-grabbing">
                       {cat.title}
                     </div>
                   )
@@ -416,7 +416,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                     key={itemId}
                     onClick={() => toggleCat(cat.id)}
                     onContextMenu={e => openCategoryContextMenu(e, cat)}
-                    className="w-full flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider hover:text-discord-text transition-colors select-none"
+                    className="w-full flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-sp-muted tracking-wider hover:text-sp-text transition-colors select-none"
                   >
                     <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
                     {cat.title}
@@ -452,9 +452,9 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {/* Edit category modal */}
       {editCategory && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditCategory(null)}>
-          <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Edit Category</h2>
-            <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Category Name</label>
+            <label className="text-xs font-semibold uppercase text-sp-muted block mb-1">Category Name</label>
             <input
               autoFocus
               className="input w-full mb-4"
@@ -466,7 +466,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               <button className="btn flex-1" onClick={handleSaveEditCategory} disabled={!editCategoryName.trim()}>
                 Save
               </button>
-              <button className="btn flex-1 bg-discord-input hover:bg-discord-input/70" onClick={() => setEditCategory(null)}>
+              <button className="btn flex-1 bg-sp-input hover:bg-sp-input/70" onClick={() => setEditCategory(null)}>
                 Cancel
               </button>
             </div>
@@ -477,7 +477,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {/* Add category modal */}
       {showAddCategory && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddCategory(false)}>
-          <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Create Category</h2>
             <input
               autoFocus
@@ -497,14 +497,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {/* Add channel modal */}
       {showAddChannel && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddChannel(false)}>
-          <div className="bg-discord-sidebar rounded-lg p-6 w-80" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Add Channel</h2>
             <div className="flex gap-2 mb-3">
               {(['text', 'voice'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setNewChannelType(t)}
-                  className={`flex-1 py-1 rounded text-sm flex items-center justify-center gap-1 ${newChannelType === t ? 'bg-discord-mention text-white' : 'bg-discord-input text-discord-text'}`}
+                  className={`flex-1 py-1 rounded text-sm flex items-center justify-center gap-1 ${newChannelType === t ? 'bg-sp-mention text-white' : 'bg-sp-input text-sp-text'}`}
                 >
                   {t === 'text'
                     ? <><Icon name="hash" size={14} /> Text</>
@@ -548,13 +548,13 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {/* Delete confirmation modal */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setConfirmDelete(null)}>
-          <div className="bg-discord-sidebar rounded-lg p-6 w-96 shadow-xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-96 shadow-sp-3" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-2">
               Delete {confirmDelete.kind === 'channel' ? 'Channel' : 'Category'}
             </h2>
-            <p className="text-discord-muted text-sm mb-1">
+            <p className="text-sp-muted text-sm mb-1">
               Are you sure you want to delete{' '}
-              <span className="font-semibold text-discord-text">
+              <span className="font-semibold text-sp-text">
                 {confirmDelete.kind === 'channel' ? '# ' : ''}{confirmDelete.name}
               </span>?
             </p>
@@ -568,13 +568,13 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
             )}
             <div className="flex gap-2 justify-end">
               <button
-                className="px-4 py-2 rounded text-sm text-discord-muted hover:text-discord-text bg-discord-input hover:bg-discord-input/70 transition-colors"
+                className="px-4 py-2 rounded-full text-sm text-sp-muted hover:text-sp-text bg-sp-input hover:bg-sp-hover transition-colors"
                 onClick={() => setConfirmDelete(null)}
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 rounded text-sm font-semibold text-white bg-red-600 hover:bg-red-500 transition-colors"
+                className="px-4 py-2 rounded-full text-sm font-semibold text-white bg-sp-danger hover:bg-red-500 transition-colors"
                 onClick={async () => {
                   if (!serverId) return
                   const target = confirmDelete
@@ -600,10 +600,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {/* Edit channel modal */}
       {editChannel && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditChannel(null)}>
-          <div className="bg-discord-sidebar rounded-lg w-[560px] max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl w-[560px] max-h-[90vh] flex flex-col overflow-hidden shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 pt-6 pb-0 shrink-0">
-              <h2 className="text-lg font-bold mb-4">Edit Channel — <span className="text-discord-muted font-normal"># {editChannel.title}</span></h2>
+              <h2 className="text-lg font-bold mb-4">Edit Channel — <span className="text-sp-muted font-normal"># {editChannel.title}</span></h2>
               {/* Tabs */}
               <div className="flex gap-1 border-b border-black/20">
                 {(['overview', 'permissions'] as const).map(t => (
@@ -613,7 +613,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                     className={`px-4 py-2 text-sm font-semibold capitalize border-b-2 -mb-px transition-colors
                       ${editChannelTab === t
                         ? 'border-white text-white'
-                        : 'border-transparent text-discord-muted hover:text-discord-text'}`}
+                        : 'border-transparent text-sp-muted hover:text-sp-text'}`}
                   >
                     {t}
                   </button>
@@ -626,7 +626,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               {editChannelTab === 'overview' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Channel Name</label>
+                    <label className="text-xs font-semibold uppercase text-sp-muted block mb-1">Channel Name</label>
                     <input
                       className="input w-full"
                       value={editChannelName}
@@ -636,7 +636,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Channel Topic <span className="normal-case font-normal">(optional)</span></label>
+                    <label className="text-xs font-semibold uppercase text-sp-muted block mb-1">Channel Topic <span className="normal-case font-normal">(optional)</span></label>
                     <textarea
                       className="input w-full resize-none text-sm"
                       rows={3}
@@ -647,7 +647,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase text-discord-muted block mb-1">Slowmode</label>
+                    <label className="text-xs font-semibold uppercase text-sp-muted block mb-1">Slowmode</label>
                     <select
                       className="input w-full text-sm"
                       value={editSlowmode}
@@ -678,14 +678,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                 <button className="btn flex-1" onClick={handleSaveEditChannel} disabled={!editChannelName.trim()}>
                   Save
                 </button>
-                <button className="btn flex-1 bg-discord-input hover:bg-discord-input/70" onClick={() => setEditChannel(null)}>
+                <button className="btn flex-1 bg-sp-input hover:bg-sp-input/70" onClick={() => setEditChannel(null)}>
                   Cancel
                 </button>
               </div>
             )}
             {editChannelTab === 'permissions' && (
               <div className="px-6 py-4 border-t border-black/20 shrink-0">
-                <button className="btn bg-discord-input hover:bg-discord-input/70" onClick={() => setEditChannel(null)}>
+                <button className="btn bg-sp-input hover:bg-sp-input/70" onClick={() => setEditChannel(null)}>
                   Close
                 </button>
               </div>
@@ -792,27 +792,27 @@ function ChannelPermTab({ serverId, channelId }: { serverId: string; channelId: 
   }
 
   if (!permsLoaded || !draft) {
-    return <div className="py-8 text-center text-discord-muted text-sm">Loading permissions…</div>
+    return <div className="py-8 text-center text-sp-muted text-sm">Loading permissions…</div>
   }
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-discord-muted">
+      <p className="text-xs text-sp-muted">
         Control what each role can do in this channel. Overrides take precedence over server-wide role permissions.<br />
         <span className="inline-flex items-center gap-3 mt-1">
           <span className="text-green-400 font-semibold">✓ Allow</span>
           <span className="text-red-400 font-semibold">✗ Deny</span>
-          <span className="text-discord-muted font-semibold">— Inherit</span>
+          <span className="text-sp-muted font-semibold">— Inherit</span>
         </span>
       </p>
 
       <div className="overflow-x-auto rounded-lg border border-black/20">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-discord-input/40">
-              <th className="px-3 py-2 text-left text-xs font-bold uppercase text-discord-muted tracking-wider min-w-[140px]">Role</th>
+            <tr className="bg-sp-input/40">
+              <th className="px-3 py-2 text-left text-xs font-bold uppercase text-sp-muted tracking-wider min-w-[140px]">Role</th>
               {PERM_COLUMNS.map(col => (
-                <th key={col.key} className="px-2 py-2 text-center text-xs font-bold uppercase text-discord-muted tracking-wider whitespace-nowrap">{col.label}</th>
+                <th key={col.key} className="px-2 py-2 text-center text-xs font-bold uppercase text-sp-muted tracking-wider whitespace-nowrap">{col.label}</th>
               ))}
             </tr>
           </thead>
@@ -820,7 +820,7 @@ function ChannelPermTab({ serverId, channelId }: { serverId: string; channelId: 
             {roles.map((role, i) => {
               const bits = draft[role.id] ?? { allow_bits: 0, deny_bits: 0 }
               return (
-                <tr key={role.id} className={i % 2 === 0 ? 'bg-discord-sidebar' : 'bg-discord-input/10'}>
+                <tr key={role.id} className={i % 2 === 0 ? 'bg-sp-sidebar' : 'bg-sp-input/10'}>
                   <td className="px-3 py-2 font-medium text-sm" style={{ color: role.color ?? undefined }}>
                     {role.name}
                     {role.is_admin && <span className="ml-1.5 text-[10px] text-yellow-400 opacity-80">ADMIN</span>}
@@ -836,7 +836,7 @@ function ChannelPermTab({ serverId, channelId }: { serverId: string; channelId: 
                           className={`w-7 h-7 rounded flex items-center justify-center mx-auto text-sm font-bold transition-colors
                             ${state === 'allow' ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                               : state === 'deny' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                              : 'bg-discord-input/60 text-discord-muted hover:bg-discord-input'}`}
+                              : 'bg-sp-input/60 text-sp-muted hover:bg-sp-input'}`}
                         >
                           {state === 'allow' ? '✓' : state === 'deny' ? '✗' : '—'}
                         </button>
@@ -854,7 +854,7 @@ function ChannelPermTab({ serverId, channelId }: { serverId: string; channelId: 
         <button
           onClick={handleSave}
           disabled={saving}
-          className="bg-discord-mention text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-discord-mention/80 transition-colors disabled:opacity-50"
+          className="bg-sp-mention text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-sp-mention/80 transition-colors disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save Permissions'}
         </button>
@@ -943,22 +943,22 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
       <button
         onClick={handleClick}
         onContextMenu={onContextMenu}
-        className={`w-full flex items-center gap-1.5 px-2 py-1 mx-1 rounded text-sm transition-colors
-          ${active
-            ? 'bg-white/10 text-discord-text font-medium'
+        className={`w-full flex items-center gap-2 px-3 py-1.5 mx-1 rounded-lg text-sm transition-all duration-200 ease-out
+          ${active 
+            ? 'bg-sp-hover font-bold text-sp-text shadow-sm' 
             : hasUnread
-              ? 'text-discord-text font-semibold hover:bg-white/5'
-              : 'text-discord-muted hover:bg-white/5 hover:text-discord-text'}`}
+              ? 'text-sp-text font-semibold hover:bg-sp-hover/60 hover:scale-[1.01]'
+              : 'text-sp-muted hover:bg-sp-hover/60 hover:text-sp-text hover:scale-[1.01]'}`}
       >
-        <Icon name={isVoice ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
+        <Icon name={isVoice ? 'headphones' : 'hash'} size={18} className={`shrink-0 transition-colors ${active ? 'text-sp-primary' : 'opacity-70'}`} />
         <span className="truncate">{channel.title}</span>
         {isMuted && (
-          <span className="ml-1 text-discord-muted" title="Notifications muted">
+          <span className="ml-1 text-sp-muted" title="Notifications muted">
             <Icon name="bell-off" size={14} />
           </span>
         )}
         {hasUnread && !active && (
-          <span className="ml-auto w-2 h-2 rounded-full bg-white shrink-0" aria-label="Unread messages" />
+          <span className="ml-auto w-2 h-2 rounded-full bg-sp-mention shrink-0" aria-label="Unread messages" />
         )}
       </button>
 
@@ -968,13 +968,13 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
           {participantUsers.map(({ user: u, isSelf, isSpeaking, isMuted, isDeafened, isSharingScreen }) => (
             <div 
               key={u.id} 
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-discord-muted hover:bg-discord-input/40 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs text-sp-muted hover:bg-sp-channel-hover cursor-pointer"
               onClick={(e) => handleUserClick(e, u.id)}
             >
               <AvatarWithStatus
                 user={u}
                 size={20}
-                className={`rounded-full transition-all ${isSpeaking ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-discord-sidebar' : ''}`}
+                className={`rounded-full transition-all ${isSpeaking ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-sp-sidebar' : ''}`}
               />
               <span className={`truncate flex-1 transition-colors ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>
               {/* Right-side status indicators */}
@@ -1013,7 +1013,7 @@ function SortableCatHeader({ id, title, collapsed, onToggle, onContextMenu }: { 
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`group flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-discord-muted tracking-wider select-none cursor-pointer hover:text-discord-text transition-colors ${isDragging ? 'opacity-0' : ''}`}
+      className={`group flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-sp-muted tracking-wider select-none cursor-pointer hover:text-sp-text transition-colors ${isDragging ? 'opacity-0' : ''}`}
       onClick={onToggle}
       onContextMenu={onContextMenu}
       {...attributes}
@@ -1048,7 +1048,7 @@ function SortableChannelItem({ id, children }: { id: string; children: ReactNode
         ref={setActivatorNodeRef}
         {...listeners}
         title="Drag to reorder"
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing text-discord-muted transition-opacity"
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing text-sp-muted transition-opacity"
       >
         <Icon name="menu" size={11} />
       </span>

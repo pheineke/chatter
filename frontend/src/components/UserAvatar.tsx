@@ -87,7 +87,7 @@ export function UserAvatar({ user, size = 40, className = '', hideDecoration = f
       <div style={{ position: 'relative', width: px, height: px, minWidth: px }} className={`shrink-0 ${className}`}>
         <div
           style={style}
-          className="rounded-full bg-discord-input flex items-center justify-center"
+          className="rounded-full bg-sp-input flex items-center justify-center"
         />
       </div>
     )

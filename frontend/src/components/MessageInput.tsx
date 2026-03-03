@@ -22,6 +22,10 @@ interface Props {
   onTyping?: () => void
   /** slowmode_delay in seconds from the channel settings; 0 = disabled */
   slowmodeDelay?: number
+  /** When true the input shows a "You are offline" indicator and routes sends to onOfflineSubmit */
+  isOffline?: boolean
+  /** Called instead of the normal API send when isOffline is true */
+  onOfflineSubmit?: (content: string) => void
 }
 
 /** Scan backwards from `cursorPos` in `text` to find an active @ trigger.
@@ -39,7 +43,7 @@ function findMentionTrigger(text: string, cursorPos: number): { query: string; t
   return { query: query.toLowerCase(), triggerStart: i }
 }
 
-export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping, slowmodeDelay = 0 }: Props) {
+export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping, slowmodeDelay = 0, isOffline = false, onOfflineSubmit }: Props) {
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -174,6 +178,12 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     if (inCooldown) return
     const trimmed = text.trim()
     if (!trimmed) return
+    if (isOffline && onOfflineSubmit) {
+      onOfflineSubmit(trimmed)
+      setText('')
+      setMentionQuery(null)
+      return
+    }
     sendMut.mutate(trimmed)
     setText('')
     setMentionQuery(null)
@@ -273,23 +283,23 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       {mentionQuery !== null && mentionCandidates.length > 0 && (
         <div
           ref={mentionListRef}
-          className="absolute bottom-full mb-1 left-4 right-4 bg-discord-sidebar border border-white/10 rounded-lg shadow-xl overflow-hidden z-50"
+          className="absolute bottom-full mb-1 left-4 right-4 bg-sp-popup border border-sp-divider/50 rounded-sp-lg shadow-sp-3 overflow-hidden z-50"
         >
-          <div className="px-3 py-1.5 text-[10px] font-bold uppercase text-discord-muted tracking-wider border-b border-white/5">
+          <div className="px-3 py-1.5 text-[10px] font-bold uppercase text-sp-muted tracking-wider border-b border-sp-divider/50">
             Members — {mentionQuery ? `matching "@${mentionQuery}"` : 'all'}
           </div>
           {mentionCandidates.map((m, idx) => (
             <button
               key={m.user_id}
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors
-                ${idx === mentionIndex ? 'bg-discord-mention/20 text-discord-text' : 'text-discord-muted hover:bg-white/5 hover:text-discord-text'}`}
+                ${idx === mentionIndex ? 'bg-sp-mention/15 text-sp-mention' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'}`}
               onMouseEnter={() => setMentionIndex(idx)}
               onMouseDown={(e) => { e.preventDefault(); selectMention(m) }}
             >
               <UserAvatar user={m.user} size={24} />
               <span className="font-semibold">{m.user.username}</span>
               {m.roles.length > 0 && (
-                <span className="text-xs text-discord-muted truncate ml-auto">
+                <span className="text-xs text-sp-muted truncate ml-auto">
                   {m.roles[0].name}
                 </span>
               )}
@@ -300,29 +310,37 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
 
       {/* Slowmode banner */}
       {inCooldown && (
-        <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-1.5 mb-1.5 text-xs text-yellow-300">
+        <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300/60 rounded-sp-sm px-3 py-1.5 mb-1.5 text-xs text-yellow-700">
           <Icon name="clock" size={13} className="shrink-0" />
           <span>Slowmode — you can send another message in <strong>{cooldownSecs}s</strong></span>
         </div>
       )}
 
+      {/* Offline banner */}
+      {isOffline && (
+        <div className="flex items-center gap-2 bg-orange-50 border border-orange-300/60 rounded-sp-sm px-3 py-1.5 mb-1.5 text-xs text-orange-700">
+          <Icon name="cloud-offline" size={13} className="shrink-0" />
+          <span>You're offline — messages will be queued and sent when you reconnect</span>
+        </div>
+      )}
+
       {/* Upload error banner */}
       {uploadError && (
-        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 mb-1.5 text-xs text-red-400">
+        <div className="flex items-center gap-2 bg-red-50 border border-red-300/60 rounded-sp-sm px-3 py-1.5 mb-1.5 text-xs text-red-600">
           <Icon name="alert-circle" size={13} className="shrink-0" />
           <span className="flex-1">{uploadError}</span>
           <button onClick={() => setUploadError(null)} className="ml-auto text-red-400/60 hover:text-red-400"><Icon name="x" size={12} /></button>
         </div>
       )}
 
-      <div className="rounded-lg ring-1 ring-white/[0.07] overflow-hidden" style={{ background: '#222327' }}>
+      <div className="rounded-2xl border border-sp-divider/60 overflow-hidden bg-sp-input shadow-sp-1">
       {/* Reply banner */}
       {replyTo && (
-        <div className="flex items-center gap-2 bg-white/5 rounded-t-lg px-3 py-1.5 text-xs text-discord-muted border-b border-white/5">
-          <Icon name="corner-up-left" size={13} className="text-discord-mention shrink-0" />
+        <div className="flex items-center gap-2 bg-sp-hover/50 rounded-t-2xl px-3 py-1.5 text-xs text-sp-muted border-b border-sp-divider/40">
+          <Icon name="corner-up-left" size={13} className="text-sp-mention shrink-0" />
           <span>
             Replying to{' '}
-            <span className="font-semibold text-discord-text">{replyTo.author.username}</span>
+            <span className="font-semibold text-sp-text">{replyTo.author.username}</span>
             {' — '}
             <span className="truncate italic">
               {(replyTo.content ?? '').length > 80 ? (replyTo.content ?? '').slice(0, 80) + '…' : (replyTo.content ?? '')}
@@ -330,7 +348,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
           </span>
           <button
             onClick={onCancelReply}
-            className="ml-auto text-discord-muted hover:text-red-400 transition-colors shrink-0"
+            className="ml-auto text-sp-muted hover:text-red-400 transition-colors shrink-0"
             title="Cancel reply"
           >
             <Icon name="x" size={14} />
@@ -343,7 +361,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
         <button
           title="Attach File"
           onClick={() => fileRef.current?.click()}
-          className="text-discord-muted hover:text-discord-text transition-colors shrink-0 mt-[2px]"
+          className="text-sp-muted hover:text-sp-text transition-colors shrink-0 mt-[2px]"
         >
           <Icon name="attach-2" size={20} />
         </button>
@@ -352,7 +370,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
         {/* Text area */}
         <textarea
           ref={textareaRef}
-          className={`flex-1 bg-transparent resize-none outline-none text-sm text-discord-text placeholder:text-discord-muted max-h-36 leading-6 py-0 mx-2 ${inCooldown ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`flex-1 bg-transparent resize-none outline-none text-sm text-sp-text placeholder:text-sp-muted max-h-36 leading-6 py-0 mx-2 ${inCooldown ? 'opacity-50 cursor-not-allowed' : ''}`}
           rows={1}
           value={text}
           placeholder={inCooldown ? `Slowmode — wait ${cooldownSecs}s…` : placeholder}
@@ -383,7 +401,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
           ref={emojiButtonRef}
           title="Emoji"
           onClick={toggleEmojiPicker}
-          className="text-discord-muted hover:text-discord-text transition-colors shrink-0 mt-[2px] mx-1"
+          className="text-sp-muted hover:text-sp-text transition-colors shrink-0 mt-[2px] mx-1"
         >
           <Icon name="smiling-face" size={20} />
         </button>
@@ -392,7 +410,10 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
         <button
           onClick={handleSend}
           disabled={!text.trim() || sendMut.isPending || inCooldown}
-          className="text-discord-muted hover:text-discord-text disabled:opacity-30 transition-colors shrink-0 mt-[2px]"
+          className={`shrink-0 mt-[2px] w-8 h-8 rounded-full flex items-center justify-center transition-all
+            ${text.trim() && !inCooldown
+              ? 'bg-sp-mention text-white hover:bg-sp-mention/85 active:scale-90 shadow-sp-1'
+              : 'text-sp-muted opacity-40 cursor-not-allowed'}`}
           title={inCooldown ? `Slowmode — wait ${cooldownSecs}s` : 'Send'}
         >
           <Icon name="paper-plane" size={20} />

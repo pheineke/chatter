@@ -71,7 +71,7 @@ export default function AppShell() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-discord-bg text-discord-text overflow-hidden">
+    <div className="flex flex-col h-screen bg-sp-bg text-sp-text overflow-hidden">
       <DesktopNotificationBanner />
       <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Global overlays */}
@@ -93,16 +93,16 @@ export default function AppShell() {
 
             {/* ── Left panel: server icons + channel/DM list ──────────────
                 Mobile (<md): fixed off-screen, slides in from left.
-                Desktop (md+): static in-flow columns, always visible.   */}
-            <div className={`flex flex-col fixed inset-y-0 left-0 z-40 w-[312px] bg-discord-sidebar transition-transform duration-200 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
+                Desktop (md+): static in-flow columns, floating card.   */}
+            <div className={`flex flex-col fixed inset-y-0 left-0 z-40 w-[312px] bg-sp-sidebar transition-transform duration-200 shadow-sp-3 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 md:m-3 md:rounded-[28px] md:h-[calc(100vh-24px)] overflow-hidden ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
               
               {/* Top area: Split into Server List (left) and Channel List (right) */}
-              <div className="flex flex-1 min-h-0 overflow-hidden">
+              <div className="flex flex-1 min-h-0 overflow-hidden relative">
                 {/* Far-left: server icons */}
                 <ServerSidebar hasUnreadDMs={hasUnreadDMs} />
 
                 {/* Second column: channel/DM list */}
-                <div className="flex flex-col flex-1 min-w-0 bg-discord-channels overflow-hidden">
+                <div className="flex flex-col flex-1 min-w-0 bg-sp-channels overflow-hidden">
                   <Routes>
                     <Route path="@me/*" element={<DMSidebar />} />
                     <Route
@@ -121,8 +121,8 @@ export default function AppShell() {
 
               {/* Bottom area: Voice + User panel — single floating card */}
               <div
-                className="mx-2 mb-2 mt-1 rounded-lg ring-1 ring-white/[0.07] overflow-hidden shrink-0 z-50"
-                style={{ background: '#202024' }}
+                className="mx-2 mb-2 mt-1 rounded-sp-lg border border-sp-divider/40 overflow-hidden shrink-0 z-50 bg-sp-user"
+                style={{ boxShadow: 'var(--m3-shadow-1)' }}
               >
                 {voiceSession && (
                   <>
@@ -130,7 +130,7 @@ export default function AppShell() {
                       session={voiceSession}
                       onLeave={handleLeaveVoice}
                     />
-                    <div className="border-b border-white/[0.08] mx-0" />
+                    <div className="border-b border-sp-divider/50 mx-0" />
                   </>
                 )}
                 <UserPanel />
@@ -138,15 +138,19 @@ export default function AppShell() {
             </div>
 
             {/* Main area — always full-width on mobile */}
-            <div className="flex flex-col flex-1 min-w-0">
-              <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex flex-col flex-1 min-w-0 bg-sp-bg md:p-3 relative z-0">
+              <div className="flex-1 min-h-0 overflow-hidden bg-sp-surface md:rounded-[28px] md:shadow-sp-3 shadow-none flex flex-col relative isolation-isolate">
                 <Routes>
                   <Route index element={<Navigate to="@me" replace />} />
                   <Route path="@me" element={<FriendsPane onOpenNav={() => setShowLeftDrawer(true)} />} />
                   <Route path="@me/:dmUserId" element={<DMPane onOpenNav={() => setShowLeftDrawer(true)} />} />
                   <Route path=":serverId" element={
-                    <div className="h-full flex items-center justify-center text-discord-muted">
-                      Select a channel to start chatting.
+                    <div className="h-full flex flex-col items-center justify-center text-sp-muted p-8 text-center">
+                      <div className="w-24 h-24 rounded-3xl bg-sp-surface-variant flex items-center justify-center mb-6 shadow-sm">
+                        <span className="text-4xl">👋</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-sp-text mb-2">Welcome specifically to {servers.find(s => s.id === currentServerId)?.title || 'this server'}!</h3>
+                      <p className="max-w-md">Select a channel from the sidebar to start chatting, or check out the server settings.</p>
                     </div>
                   } />
                   <Route
@@ -169,13 +173,13 @@ function DesktopNotificationBanner() {
   const { isEnabled, permission, deniedDismissed, dismissDenied } = useDesktopNotificationsContext()
   if (!isEnabled || permission !== 'denied' || deniedDismissed) return null
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-2 bg-red-500/20 border-b border-red-500/30 text-sm text-red-300 shrink-0">
+    <div className="flex items-center justify-between gap-3 px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-700 shrink-0">
       <span>
         Desktop notifications are blocked by the browser. To enable them, update the permission in your browser&apos;s site settings then reload.
       </span>
       <button
         onClick={dismissDenied}
-        className="shrink-0 text-red-300 hover:text-white transition-colors"
+        className="shrink-0 text-red-400 hover:text-red-700 transition-colors"
         title="Dismiss"
       >
         ✕
@@ -188,7 +192,7 @@ function DesktopNotificationBanner() {
 function _DMSidebarUnused() {
   return (
     <div className="flex flex-col h-full">
-      <div className="px-3 py-2 text-xs font-semibold uppercase text-discord-muted tracking-wider">
+      <div className="px-3 py-2 text-xs font-semibold uppercase text-sp-muted tracking-wider">
         Direct Messages
       </div>
       {/* DMPane renders its own sidebar list; this is just a placeholder header */}

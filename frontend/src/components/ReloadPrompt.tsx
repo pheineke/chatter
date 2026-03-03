@@ -20,17 +20,17 @@ export function ReloadPrompt() {
   if (!needRefresh) return null
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-lg bg-discord-sidebar border border-discord-border shadow-xl text-sm">
-      <span className="text-discord-text">A new version of Chat is available.</span>
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-m3-md bg-sp-popup border border-sp-divider/60 text-sm" style={{ boxShadow: 'var(--m3-shadow-2)' }}>
+      <span className="text-sp-text">A new version of Chat is available.</span>
       <button
         onClick={() => updateServiceWorker(true)}
-        className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors"
+        className="px-3 py-1.5 rounded-m3-sm bg-sp-mention hover:bg-sp-mention/85 text-white font-medium transition-colors"
       >
         Reload
       </button>
       <button
         onClick={() => setNeedRefresh(false)}
-        className="px-3 py-1.5 rounded bg-discord-input hover:bg-discord-muted/30 text-discord-muted hover:text-discord-text transition-colors"
+        className="px-3 py-1.5 rounded bg-sp-input hover:bg-sp-muted/30 text-sp-muted hover:text-sp-text transition-colors"
       >
         Dismiss
       </button>

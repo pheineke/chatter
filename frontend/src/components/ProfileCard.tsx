@@ -27,7 +27,7 @@ function UserTag({ userId }: { userId: string }) {
     <button
       onClick={copy}
       title="Click to copy user ID"
-      className="flex items-center gap-1 text-xs text-discord-muted hover:text-discord-text transition mt-0.5 group"
+      className="flex items-center gap-1 text-xs text-sp-muted hover:text-sp-text transition mt-0.5 group"
     >
       <span className="font-mono">{short}…</span>
       <span className="opacity-0 group-hover:opacity-100 transition text-[10px]">
@@ -109,11 +109,11 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   if (!user) return null
 
   return (
-    <div ref={ref} style={style} className="group/card w-80 bg-discord-sidebar rounded-lg shadow-2xl overflow-hidden flex flex-col text-discord-text animate-fade-in-up">
+    <div ref={ref} style={{ ...style, boxShadow: 'var(--m3-shadow-4)' }} className="group/card w-80 bg-sp-popup border border-sp-divider/60 rounded-m3-lg overflow-hidden flex flex-col text-sp-text animate-fade-in-up">
        {/* Banner */}
        <div 
-         className="h-24 bg-discord-mention relative"
-         style={{ backgroundColor: user.banner ? undefined : '#5865F2', backgroundImage: user.banner ? `url(/api/static/${user.banner})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}
+         className="h-24 bg-sp-mention relative"
+         style={{ backgroundColor: user.banner ? undefined : '#3F51B5', backgroundImage: user.banner ? `url(/api/static/${user.banner})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}
        >
          {/* More options button */}
          <div className="absolute top-2 right-2" ref={menuRef}>
@@ -126,11 +126,11 @@ export function ProfileCard({ userId, onClose, position }: Props) {
            </button>
 
            {menuOpen && (
-             <div className="absolute right-0 top-full mt-1 w-52 bg-[#111214] border border-white/[0.07] rounded-md shadow-2xl z-[110] overflow-visible py-1 text-sm">
+             <div className="absolute right-0 top-full mt-1 w-52 bg-sp-popup border border-sp-divider/60 rounded-m3-md z-[110] overflow-visible py-1.5 text-sm" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
                {/* View Full Profile */}
                <button
                  onClick={() => { setShowFullProfile(true); setMenuOpen(false) }}
-                 className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors"
+                 className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text transition-colors"
                >View Full Profile</button>
 
                {isSelf ? (
@@ -138,7 +138,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
                    {/* Edit Profile — self only */}
                    <button
                      onClick={() => { navigate('/channels/settings?tab=profile'); setMenuOpen(false); onClose() }}
-                     className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors"
+                     className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text transition-colors"
                    >Edit Profile</button>
                  </>
                ) : (
@@ -149,19 +149,19 @@ export function ProfileCard({ userId, onClose, position }: Props) {
                      onMouseEnter={() => setShowInviteSubmenu(true)}
                      onMouseLeave={() => setShowInviteSubmenu(false)}
                    >
-                     <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors flex items-center justify-between">
+                     <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text transition-colors flex items-center justify-between">
                        <span>Invite to Server</span>
-                       <Icon name="chevron-right" size={14} className="text-discord-muted" />
+                       <Icon name="chevron-right" size={14} className="text-sp-muted" />
                      </button>
                      {showInviteSubmenu && (
-                       <div className="absolute left-full top-0 ml-1 w-48 bg-[#111214] border border-white/[0.07] rounded-md shadow-2xl py-1">
-                         {!myServers && <div className="px-3 py-2 text-xs text-discord-muted">Loading…</div>}
-                         {myServers && myServers.length === 0 && <div className="px-3 py-2 text-xs text-discord-muted">No servers</div>}
+                       <div className="absolute left-full top-0 ml-1 w-48 bg-sp-popup border border-sp-divider/60 rounded-m3-md py-1.5" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
+                         {!myServers && <div className="px-3 py-2 text-xs text-sp-muted">Loading…</div>}
+                         {myServers && myServers.length === 0 && <div className="px-3 py-2 text-xs text-sp-muted">No servers</div>}
                          {myServers?.map(s => (
                            <button
                              key={s.id}
                              onClick={() => handleInviteToServer(s.id)}
-                             className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text text-sm transition-colors truncate"
+                             className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text text-sm transition-colors truncate"
                            >{s.title}</button>
                          ))}
                        </div>
@@ -172,7 +172,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
                    <div className="my-1 border-t border-white/[0.08]" />
 
                    {/* Ignore */}
-                   <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-text transition-colors"
+                   <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text transition-colors"
                      onClick={() => setMenuOpen(false)}
                    >Ignore</button>
 
@@ -191,7 +191,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
                    <div className="my-1 border-t border-white/[0.08]" />
                    <button
                      onClick={() => { navigator.clipboard.writeText(userId); setMenuOpen(false) }}
-                     className="w-full text-left px-3 py-2 hover:bg-white/10 text-discord-muted hover:text-discord-text transition-colors"
+                     className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-muted hover:text-sp-text transition-colors"
                    >Copy User ID</button>
                  </>
                )}
@@ -202,7 +202,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
 
        <div className="px-4 pb-4 relative">
           {/* Avatar */}
-          <div className="absolute -top-10 left-4 rounded-full p-1.5 bg-discord-sidebar">
+          <div className="absolute -top-10 left-4 rounded-full p-1.5 bg-sp-sidebar">
              <AvatarWithStatus user={user} size={80} ringColor="#121214" />
           </div>
           
@@ -213,28 +213,28 @@ export function ProfileCard({ userId, onClose, position }: Props) {
                  <span
                    title="Add Note"
                    onClick={() => { setShowFullProfile(true); setFocusNote(true) }}
-                   className="cursor-pointer text-discord-muted hover:text-discord-text transition-colors leading-none opacity-0 group-hover/card:opacity-100 translate-y-px"
+                   className="cursor-pointer text-sp-muted hover:text-sp-text transition-colors leading-none opacity-0 group-hover/card:opacity-100 translate-y-px"
                  >
                    <Icon name="file-text" size={14} />
                  </span>
                )}
              </div>
              <UserTag userId={user.id} />
-             <div className="text-sm text-discord-muted">{user.pronouns}</div>
+             <div className="text-sm text-sp-muted">{user.pronouns}</div>
              
-             <div className="mt-4 border-t border-discord-input pt-2">
-                 <div className="text-xs font-bold text-discord-muted uppercase mb-1">About Me</div>
-                 <div className="text-sm text-discord-text/90 whitespace-pre-wrap leading-relaxed">
+             <div className="mt-4 border-t border-sp-input pt-2">
+                 <div className="text-xs font-bold text-sp-muted uppercase mb-1">About Me</div>
+                 <div className="text-sm text-sp-text/90 whitespace-pre-wrap leading-relaxed">
                     {user.description
                       ? <Linkified text={user.description} noMentions />
-                      : <span className="italic text-discord-muted">No bio yet.</span>}
+                      : <span className="italic text-sp-muted">No bio yet.</span>}
                  </div>
              </div>
 
              <form onSubmit={handleMessage} className="mt-4">
                  {!isSelf && (
                    <input 
-                      className="input w-full bg-discord-bg" 
+                      className="input w-full bg-sp-bg" 
                       placeholder={`Message @${user.username}`}
                       value={msg}
                       onChange={e => setMsg(e.target.value)}

@@ -1,6 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Soft Pop Design Tokens ─────────────────────────────────────────────── */
+:root {
+  --sp-radius-xs: 4px;
+  --sp-radius-sm: 8px;
+  --sp-radius-md: 12px;
+  --sp-radius-lg: 16px;
+  --sp-radius-xl: 24px;
+  --sp-transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --sp-shadow-1: 0 2px 8px rgba(124,77,255,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --sp-shadow-2: 0 4px 16px rgba(124,77,255,0.12), 0 2px 4px rgba(0,0,0,0.08);
+  --sp-shadow-3: 0 8px 28px rgba(124,77,255,0.16), 0 3px 8px rgba(0,0,0,0.10);
+  /* keep m3 aliases */
+  --m3-radius-sm: 6px;
+  --m3-radius-md: 10px;
+  --m3-radius-lg: 14px;
+  --m3-radius-xl: 20px;
+  --m3-transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --m3-shadow-1: 0 2px 8px rgba(124,77,255,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --m3-shadow-2: 0 4px 16px rgba(124,77,255,0.12), 0 2px 4px rgba(0,0,0,0.08);
+  --m3-shadow-3: 0 8px 28px rgba(124,77,255,0.16), 0 3px 8px rgba(0,0,0,0.10);
+}
 
 * {
   box-sizing: border-box;
@@ -8,25 +32,25 @@
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background-color: #1a1a1e;
-  color: #f2f3f5;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  background-color: #FFFBFE;
+  color: #1C1B1F;
   overflow: hidden;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar – soft lavender */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #111214;
-  border-radius: 4px;
+  background: #E7E0EC;
+  border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #0b0c0e;
+  background: #B9A8D9;
 }
 
 /* Avatar ring: swap to hover color when parent row is hovered */
@@ -36,27 +60,41 @@ body {
 
 /* Mention highlight inside messages */
 .mention {
-  @apply bg-discord-mention/20 text-discord-mention rounded px-0.5 cursor-pointer;
+  @apply bg-sp-mention/15 text-sp-mention rounded-full px-1.5 py-0.5 cursor-pointer font-medium;
 }
 .mention:hover {
-  @apply bg-discord-mention/40;
+  @apply bg-sp-mention/25;
 }
 
-/* Reusable button */
+/* Reusable button – squishy pill */
 .btn {
-  @apply px-4 py-2 rounded bg-discord-mention text-white font-semibold text-sm
-         hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed
-         transition-colors;
+  @apply px-5 py-2 rounded-full bg-sp-mention text-white font-semibold text-sm
+         hover:bg-sp-mention/85 active:scale-95 active:bg-sp-mention/75
+         disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+         transition-all shadow-sp-1 hover:shadow-sp-2;
 }
 .btn-ghost {
-  @apply bg-discord-input text-discord-text hover:bg-discord-input/80;
+  @apply bg-sp-input text-sp-text hover:bg-sp-hover shadow-none;
 }
 
-/* Reusable text input */
+/* Reusable text input – pill shape */
 .input {
-  @apply bg-discord-bg rounded px-3 py-2 text-sm text-discord-text
-         placeholder:text-discord-muted outline-none border border-transparent
-         focus:border-discord-mention transition-colors;
+  @apply bg-sp-input rounded-full px-4 py-2 text-sm text-sp-text
+         placeholder:text-sp-muted outline-none border border-sp-divider/60
+         focus:border-sp-mention/60 focus:ring-2 focus:ring-sp-mention/15 transition-all;
+}
+
+/* ── Soft Pop Surface / Card utilities ────────────────────────────────── */
+.card {
+  @apply bg-sp-input border border-sp-divider/60 rounded-sp-lg;
+  box-shadow: var(--sp-shadow-1);
+}
+.card-elevated {
+  @apply bg-sp-popup border border-sp-divider/50 rounded-sp-xl;
+  box-shadow: var(--sp-shadow-3);
+}
+.surface {
+  @apply bg-sp-sidebar border border-sp-divider/40 rounded-sp-md;
 }
 
 /* Hide scrollbar but keep scroll */
@@ -68,42 +106,42 @@ body {
 }
 
 /* ── Discord-flavoured markdown ─────────────────────────────────────────── */
-.discord-markdown {
-  @apply text-sm text-discord-text break-words leading-relaxed;
+.sp-markdown {
+  @apply text-sm text-sp-text break-words leading-relaxed;
 }
-.discord-markdown p {
+.sp-markdown p {
   @apply m-0;
 }
-.discord-markdown p + p {
+.sp-markdown p + p {
   @apply mt-1;
 }
-.discord-markdown strong, .discord-markdown b {
-  @apply font-bold text-white;
+.sp-markdown strong, .sp-markdown b {
+  @apply font-bold text-sp-text;
 }
-.discord-markdown em, .discord-markdown i {
+.sp-markdown em, .sp-markdown i {
   @apply italic;
 }
-.discord-markdown del, .discord-markdown s {
+.sp-markdown del, .sp-markdown s {
   @apply line-through;
 }
-.discord-markdown code {
-  @apply bg-black/40 text-discord-text rounded px-1 py-0.5 text-[13px] font-mono;
+.sp-markdown code {
+  @apply bg-sp-input text-sp-text rounded-sp-xs px-1.5 py-0.5 text-[13px] font-mono border border-sp-divider/40;
 }
-.discord-markdown pre {
-  @apply bg-black/40 rounded p-3 my-1 overflow-x-auto relative;
+.sp-markdown pre {
+  @apply bg-sp-input rounded-sp-sm p-3 my-1 overflow-x-auto relative border border-sp-divider/40;
 }
-.discord-markdown pre code {
+.sp-markdown pre code {
   @apply bg-transparent p-0;
 }
 
 /* Code block copy button */
 .code-copy-btn {
   @apply absolute top-2 right-2 w-7 h-7 flex items-center justify-center
-         rounded bg-white/5 text-discord-muted opacity-0
-         hover:bg-white/10 hover:text-discord-text
+         rounded-full bg-sp-divider/40 text-sp-muted opacity-0
+         hover:bg-sp-divider hover:text-sp-text
          transition-all cursor-pointer border-none;
 }
-.discord-markdown pre:hover .code-copy-btn {
+.sp-markdown pre:hover .code-copy-btn {
   @apply opacity-100;
 }
 .code-copy-btn.copied {
@@ -118,35 +156,35 @@ body {
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-position: center;
 }
-.discord-markdown blockquote {
-  @apply border-l-4 border-discord-muted/50 pl-3 my-1 text-discord-muted;
+.sp-markdown blockquote {
+  @apply border-l-4 border-sp-mention/40 pl-3 my-1 text-sp-muted;
 }
-.discord-markdown ul {
+.sp-markdown ul {
   @apply list-disc pl-5 my-1;
 }
-.discord-markdown ol {
+.sp-markdown ol {
   @apply list-decimal pl-5 my-1;
 }
-.discord-markdown li {
+.sp-markdown li {
   @apply my-0.5;
 }
 /* External link */
 .md-link {
-  @apply text-discord-mention underline hover:text-indigo-300 transition-colors;
+  @apply text-sp-mention underline hover:text-purple-700 transition-colors;
 }
 /* Spoiler */
 .spoiler {
-  @apply bg-discord-muted/30 text-transparent rounded cursor-pointer select-none px-0.5
-         transition-colors;
+  @apply bg-sp-input text-transparent rounded-sp-xs cursor-pointer select-none px-1
+         transition-colors border border-sp-divider/40;
 }
 .spoiler.revealed {
-  @apply bg-discord-muted/20 text-discord-text;
+  @apply bg-sp-hover/60 text-sp-text;
 }
 
 /* Reply jump highlight */
 @keyframes highlight-flash {
-  0%   { background-color: rgba(88, 101, 242, 0.25); }
-  80%  { background-color: rgba(88, 101, 242, 0.10); }
+  0%   { background-color: rgba(124, 77, 255, 0.18); }
+  80%  { background-color: rgba(124, 77, 255, 0.07); }
   100% { background-color: transparent; }
 }
 .highlight-flash {

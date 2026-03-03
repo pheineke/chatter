@@ -354,36 +354,14 @@ Make the client installable as a desktop/mobile app with a cached static shell a
 
 ---
 
-### 10.3. DM Offline Cache (Hybrid)
-
-Cache DM conversation history in IndexedDB so the user can read recent DMs and compose messages while offline. Server channels remain network-only. Depends on 10.2 (PWA service worker must be in place).
-
-**Implementation plan:**
-
-1. **Install `dexie`** (`npm i dexie`) — typed IndexedDB wrapper with a clean async API.
-
-2. **IndexedDB schema** (`src/db.ts`) — `Dexie` subclass with two tables:
-   - `dmMessages`: `[channelId+id], channelId, created_at` — stores `MessageRead` objects
-   - `dmConversations`: `id` — stores `DMChannel` objects (partner info, last message preview)
-   - Cap per conversation: keep last 200 messages; on write, prune oldest when count exceeds 200
-
-3. **Write-through on WS events** — in `useChannelWS`, when a `message.created` event fires for a DM channel (`channelId` in the user's DM list), also write to `db.dmMessages`. Same for `message.updated` and `message.deleted` (upsert / delete by `[channelId, id]`).
-
-4. **Seed on first open** — when `DMPane` mounts for a conversation, if IndexedDB has no entries for that `channelId`, seed from the first page of the existing `useMessages` infinite query result.
-
-5. **Offline read path** — `useDMMessages(channelId)` hook:
-   - Online: behaves exactly like today (TanStack Query → network), but also mirrors fetched pages into IndexedDB
-   - Offline (`navigator.onLine === false` or network error): reads from `db.dmMessages` ordered by `created_at`, returns as a flat list; shows a banner "You're offline — showing cached messages" and disables the message input's send button (unless composing for the queue — see below)
-
-6. **Outgoing message queue** — `db.outboxMessages` table (`channelId, localId, content, created_at`):
-   - When offline and the user submits a message, write to the outbox and show it in the message list as a pending bubble (greyed, no timestamp)
-   - On reconnect (`online` event + WS reconnect), flush the outbox in order: `POST /channels/{id}/messages` for each entry, remove from outbox on success
-   - Dedup guard: include a `localId` (UUID) in the request body; the backend ignores unknown extra fields, so no changes needed there; the frontend matches the server response back to the pending bubble by `localId` before removing it
-
-7. **Sync on reconnect** — after the WS reconnects, for each DM channel with cached messages, call `GET /channels/{id}/messages?after=<last_cached_id>&limit=50` and merge results into IndexedDB (upsert by id). This fills the gap for messages received while offline.
-
-8. **DM conversation list offline** — `useDMList` hook reads from `db.dmConversations` when offline, so the sidebar still shows all conversations.
-
-9. **Settings** — add a "Clear DM cache" button in Settings → Privacy that calls `db.dmMessages.clear()` and `db.dmConversations.clear()`.
-
-**Files touched:** `src/db.ts` (new), `src/hooks/useDMMessages.ts` (new or refactor of existing DM query logic), `src/hooks/useChannelWS.ts` (write-through), `src/components/DMPane.tsx` (offline banner, pending bubbles), `src/components/DMSidebar.tsx` (offline read), `src/pages/SettingsPage.tsx` (cache clear button).
+### ~~10.3. DM Offline Cache (Hybrid)~~ ✅ Implemented
+- DM conversation history is persisted to IndexedDB so users can read recent messages and queue outgoing messages while offline. Server channels remain network-only.
+- **Schema** (`src/db/dmCache.ts`): Dexie v4 database `chatter-dm-cache` with three tables: `dmMessages` (`[channel_id+id]` compound PK, secondary index on `channel_id, created_at`), `dmConversations` (`channel_id` PK), `dmOutbox` (`localId` PK, indexed by `channelId`). Messages are capped at 200 per conversation (oldest pruned on write).
+- **Write-through** (`useChannelWS`): accepts `{ isDM?: boolean; onReconnect?: () => void }` options. When `isDM=true`, `message.created` and `message.updated` events call `cachePutMessage`; `message.deleted` calls `deleteCachedMessage`. The `onReconnect` callback is passed as `onOpen` to the WebSocket. Called from `DMPane` with `isDM=!isSelf`.
+- **Online mirroring** (`MessageList`): when `partnerId` is set (DM mode), fetched pages are mirrored to IndexedDB via `cachePutMessages` as they load, tracked by a page-count ref to avoid redundant writes.
+- **Offline read** (`DMPane`): listens to `window online/offline` events. When offline, replaces `MessageList` with a simple read-only view loading `getCachedMessages(channelId)`. Shows an orange "You're offline" banner with the cached message count.
+- **Offline compose** (`MessageInput`): accepts `isOffline?: boolean` and `onOfflineSubmit?: (content) => void` props. When offline, shows an amber banner and routes sends to `onOfflineSubmit` instead of the API. `DMPane` provides `handleOfflineSubmit` which writes to `dmOutbox` and appends a greyed "queued" bubble to the display.
+- **Outbox flush + gap sync on reconnect** (`DMPane.handleReconnect` via `useChannelWS.onReconnect`): on WS (re)open, flushes all outbox entries in creation order (`sendMessage` → `outboxRemove`), then fetches messages after `getLastCachedMessageId` using the new `GET /channels/{id}/messages?after=<id>` cursor, merges them into both the IndexedDB cache and the TanStack Query infinite cache.
+- **`after` cursor** (`backend/app/routers/messages.py`, `frontend/src/api/messages.ts`): new `after` query parameter on `GET /channels/{id}/messages` returns messages with `created_at > after_msg.created_at`, used exclusively for gap-sync.
+- **Conversation list offline** (`DMSidebar`): mirrors fetched conversations to IndexedDB via `cacheConversations`; on `offline`, loads `getCachedConversations()` and disables the network query.
+- **Settings** (`SettingsPage` → Privacy & Safety → DM Cache): "Clear DM cache" button calls `clearDMCache()` (wipes messages, conversations, and outbox) with a 3-second "Cache cleared." confirmation.

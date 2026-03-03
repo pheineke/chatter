@@ -37,10 +37,13 @@ const fakeUser = {
   status: 'online' as const,
   avatar: null,
   banner: null,
-  bio: '',
-  display_name: null,
-  preferred_status: null,
+  avatar_decoration: null,
+  description: null,
+  pronouns: null,
+  dm_permission: 'everyone' as const,
+  preferred_status: 'online' as const,
   hide_status: false,
+  created_at: '',
 }
 
 beforeEach(() => {
@@ -94,10 +97,10 @@ describe('getMe', () => {
 
 describe('updateMe', () => {
   it('PATCHes /users/me with patch and returns updated user', async () => {
-    const updated = { ...fakeUser, bio: 'Hello' }
+    const updated = { ...fakeUser, description: 'Hello' }
     mockPatch.mockResolvedValue({ data: updated })
-    const result = await updateMe({ bio: 'Hello' })
-    expect(mockPatch).toHaveBeenCalledWith('/users/me', { bio: 'Hello' })
+    const result = await updateMe({ description: 'Hello' })
+    expect(mockPatch).toHaveBeenCalledWith('/users/me', { description: 'Hello' })
     expect(result).toEqual(updated)
   })
 })

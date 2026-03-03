@@ -21,9 +21,9 @@ function VoiceBtn({
       title={title}
       onClick={onClick}
       className={`w-9 h-9 rounded flex items-center justify-center text-lg transition-colors
-        ${danger ? 'hover:bg-red-500 text-discord-muted hover:text-white'
-          : active ? 'bg-discord-input text-discord-text'
-          : 'text-discord-muted hover:bg-discord-input hover:text-discord-text'}`}
+        ${danger ? 'hover:bg-red-500 text-sp-muted hover:text-white'
+          : active ? 'bg-sp-input text-sp-text'
+          : 'text-sp-muted hover:bg-sp-input hover:text-sp-text'}`}
     >
       {children}
     </button>
@@ -38,11 +38,11 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
       {/* Connection info */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-1.5 font-semibold text-discord-online text-xs">
-            <span className="w-2 h-2 rounded-full bg-discord-online animate-pulse" />
+          <div className="flex items-center gap-1.5 font-semibold text-sp-online text-xs">
+            <span className="w-2 h-2 rounded-full bg-sp-online animate-pulse" />
             Voice Connected
           </div>
-          <span className="text-discord-muted text-xs truncate pl-3.5">
+          <span className="text-sp-muted text-xs truncate pl-3.5">
             {session.channelName} / {session.serverId ? 'Server' : 'DM'}
           </span>
         </div>
@@ -51,7 +51,7 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
         <button 
           title="Disconnect" 
           onClick={onLeave}
-          className="w-8 h-8 rounded flex items-center justify-center text-discord-muted hover:text-white hover:bg-discord-danger transition-colors"
+          className="w-8 h-8 rounded flex items-center justify-center text-sp-muted hover:text-white hover:bg-sp-danger transition-colors"
         >
           <Icon name="phone-off" size={16} />
         </button>

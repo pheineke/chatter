@@ -70,11 +70,11 @@ export function ServerSettingsPage() {
   const visibleTabs = NAV.filter(n => !n.adminOnly || isAdmin)
 
   return (
-    <div className="flex h-screen w-full bg-discord-bg text-discord-text overflow-hidden">
+    <div className="flex h-screen w-full bg-sp-bg text-sp-text overflow-hidden">
       {/* Left nav */}
-      <div className="w-[218px] shrink-0 bg-discord-sidebar flex flex-col items-end overflow-y-auto py-4">
+      <div className="w-[218px] shrink-0 bg-sp-sidebar flex flex-col items-end overflow-y-auto py-4">
         <div className="w-[172px]">
-          <div className="text-xs font-bold uppercase text-discord-muted tracking-wider px-2 mb-1 truncate">
+          <div className="text-xs font-bold uppercase text-sp-muted tracking-wider px-2 mb-1 truncate">
             {server.title}
           </div>
           {visibleTabs.map(n => (
@@ -82,7 +82,7 @@ export function ServerSettingsPage() {
               key={n.tab}
               onClick={() => setTab(n.tab)}
               className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm font-medium transition-colors
-                ${tab === n.tab ? 'bg-discord-input text-white' : 'text-discord-muted hover:bg-discord-input/50 hover:text-discord-text'}`}
+                ${tab === n.tab ? 'bg-sp-input text-white' : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
             >
               <Icon name={n.icon} size={16} className="shrink-0" />
               {n.label}
@@ -138,12 +138,12 @@ export function ServerSettingsPage() {
         <div className="px-6 py-4 flex flex-col items-center gap-2 shrink-0">
           <button
             onClick={close}
-            className="w-9 h-9 rounded-full bg-discord-input hover:bg-discord-input/60 flex items-center justify-center transition-colors text-discord-muted hover:text-discord-text"
+            className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-input/60 flex items-center justify-center transition-colors text-sp-muted hover:text-sp-text"
             title="Close (Esc)"
           >
             <Icon name="close" size={18} />
           </button>
-          <span className="text-[10px] text-discord-muted">ESC</span>
+          <span className="text-[10px] text-sp-muted">ESC</span>
         </div>
       </div>
     </div>
@@ -201,11 +201,11 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
       <h2 className="text-xl font-bold">Server Overview</h2>
 
       {/* Banner */}
-      <div className="bg-discord-sidebar rounded-lg overflow-hidden">
+      <div className="bg-sp-sidebar rounded-lg overflow-hidden">
         <div
           className="h-28 relative bg-cover bg-center group cursor-pointer"
           style={{
-            backgroundColor: server.banner ? undefined : '#5865F2',
+            backgroundColor: server.banner ? undefined : '#3F51B5',
             backgroundImage: server.banner ? `url(/api/static/${server.banner})` : undefined,
           }}
           onClick={() => bannerRef.current?.click()}
@@ -222,13 +222,13 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
         <div className="px-4 pb-4">
           <div className="flex items-end gap-4 -mt-10">
             <div
-              className="relative group rounded-2xl overflow-hidden cursor-pointer shrink-0 ring-4 ring-discord-sidebar"
+              className="relative group rounded-2xl overflow-hidden cursor-pointer shrink-0 ring-4 ring-sp-sidebar"
               style={{ width: 80, height: 80 }}
               onClick={() => iconRef.current?.click()}
             >
               {server.image
                 ? <img src={`/api/static/${server.image}`} className="w-full h-full object-cover" alt="icon" />
-                : <div className="w-full h-full bg-discord-mention flex items-center justify-center text-white text-2xl font-bold">{server.title[0].toUpperCase()}</div>
+                : <div className="w-full h-full bg-sp-mention flex items-center justify-center text-white text-2xl font-bold">{server.title[0].toUpperCase()}</div>
               }
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                 <span className="text-[10px] font-bold text-white text-center leading-tight">CHANGE{'\n'}ICON</span>
@@ -243,9 +243,9 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
       </div>
 
       {/* Name & Description */}
-      <div className="bg-discord-sidebar rounded-lg p-4 space-y-4">
+      <div className="bg-sp-sidebar rounded-lg p-4 space-y-4">
         <div>
-          <label className="block text-xs font-bold uppercase text-discord-muted mb-1.5">Server Name</label>
+          <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Server Name</label>
           <input
             className="input w-full"
             value={name}
@@ -254,7 +254,7 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
           />
         </div>
         <div>
-          <label className="block text-xs font-bold uppercase text-discord-muted mb-1.5">Description</label>
+          <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Description</label>
           <textarea
             className="input w-full resize-none"
             rows={3}
@@ -266,11 +266,11 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
       </div>
 
       {isDirty && (
-        <div className="sticky bottom-0 flex items-center justify-between bg-discord-servers border border-white/10 rounded-lg px-4 py-3 shadow-xl">
-          <span className="text-sm text-discord-muted">Careful — you have unsaved changes!</span>
+        <div className="sticky bottom-0 flex items-center justify-between bg-sp-servers border border-white/10 rounded-lg px-4 py-3 shadow-xl">
+          <span className="text-sm text-sp-muted">Careful — you have unsaved changes!</span>
           <div className="flex items-center gap-2">
             <button
-              className="px-4 py-1.5 rounded text-sm font-semibold text-discord-muted hover:text-discord-text hover:bg-white/5 transition-colors"
+              className="px-4 py-1.5 rounded text-sm font-semibold text-sp-muted hover:text-sp-text hover:bg-white/5 transition-colors"
               onClick={handleDiscard}
               disabled={saving}
             >
@@ -324,10 +324,10 @@ function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
         />
       </div>
 
-      <div className="bg-discord-sidebar rounded-lg overflow-hidden">
+      <div className="bg-sp-sidebar rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-black/20 text-discord-muted text-xs uppercase">
+            <tr className="border-b border-black/20 text-sp-muted text-xs uppercase">
               <th className="px-4 py-2.5 text-left font-bold tracking-wider">User</th>
               <th className="px-4 py-2.5 text-left font-bold tracking-wider">Roles</th>
               <th className="px-4 py-2.5 text-left font-bold tracking-wider">Joined</th>
@@ -336,12 +336,12 @@ function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
           </thead>
           <tbody>
             {filtered.map(m => (
-              <tr key={m.user.id} className="border-b border-black/10 hover:bg-discord-input/20 transition-colors">
+              <tr key={m.user.id} className="border-b border-black/10 hover:bg-sp-input/20 transition-colors">
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-2.5">
                     <UserAvatar user={m.user} size={32} />
                     <div>
-                      <div className="font-medium text-discord-text">{m.user.username}</div>
+                      <div className="font-medium text-sp-text">{m.user.username}</div>
                       {m.user.id === ownerId && (
                         <div className="text-[10px] text-yellow-400 font-bold uppercase">Owner</div>
                       )}
@@ -351,7 +351,7 @@ function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
                 <td className="px-4 py-2.5">
                   <MemberRolePicker serverId={serverId} member={m} allRoles={roles} />
                 </td>
-                <td className="px-4 py-2.5 text-discord-muted text-xs">
+                <td className="px-4 py-2.5 text-sp-muted text-xs">
                   {new Date(m.joined_at).toLocaleDateString()}
                 </td>
                 <td className="px-4 py-2.5 text-right">
@@ -373,11 +373,11 @@ function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
       {/* Kick confirm */}
       {confirmKick && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-discord-sidebar rounded-lg p-6 w-80 shadow-2xl">
+          <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-lg p-6 w-80" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
             <h3 className="font-bold text-lg mb-2">Kick {confirmKick.user.username}?</h3>
-            <p className="text-discord-muted text-sm mb-4">They will be removed from the server but can rejoin via invite.</p>
+            <p className="text-sp-muted text-sm mb-4">They will be removed from the server but can rejoin via invite.</p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setConfirmKick(null)} className="px-4 py-2 rounded bg-discord-input text-sm font-semibold">Cancel</button>
+              <button onClick={() => setConfirmKick(null)} className="px-4 py-2 rounded bg-sp-input text-sm font-semibold">Cancel</button>
               <button onClick={() => handleKick(confirmKick)} className="px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white text-sm font-semibold">Kick</button>
             </div>
           </div>
@@ -389,7 +389,7 @@ function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
 
 function MemberRolePicker({ serverId, member, allRoles }: { serverId: string; member: Member; allRoles: Role[] }) {
   const qc = useQueryClient()
-  if (allRoles.length === 0) return <span className="text-discord-muted text-xs">—</span>
+  if (allRoles.length === 0) return <span className="text-sp-muted text-xs">—</span>
   const assignedIds = new Set(member.roles.map(r => r.id))
   return (
     <div className="flex flex-wrap gap-1">
@@ -485,7 +485,7 @@ function RolesTab({ serverId }: { serverId: string }) {
             <div
               key={role.id}
               className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer transition-colors
-                ${selected?.id === role.id ? 'bg-discord-input' : 'hover:bg-discord-input/50'}`}
+                ${selected?.id === role.id ? 'bg-sp-input' : 'hover:bg-sp-input/50'}`}
               onClick={() => selectRole(role)}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -498,12 +498,12 @@ function RolesTab({ serverId }: { serverId: string }) {
               </div>
             </div>
           ))}
-          {roles.length === 0 && <p className="text-discord-muted text-xs px-2">No roles yet.</p>}
+          {roles.length === 0 && <p className="text-sp-muted text-xs px-2">No roles yet.</p>}
         </div>
 
         {/* Role editor */}
         {selected ? (
-          <div className="flex-1 bg-discord-sidebar rounded-lg p-4 space-y-4">
+          <div className="flex-1 bg-sp-sidebar rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-bold">Edit Role</h3>
               <button
@@ -514,59 +514,59 @@ function RolesTab({ serverId }: { serverId: string }) {
               </button>
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase text-discord-muted mb-1.5">Role Name</label>
+              <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Role Name</label>
               <input className="input w-full" value={editName} onChange={e => setEditName(e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase text-discord-muted mb-1.5">Color</label>
+              <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Color</label>
               <div className="flex items-center gap-3">
                 <label className="relative w-10 h-10 rounded-lg cursor-pointer ring-2 ring-white/10 hover:ring-white/30 overflow-hidden">
                   <div className="w-full h-full" style={{ backgroundColor: editColor }} />
                   <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
                 </label>
-                <span className="text-sm text-discord-muted font-mono">{editColor}</span>
+                <span className="text-sm text-sp-muted font-mono">{editColor}</span>
               </div>
             </div>
             <div>
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <div
                   onClick={() => setEditAdmin(v => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editAdmin ? 'bg-discord-mention' : 'bg-discord-input'}`}
+                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editAdmin ? 'bg-sp-mention' : 'bg-sp-input'}`}
                 >
                   <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editAdmin ? 'translate-x-5' : 'translate-x-0'}`} />
                 </div>
                 <span className="text-sm font-medium">Administrator</span>
               </label>
-              <p className="text-xs text-discord-muted mt-1 ml-12">Members with this role can manage the server.</p>
+              <p className="text-xs text-sp-muted mt-1 ml-12">Members with this role can manage the server.</p>
             </div>
             <div>
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <div
                   onClick={() => setEditHoist(v => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editHoist ? 'bg-discord-mention' : 'bg-discord-input'}`}
+                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editHoist ? 'bg-sp-mention' : 'bg-sp-input'}`}
                 >
                   <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editHoist ? 'translate-x-5' : 'translate-x-0'}`} />
                 </div>
                 <span className="text-sm font-medium">Display role members separately</span>
               </label>
-              <p className="text-xs text-discord-muted mt-1 ml-12">Members with this role appear in their own section in the member list.</p>
+              <p className="text-xs text-sp-muted mt-1 ml-12">Members with this role appear in their own section in the member list.</p>
             </div>
             <div>
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <div
                   onClick={() => setEditMentionable(v => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editMentionable ? 'bg-discord-mention' : 'bg-discord-input'}`}
+                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editMentionable ? 'bg-sp-mention' : 'bg-sp-input'}`}
                 >
                   <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editMentionable ? 'translate-x-5' : 'translate-x-0'}`} />
                 </div>
                 <span className="text-sm font-medium">Allow anyone to @mention this role</span>
               </label>
-              <p className="text-xs text-discord-muted mt-1 ml-12">Anyone can ping all members of this role.</p>
+              <p className="text-xs text-sp-muted mt-1 ml-12">Anyone can ping all members of this role.</p>
             </div>
             <button className="btn" onClick={handleSaveRole}>Save Role</button>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-discord-muted text-sm">
+          <div className="flex-1 flex items-center justify-center text-sp-muted text-sm">
             Select a role to edit
           </div>
         )}
@@ -575,7 +575,7 @@ function RolesTab({ serverId }: { serverId: string }) {
       {/* Create role modal */}
       {creating && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-discord-sidebar rounded-lg p-6 w-72 shadow-2xl">
+          <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-lg p-6 w-72" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
             <h3 className="font-bold text-lg mb-3">Create Role</h3>
             <input
               className="input w-full mb-3"
@@ -586,7 +586,7 @@ function RolesTab({ serverId }: { serverId: string }) {
               autoFocus
             />
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setCreating(false)} className="px-4 py-2 rounded bg-discord-input text-sm font-semibold">Cancel</button>
+              <button onClick={() => setCreating(false)} className="px-4 py-2 rounded bg-sp-input text-sm font-semibold">Cancel</button>
               <button onClick={handleCreateRole} className="btn text-sm" disabled={!newName.trim()}>Create</button>
             </div>
           </div>
@@ -624,7 +624,7 @@ function InvitesTab({ serverId, serverTitle }: { serverId: string; serverTitle: 
         <h2 className="text-xl font-bold">Invites</h2>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 bg-discord-mention text-white text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-discord-mention/80 transition-colors"
+          className="flex items-center gap-2 bg-sp-mention text-white text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-sp-mention/80 transition-colors"
         >
           <Icon name="add" size={16} />
           Create Invite
@@ -640,12 +640,12 @@ function InvitesTab({ serverId, serverTitle }: { serverId: string; serverTitle: 
       )}
 
       {invites.length === 0 ? (
-        <div className="text-discord-muted text-center py-10">No invites created yet.</div>
+        <div className="text-sp-muted text-center py-10">No invites created yet.</div>
       ) : (
-        <div className="bg-discord-sidebar rounded-lg overflow-hidden">
+        <div className="bg-sp-sidebar rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-black/20 text-discord-muted text-xs uppercase">
+              <tr className="border-b border-black/20 text-sp-muted text-xs uppercase">
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">Code</th>
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">Uses</th>
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">Expires</th>
@@ -655,12 +655,12 @@ function InvitesTab({ serverId, serverTitle }: { serverId: string; serverTitle: 
             </thead>
             <tbody>
               {invites.map(inv => (
-                <tr key={inv.code} className="border-b border-black/10 hover:bg-discord-input/20 transition-colors">
-                  <td className="px-4 py-2.5 font-mono text-xs text-discord-text">
+                <tr key={inv.code} className="border-b border-black/10 hover:bg-sp-input/20 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-xs text-sp-text">
                     <div className="flex items-center gap-2">
                       <span>{inv.code}</span>
                       <button
-                        className="text-discord-muted hover:text-discord-text transition-colors"
+                        className="text-sp-muted hover:text-sp-text transition-colors"
                         title="Copy link"
                         onClick={() => navigator.clipboard.writeText(`${window.location.origin}/invite/${inv.code}`)}
                       >
@@ -668,11 +668,11 @@ function InvitesTab({ serverId, serverTitle }: { serverId: string; serverTitle: 
                       </button>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-discord-muted">
+                  <td className="px-4 py-2.5 text-sp-muted">
                     {inv.uses}{inv.max_uses ? ` / ${inv.max_uses}` : ''}
                   </td>
-                  <td className="px-4 py-2.5 text-discord-muted text-xs">{formatExpiry(inv.expires_at)}</td>
-                  <td className="px-4 py-2.5 text-discord-muted text-xs">{new Date(inv.created_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-2.5 text-sp-muted text-xs">{formatExpiry(inv.expires_at)}</td>
+                  <td className="px-4 py-2.5 text-sp-muted text-xs">{new Date(inv.created_at).toLocaleDateString()}</td>
                   <td className="px-4 py-2.5 text-right">
                     <button
                       onClick={() => handleRevoke(inv.code)}
@@ -701,7 +701,7 @@ const ACTION_LABELS: Record<WordFilterAction, string> = {
 }
 
 const ACTION_COLORS: Record<WordFilterAction, string> = {
-  delete: 'text-discord-muted',
+  delete: 'text-sp-muted',
   warn:   'text-yellow-400',
   kick:   'text-orange-400',
   ban:    'text-red-400',
@@ -745,17 +745,17 @@ function WordFiltersTab({ serverId }: { serverId: string }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold">Word Filters</h2>
-        <p className="text-discord-muted text-sm mt-1">
-          Block words or phrases from being sent in this server. Use <code className="bg-discord-input px-1 rounded text-xs">*</code> as a wildcard (e.g. <code className="bg-discord-input px-1 rounded text-xs">bad*</code>). Matching is case-insensitive.
+        <p className="text-sp-muted text-sm mt-1">
+          Block words or phrases from being sent in this server. Use <code className="bg-sp-input px-1 rounded text-xs">*</code> as a wildcard (e.g. <code className="bg-sp-input px-1 rounded text-xs">bad*</code>). Matching is case-insensitive.
         </p>
       </div>
 
       {/* Add filter form */}
-      <form onSubmit={handleAdd} className="bg-discord-sidebar rounded-lg p-4 space-y-3">
-        <h3 className="text-sm font-bold text-discord-text">Add Filter</h3>
+      <form onSubmit={handleAdd} className="bg-sp-sidebar rounded-lg p-4 space-y-3">
+        <h3 className="text-sm font-bold text-sp-text">Add Filter</h3>
         <div className="flex gap-3 items-end">
           <div className="flex-1">
-            <label className="block text-xs font-bold uppercase text-discord-muted mb-1.5">Pattern</label>
+            <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Pattern</label>
             <input
               className="input w-full"
               placeholder="e.g. badword or bad*"
@@ -765,7 +765,7 @@ function WordFiltersTab({ serverId }: { serverId: string }) {
             />
           </div>
           <div className="w-36">
-            <label className="block text-xs font-bold uppercase text-discord-muted mb-1.5">Action</label>
+            <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Action</label>
             <select
               className="input w-full"
               value={action}
@@ -780,7 +780,7 @@ function WordFiltersTab({ serverId }: { serverId: string }) {
           <button
             type="submit"
             disabled={adding || !pattern.trim()}
-            className="bg-discord-mention text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-discord-mention/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            className="bg-sp-mention text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-sp-mention/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {adding ? 'Adding…' : 'Add Filter'}
           </button>
@@ -790,12 +790,12 @@ function WordFiltersTab({ serverId }: { serverId: string }) {
 
       {/* Filter list */}
       {filters.length === 0 ? (
-        <div className="text-discord-muted text-center py-10">No word filters configured.</div>
+        <div className="text-sp-muted text-center py-10">No word filters configured.</div>
       ) : (
-        <div className="bg-discord-sidebar rounded-lg overflow-hidden">
+        <div className="bg-sp-sidebar rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-black/20 text-discord-muted text-xs uppercase">
+              <tr className="border-b border-black/20 text-sp-muted text-xs uppercase">
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">Pattern</th>
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">Action</th>
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">Added</th>
@@ -804,12 +804,12 @@ function WordFiltersTab({ serverId }: { serverId: string }) {
             </thead>
             <tbody>
               {filters.map(f => (
-                <tr key={f.id} className="border-b border-black/10 hover:bg-discord-input/20 transition-colors">
-                  <td className="px-4 py-2.5 font-mono text-xs text-discord-text">{f.pattern}</td>
+                <tr key={f.id} className="border-b border-black/10 hover:bg-sp-input/20 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-xs text-sp-text">{f.pattern}</td>
                   <td className={`px-4 py-2.5 font-semibold text-xs ${ACTION_COLORS[f.action as WordFilterAction]}`}>
                     {ACTION_LABELS[f.action as WordFilterAction] ?? f.action}
                   </td>
-                  <td className="px-4 py-2.5 text-discord-muted text-xs">
+                  <td className="px-4 py-2.5 text-sp-muted text-xs">
                     {new Date(f.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-2.5 text-right">
@@ -850,12 +850,12 @@ function BansTab({ serverId }: { serverId: string }) {
       <h2 className="text-xl font-bold">Bans</h2>
 
       {bans.length === 0 ? (
-        <div className="text-discord-muted text-center py-10">No banned members.</div>
+        <div className="text-sp-muted text-center py-10">No banned members.</div>
       ) : (
-        <div className="bg-discord-sidebar rounded-lg overflow-hidden">
+        <div className="bg-sp-sidebar rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-black/20 text-discord-muted text-xs uppercase">
+              <tr className="border-b border-black/20 text-sp-muted text-xs uppercase">
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">User ID</th>
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">Reason</th>
                 <th className="px-4 py-2.5 text-left font-bold tracking-wider">Banned</th>
@@ -864,12 +864,12 @@ function BansTab({ serverId }: { serverId: string }) {
             </thead>
             <tbody>
               {bans.map(b => (
-                <tr key={b.user_id} className="border-b border-black/10 hover:bg-discord-input/20 transition-colors">
-                  <td className="px-4 py-2.5 font-mono text-xs text-discord-text">{b.user_id}</td>
-                  <td className="px-4 py-2.5 text-discord-muted text-xs max-w-xs truncate">
+                <tr key={b.user_id} className="border-b border-black/10 hover:bg-sp-input/20 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-xs text-sp-text">{b.user_id}</td>
+                  <td className="px-4 py-2.5 text-sp-muted text-xs max-w-xs truncate">
                     {b.reason ?? <span className="italic">No reason given</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-discord-muted text-xs">
+                  <td className="px-4 py-2.5 text-sp-muted text-xs">
                     {new Date(b.banned_at).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-2.5 text-right">

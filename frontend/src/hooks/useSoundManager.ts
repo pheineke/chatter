@@ -3,14 +3,14 @@
  * respecting the per-sound enable/disable settings stored in localStorage.
  *
  * Sound keys (localStorage):
- *   connectSound    → discord-join.mp3
- *   disconnectSound → discord-leave.mp3
- *   muteSound       → discord-mute.mp3
- *   unmuteSound     → discord-unmute.mp3
- *   deafenSound     → discord-deafen.mp3
- *   undeafenSound   → discord-undeafen.mp3
- *   notificationSound → discord-notification.mp3
- *   callSound       → discord-call-sound.mp3
+ *   connectSound    → sp-join.mp3
+ *   disconnectSound → sp-leave.mp3
+ *   muteSound       → sp-mute.mp3
+ *   unmuteSound     → sp-unmute.mp3
+ *   deafenSound     → sp-deafen.mp3
+ *   undeafenSound   → sp-undeafen.mp3
+ *   notificationSound → sp-notification.mp3
+ *   callSound       → sp-call-sound.mp3
  */
 
 import { useCallback, useRef } from 'react'
@@ -27,14 +27,14 @@ export type SoundKey =
   | 'callSound'
 
 const SOUND_FILES: Record<SoundKey, string> = {
-  connectSound:      '/sounds/discord-join.mp3',
-  disconnectSound:   '/sounds/discord-leave.mp3',
-  muteSound:         '/sounds/discord-mute.mp3',
-  unmuteSound:       '/sounds/discord-unmute.mp3',
-  deafenSound:       '/sounds/discord-deafen.mp3',
-  undeafenSound:     '/sounds/discord-undeafen.mp3',
-  notificationSound: '/sounds/discord-notification.mp3',
-  callSound:         '/sounds/discord-call-sound.mp3',
+  connectSound:      '/sounds/sp-join.mp3',
+  disconnectSound:   '/sounds/sp-leave.mp3',
+  muteSound:         '/sounds/sp-mute.mp3',
+  unmuteSound:       '/sounds/sp-unmute.mp3',
+  deafenSound:       '/sounds/sp-deafen.mp3',
+  undeafenSound:     '/sounds/sp-undeafen.mp3',
+  notificationSound: '/sounds/sp-notification.mp3',
+  callSound:         '/sounds/sp-call-sound.mp3',
 }
 
 /** Returns true if the given sound is enabled (default: true). */

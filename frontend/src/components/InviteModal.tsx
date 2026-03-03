@@ -62,14 +62,14 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-discord-sidebar w-full max-w-md rounded-xl shadow-2xl p-6 flex flex-col gap-5">
+      <div className="bg-sp-popup border border-sp-divider/50 w-full max-w-md rounded-sp-xl shadow-sp-3 p-6 flex flex-col gap-5">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-discord-text">Invite to <span className="text-discord-mention">{serverName}</span></h2>
-            <p className="text-xs text-discord-muted mt-0.5">Share a link so friends can join this server</p>
+            <h2 className="text-lg font-bold text-sp-text">Invite to <span className="text-sp-mention">{serverName}</span></h2>
+            <p className="text-xs text-sp-muted mt-0.5">Share a link so friends can join this server</p>
           </div>
-          <button onClick={onClose} className="text-discord-muted hover:text-discord-text transition-colors mt-0.5">
+          <button onClick={onClose} className="text-sp-muted hover:text-sp-text transition-colors mt-0.5">
             <Icon name="x" size={18} />
           </button>
         </div>
@@ -77,7 +77,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
         {/* Options */}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-discord-muted">Expire after</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-sp-muted">Expire after</label>
             <select
               value={expiresHours ?? 'null'}
               onChange={(e) => {
@@ -85,7 +85,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
                 setExpiresHours(v === 'null' ? null : Number(v))
                 setInvite(null)
               }}
-              className="bg-discord-input text-discord-text text-sm rounded-lg px-3 py-2 border border-white/10 outline-none focus:border-discord-mention transition"
+              className="bg-sp-input text-sp-text text-sm rounded-full px-4 py-2 border border-sp-divider/60 outline-none focus:border-sp-mention transition"
             >
               {EXPIRY_OPTIONS.map((o) => (
                 <option key={String(o.value)} value={o.value ?? 'null'}>{o.label}</option>
@@ -94,7 +94,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-discord-muted">Max uses</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-sp-muted">Max uses</label>
             <select
               value={maxUses ?? 'null'}
               onChange={(e) => {
@@ -102,7 +102,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
                 setMaxUses(v === 'null' ? null : Number(v))
                 setInvite(null)
               }}
-              className="bg-discord-input text-discord-text text-sm rounded-lg px-3 py-2 border border-white/10 outline-none focus:border-discord-mention transition"
+              className="bg-sp-input text-sp-text text-sm rounded-full px-4 py-2 border border-sp-divider/60 outline-none focus:border-sp-mention transition"
             >
               {MAX_USES_OPTIONS.map((o) => (
                 <option key={String(o.value)} value={o.value ?? 'null'}>{o.label}</option>
@@ -116,7 +116,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
           <button
             onClick={() => generateMut.mutate()}
             disabled={generateMut.isPending}
-            className="bg-discord-mention text-white font-semibold rounded-lg py-2.5 text-sm hover:bg-discord-mention/80 disabled:opacity-50 transition-colors"
+            className="bg-sp-mention text-white font-semibold rounded-lg py-2.5 text-sm hover:bg-sp-mention/80 disabled:opacity-50 transition-colors"
           >
             {generateMut.isPending ? 'Generating…' : 'Generate Invite Link'}
           </button>
@@ -125,32 +125,32 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
         {/* Generated link */}
         {invite && (
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 bg-discord-input rounded-lg px-3 py-2.5">
-              <span className="flex-1 text-sm text-discord-text truncate font-mono select-all">
+            <div className="flex items-center gap-2 bg-sp-input rounded-lg px-3 py-2.5">
+              <span className="flex-1 text-sm text-sp-text truncate font-mono select-all">
                 {inviteLink(invite.code)}
               </span>
               <button
                 onClick={handleCopy}
                 className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors shrink-0
-                  ${copied ? 'bg-green-600 text-white' : 'bg-discord-mention text-white hover:bg-discord-mention/80'}`}
+                  ${copied ? 'bg-green-600 text-white' : 'bg-sp-mention text-white hover:bg-sp-mention/80'}`}
               >
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
 
-            <div className="flex gap-4 text-xs text-discord-muted">
+            <div className="flex gap-4 text-xs text-sp-muted">
               <span>
-                <span className="font-semibold text-discord-text">{invite.uses}</span> uses
+                <span className="font-semibold text-sp-text">{invite.uses}</span> uses
                 {invite.max_uses != null && <> / {invite.max_uses}</>}
               </span>
               <span>
-                Expires: <span className="font-semibold text-discord-text">{formatExpiry(invite)}</span>
+                Expires: <span className="font-semibold text-sp-text">{formatExpiry(invite)}</span>
               </span>
             </div>
 
             <button
               onClick={() => { setInvite(null) }}
-              className="text-xs text-discord-muted hover:text-discord-text transition-colors self-start underline underline-offset-2"
+              className="text-xs text-sp-muted hover:text-sp-text transition-colors self-start underline underline-offset-2"
             >
               Generate a new link with different settings
             </button>

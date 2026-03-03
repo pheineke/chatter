@@ -7,10 +7,10 @@ interface Props {
 }
 
 const STATUS_COLORS: Record<UserStatus, string> = {
-  online: 'bg-discord-online',
-  away: 'bg-discord-idle',
-  dnd: 'bg-discord-dnd',
-  offline: 'bg-discord-offline',
+  online: 'bg-sp-online',
+  away: 'bg-sp-idle',
+  dnd: 'bg-sp-dnd',
+  offline: 'bg-sp-offline',
 }
 
 export function StatusIndicator({ status, size = 10, className = '' }: Props) {

@@ -92,7 +92,7 @@ export function MarkdownContent({ text, className = '' }: Props) {
   return (
     <div
       ref={ref}
-      className={`discord-markdown ${className}`.trim()}
+      className={`sp-markdown ${className}`.trim()}
       dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
     />
   )

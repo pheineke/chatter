@@ -51,7 +51,7 @@ vi.mock('./Icon', () => ({
 
 // ---- helpers ----
 
-const baseAuthor = { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, bio: '', display_name: null, preferred_status: null, hide_status: false }
+const baseAuthor: import('../api/types').User = { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' }
 
 function makeMsg(overrides: Partial<Message> = {}): Message {
   return {
@@ -61,13 +61,16 @@ function makeMsg(overrides: Partial<Message> = {}): Message {
     content: 'Hello world',
     created_at: new Date().toISOString(),
     edited_at: null,
-    is_pinned: false,
     is_edited: false,
     reply_to: null,
     reply_to_id: null,
     reactions: [],
     attachments: [],
     author_nickname: null,
+    is_deleted: false,
+    mentions: [],
+    is_encrypted: false,
+    nonce: null,
     ...overrides,
   }
 }
@@ -112,7 +115,7 @@ describe('MessageBubble', () => {
   })
 
   it('shows reply header when reply_to_id is set', () => {
-    const reply = makeMsg({ id: 'orig', content: 'original' })
+    const reply: import('../api/types').MessageReply = { id: 'orig', content: 'original', is_deleted: false, author: baseAuthor }
     render(
       <MessageBubble message={makeMsg({ reply_to_id: 'orig', reply_to: reply })} channelId="chan-1" />,
       { wrapper: qcWrapper() },
