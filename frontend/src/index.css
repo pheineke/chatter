@@ -79,9 +79,13 @@ body {
 
 /* Reusable text input – pill shape */
 .input {
-  @apply bg-sp-input rounded-full px-4 py-2 text-sm text-sp-text
+  @apply bg-sp-input rounded-sp-md px-4 py-2 text-sm text-sp-text
          placeholder:text-sp-muted outline-none border border-sp-divider/60
          focus:border-sp-mention/60 focus:ring-2 focus:ring-sp-mention/15 transition-all;
+}
+/* Pill radius only for single-line inputs, not textareas/selects */
+input.input {
+  @apply rounded-full;
 }
 
 /* ── Soft Pop Surface / Card utilities ────────────────────────────────── */

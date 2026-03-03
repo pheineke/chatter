@@ -47,6 +47,8 @@ export const COLOR_SWATCHES: { key: string; label: string; default: string; gene
       .hover\\:bg-sp-channel-hover:hover { background-color: ${v} !important; }
       .hover\\:bg-sp-channel-hover\\/60:hover { background-color: color-mix(in srgb, ${v} 60%, transparent) !important; }
       .bg-sp-popup { background-color: ${v} !important; }
+      .input { background-color: ${v} !important; }
+      select.input { background-color: ${v} !important; }
     `,
   },
   {
@@ -61,7 +63,8 @@ export const COLOR_SWATCHES: { key: string; label: string; default: string; gene
       .sp-markdown { color: ${v} !important; }
       .sp-markdown strong, .sp-markdown b { color: ${v} !important; }
       .sp-markdown code { color: ${v} !important; }
-      .input, .btn-ghost { color: ${v} !important; }
+      .input, select.input { color: ${v} !important; }
+      .btn-ghost { color: ${v} !important; }
     `,
   },
   {
@@ -71,6 +74,7 @@ export const COLOR_SWATCHES: { key: string; label: string; default: string; gene
       .hover\\:text-sp-muted:hover { color: ${v} !important; }
       .sp-markdown blockquote { color: ${v} !important; }
       .placeholder\\:text-sp-muted::placeholder { color: ${v} !important; }
+      .input::placeholder, select.input::placeholder { color: ${v} !important; }
     `,
   },
 ]
