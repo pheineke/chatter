@@ -170,7 +170,7 @@ body {
 }
 /* External link */
 .md-link {
-  @apply text-sp-mention underline hover:text-purple-700 transition-colors;
+  @apply text-sp-mention underline hover:opacity-80 transition-opacity;
 }
 /* Spoiler */
 .spoiler {

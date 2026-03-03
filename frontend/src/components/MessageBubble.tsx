@@ -218,12 +218,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
             </div>
           </div>
         ) : (
-          <div className={`text-sm break-words leading-relaxed inline-block px-3 py-2 shadow-sm max-w-full
-            ${isOwn 
-              ? 'bg-sp-primary-container text-sp-on-primary-container rounded-[12px_2px_12px_12px]' 
-              : 'bg-sp-surface-variant text-sp-on-surface rounded-[2px_12px_12px_12px]'
-            }`}
-          >
+          <div className="text-sm break-words leading-relaxed text-sp-text max-w-full">
             {msg.is_encrypted && !decryptedContent && !decryptFailed && (
               <span className="text-sp-muted italic text-xs flex items-center gap-1">
                 <Icon name="lock" size={11} />

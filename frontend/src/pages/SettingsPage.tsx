@@ -492,7 +492,7 @@ const PRESETS: { id: string; label: string; accent: string; bg: string; sidebar:
 
 function AppearanceTab() {
   const initSaved   = loadColorOverrides
-  const initPreset  = () => localStorage.getItem('appPreset') ?? 'default'
+  const initPreset  = () => localStorage.getItem('appPreset') ?? 'softpop'
 
   const [saved,        setSaved]        = useState<Record<string, string>>(initSaved)
   const [savedPreset,  setSavedPreset]  = useState<string>(initPreset)
@@ -535,11 +535,11 @@ function AppearanceTab() {
 
   function resetColors() {
     setSaved({})
-    setSavedPreset('default')
+    setSavedPreset('softpop')
     setPending({})
-    setPendingPreset('default')
+    setPendingPreset('softpop')
     localStorage.removeItem('colorOverrides')
-    localStorage.setItem('appPreset', 'default')
+    localStorage.setItem('appPreset', 'softpop')
     applyColorOverrides({})
   }
 
@@ -1443,7 +1443,7 @@ export function SettingsPage() {
     <div className="flex h-screen w-full bg-sp-bg text-sp-text overflow-hidden">
 
       {/* Nav sidebar */}
-      <div className="flex flex-col w-[218px] shrink-0 bg-sp-sidebar px-2 py-6 overflow-y-auto">
+      <div className="w-[218px] shrink-0 bg-sp-sidebar flex flex-col px-2 py-6 overflow-y-auto md:m-3 md:rounded-[28px] md:shadow-sp-3 md:h-[calc(100vh-24px)] border-r border-sp-divider/20 md:border-none relative z-10">
         {NAV.map(group => (
           <div key={group.group} className="mb-4">
             <div className="px-2 mb-1 text-[11px] font-bold text-sp-muted uppercase tracking-wide">{group.group}</div>
@@ -1469,9 +1469,10 @@ export function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 min-w-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-2xl mx-auto">
+      <div className="flex flex-col flex-1 min-w-0 bg-sp-bg md:p-3 relative z-0 md:pl-0">
+        <div className="flex flex-1 min-w-0 overflow-hidden bg-sp-surface md:rounded-[28px] md:shadow-sp-3 shadow-none relative isolation-isolate">
+          <div className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-2xl mx-auto">
             {tab === 'account'       && <AccountTab />}
             {tab === 'privacy'       && <PrivacyTab />}
             {tab === 'appearance'    && <AppearanceTab />}
@@ -1481,11 +1482,12 @@ export function SettingsPage() {
           </div>
         </div>
         {/* Close button */}
-        <div className="p-4 shrink-0 flex flex-col items-center gap-1">
+        <div className="p-4 shrink-0 flex flex-col items-center gap-1 relative z-10">
           <button onClick={() => navigate(-1)} title="Close (Esc)" className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-muted/30 flex items-center justify-center transition-colors group">
             <Icon name="close" size={20} className="text-sp-muted group-hover:text-sp-text" />
           </button>
           <span className="text-[10px] text-sp-muted">ESC</span>
+        </div>
         </div>
       </div>
     </div>

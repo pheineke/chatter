@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+    <defs>
+        <!-- Reusable block styling to create the classic glossy/embossed Tetris look -->
+        <!-- Highlight (top and left edges) -->
+        <polygon id="hl" points="0,0 10,0 8,2 2,2 2,8 0,10" fill="#FFFFFF" opacity="0.6"/>
+        <!-- Shadow (bottom and right edges) -->
+        <polygon id="sh" points="10,10 0,10 2,8 8,8 8,2 10,0" fill="#000000" opacity="0.3"/>
+        
+        <!-- Individual Colored Tetris Blocks -->
+        <g id="b-cyan"><rect width="10" height="10" fill="#00CCCC"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#00FFFF"/></g>
+        <g id="b-yellow"><rect width="10" height="10" fill="#CCCC00"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#FFFF00"/></g>
+        <g id="b-purple"><rect width="10" height="10" fill="#AA00AA"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#FF00FF"/></g>
+        <g id="b-green"><rect width="10" height="10" fill="#00AA00"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#00FF00"/></g>
+        <g id="b-red"><rect width="10" height="10" fill="#AA0000"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#FF0000"/></g>
+        <g id="b-blue"><rect width="10" height="10" fill="#0000AA"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#4444FF"/></g>
+        <g id="b-orange"><rect width="10" height="10" fill="#CC6600"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#FF8800"/></g>
+        
+        <!-- Pre-assembled falling pieces (O-Pieces, 2x2) -->
+        <g id="p-yellow-O">
+            <use href="#b-yellow" x="0" y="0"/><use href="#b-yellow" x="10" y="0"/>
+            <use href="#b-yellow" x="0" y="10"/><use href="#b-yellow" x="10" y="10"/>
+        </g>
+        <g id="p-cyan-O">
+            <use href="#b-cyan" x="0" y="0"/><use href="#b-cyan" x="10" y="0"/>
+            <use href="#b-cyan" x="0" y="10"/><use href="#b-cyan" x="10" y="10"/>
+        </g>
+
+        <!-- Pixel Art "+100" Text Shape (Using 2x2 blocks for pixels) -->
+        <g id="score-shape">
+            <!-- "+" symbol -->
+            <rect x="2" y="4" width="2" height="6" />
+            <rect x="0" y="6" width="6" height="2" />
+            <!-- "1" symbol -->
+            <rect x="8" y="2" width="2" height="2" />
+            <rect x="10" y="0" width="2" height="10" />
+            <rect x="8" y="10" width="6" height="2" />
+            <!-- "0" symbol -->
+            <rect x="16" y="0" width="2" height="12" />
+            <rect x="20" y="0" width="2" height="12" />
+            <rect x="18" y="0" width="2" height="2" />
+            <rect x="18" y="10" width="2" height="2" />
+            <!-- "0" symbol -->
+            <rect x="24" y="0" width="2" height="12" />
+            <rect x="28" y="0" width="2" height="12" />
+            <rect x="26" y="0" width="2" height="2" />
+            <rect x="26" y="10" width="2" height="2" />
+        </g>
+
+        <!-- Clip path to hide blocks before they enter the inner screen -->
+        <clipPath id="playfield-clip">
+            <rect x="10" y="10" width="100" height="100" />
+        </clipPath>
+    </defs>
+
+    <!-- 1. Background Screen Tint & Grid -->
+    <!-- Semi-transparent dark overlay to make it look like a screen, but keeps avatar visible -->
+    <rect x="10" y="10" width="100" height="100" fill="#000000" opacity="0.3" />
+    
+    <!-- Subtle Playfield Grid -->
+    <g stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="0.5">
+        <path d="M20,10 v100 M30,10 v100 M40,10 v100 M50,10 v100 M60,10 v100 M70,10 v100 M80,10 v100 M90,10 v100 M100,10 v100" />
+        <path d="M10,20 h100 M10,30 h100 M10,40 h100 M10,50 h100 M10,60 h100 M10,70 h100 M10,80 h100 M10,90 h100 M10,100 h100" />
+    </g>
+
+    <!-- Inner Screen Shadow -->
+    <rect x="10" y="10" width="100" height="100" fill="none" stroke="#000000" stroke-width="2" opacity="0.4" />
+
+    <!-- 2. Active Playfield & Falling Blocks -->
+    <g clip-path="url(#playfield-clip)">
+        
+        <!-- The blocks that will be cleared -->
+        <g>
+            <!-- Fade out the blocks when the lines are cleared, and fade back in for next loop -->
+            <animate attributeName="opacity" values="1; 1; 0; 0; 1" keyTimes="0; 0.44; 0.45; 0.95; 1" dur="10s" repeatCount="indefinite" />
+            
+            <!-- Base "Garbage" Blocks (Leaves a 4x2 hole at x=40 to 70 for the falling pieces) -->
+            <!-- Bottom Row (y=100) -->
+            <use href="#b-blue" x="10" y="100"/> <use href="#b-red" x="20" y="100"/> <use href="#b-red" x="30" y="100"/>
+            <use href="#b-purple" x="80" y="100"/> <use href="#b-purple" x="90" y="100"/> <use href="#b-green" x="100" y="100"/>
+            
+            <!-- Second Row from Bottom (y=90) -->
+            <use href="#b-red" x="10" y="90"/> <use href="#b-red" x="20" y="90"/> <use href="#b-orange" x="30" y="90"/>
+            <use href="#b-purple" x="80" y="90"/> <use href="#b-green" x="90" y="90"/> <use href="#b-green" x="100" y="90"/>
+
+            <!-- Falling Piece 1: Yellow O-Piece -->
+            <g>
+                <animateTransform attributeName="transform" type="translate" values="60,-20; 60,90; 60,90" keyTimes="0; 0.15; 1" dur="10s" repeatCount="indefinite" />
+                <use href="#p-yellow-O" />
+            </g>
+
+            <!-- Falling Piece 2: Cyan O-Piece -->
+            <g>
+                <animateTransform attributeName="transform" type="translate" values="40,-20; 40,-20; 40,90; 40,90" keyTimes="0; 0.15; 0.3; 1" dur="10s" repeatCount="indefinite" />
+                <use href="#p-cyan-O" />
+            </g>
+        </g>
+
+        <!-- White Flash Effect when rows complete -->
+        <rect x="10" y="90" width="100" height="20" fill="#FFFFFF" opacity="0">
+            <animate attributeName="opacity" values="0; 0; 0.8; 0; 0" keyTimes="0; 0.42; 0.43; 0.44; 1" dur="10s" repeatCount="indefinite" />
+        </rect>
+        
+        <!-- +100 Score Popup Pixel Art -->
+        <g opacity="0">
+            <!-- Fade in quickly, hold, then fade out -->
+            <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.44; 0.45; 0.6; 0.7; 1" dur="10s" repeatCount="indefinite" />
+            <!-- Float upwards -->
+            <animateTransform attributeName="transform" type="translate" values="45,90; 45,90; 45,55; 45,55" keyTimes="0; 0.44; 0.7; 1" dur="10s" repeatCount="indefinite" />
+            
+            <!-- Drop Shadow -->
+            <use href="#score-shape" x="1" y="1" fill="#D2691E" />
+            <!-- Main Yellow Text -->
+            <use href="#score-shape" x="0" y="0" fill="#FFD700" />
+        </g>
+        
+    </g>
+
+    <!-- 3. Static Frame Borders (Hugs the avatar inside the 100x100 space) -->
+    <g id="static-borders">
+        <!-- Top Border -->
+        <use href="#b-red" x="0" y="0"/><use href="#b-green" x="10" y="0"/><use href="#b-blue" x="20" y="0"/>
+        <use href="#b-yellow" x="30" y="0"/><use href="#b-cyan" x="40" y="0"/><use href="#b-purple" x="50" y="0"/>
+        <use href="#b-orange" x="60" y="0"/><use href="#b-red" x="70" y="0"/><use href="#b-green" x="80" y="0"/>
+        <use href="#b-blue" x="90" y="0"/><use href="#b-yellow" x="100" y="0"/><use href="#b-cyan" x="110" y="0"/>
+
+        <!-- Bottom Border -->
+        <use href="#b-purple" x="0" y="110"/><use href="#b-orange" x="10" y="110"/><use href="#b-cyan" x="20" y="110"/>
+        <use href="#b-red" x="30" y="110"/><use href="#b-yellow" x="40" y="110"/><use href="#b-blue" x="50" y="110"/>
+        <use href="#b-green" x="60" y="110"/><use href="#b-purple" x="70" y="110"/><use href="#b-orange" x="80" y="110"/>
+        <use href="#b-cyan" x="90" y="110"/><use href="#b-red" x="100" y="110"/><use href="#b-yellow" x="110" y="110"/>
+
+        <!-- Left Border -->
+        <use href="#b-yellow" x="0" y="10"/><use href="#b-blue" x="0" y="20"/><use href="#b-red" x="0" y="30"/>
+        <use href="#b-orange" x="0" y="40"/><use href="#b-cyan" x="0" y="50"/><use href="#b-green" x="0" y="60"/>
+        <use href="#b-purple" x="0" y="70"/><use href="#b-yellow" x="0" y="80"/><use href="#b-blue" x="0" y="90"/>
+        <use href="#b-red" x="0" y="100"/>
+
+        <!-- Right Border -->
+        <use href="#b-green" x="110" y="10"/><use href="#b-cyan" x="110" y="20"/><use href="#b-orange" x="110" y="30"/>
+        <use href="#b-purple" x="110" y="40"/><use href="#b-blue" x="110" y="50"/><use href="#b-red" x="110" y="60"/>
+        <use href="#b-yellow" x="110" y="70"/><use href="#b-green" x="110" y="80"/><use href="#b-cyan" x="110" y="90"/>
+        <use href="#b-orange" x="110" y="100"/>
+    </g>
+
+</svg>

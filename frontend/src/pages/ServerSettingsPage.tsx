@@ -72,7 +72,7 @@ export function ServerSettingsPage() {
   return (
     <div className="flex h-screen w-full bg-sp-bg text-sp-text overflow-hidden">
       {/* Left nav */}
-      <div className="w-[218px] shrink-0 bg-sp-sidebar flex flex-col items-end overflow-y-auto py-4">
+      <div className="w-[218px] shrink-0 bg-sp-sidebar flex flex-col items-end overflow-y-auto py-4 md:m-3 md:rounded-[28px] md:shadow-sp-3 md:h-[calc(100vh-24px)] border-r border-sp-divider/20 md:border-none relative z-10">
         <div className="w-[172px]">
           <div className="text-xs font-bold uppercase text-sp-muted tracking-wider px-2 mb-1 truncate">
             {server.title}
@@ -124,8 +124,9 @@ export function ServerSettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 min-w-0">
-        <div className="flex-1 overflow-y-auto px-10 py-8 max-w-3xl">
+      <div className="flex flex-col flex-1 min-w-0 bg-sp-bg md:p-3 relative z-0 md:pl-0">
+        <div className="flex flex-1 min-w-0 overflow-hidden bg-sp-surface md:rounded-[28px] md:shadow-sp-3 shadow-none relative isolation-isolate">
+          <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 max-w-3xl">
           {tab === 'overview'      && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
           {tab === 'members'       && <MembersTab  serverId={serverId} members={members} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
           {tab === 'roles'         && <RolesTab    serverId={serverId} />}
@@ -135,7 +136,7 @@ export function ServerSettingsPage() {
         </div>
 
         {/* Close button */}
-        <div className="px-6 py-4 flex flex-col items-center gap-2 shrink-0">
+        <div className="px-4 md:px-6 py-4 flex flex-col items-center gap-2 shrink-0 relative z-10">
           <button
             onClick={close}
             className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-input/60 flex items-center justify-center transition-colors text-sp-muted hover:text-sp-text"
@@ -144,6 +145,7 @@ export function ServerSettingsPage() {
             <Icon name="close" size={18} />
           </button>
           <span className="text-[10px] text-sp-muted">ESC</span>
+        </div>
         </div>
       </div>
     </div>

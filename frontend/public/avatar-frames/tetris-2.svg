@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+    <defs>
+        <!-- Reusable styling for 3D embossed Tetris blocks -->
+        <polygon id="hl" points="0,0 10,0 8,2 2,2 2,8 0,10" fill="#FFFFFF" opacity="0.6"/>
+        <polygon id="sh" points="10,10 0,10 2,8 8,8 8,2 10,0" fill="#000000" opacity="0.3"/>
+        
+        <!-- Individual Colored Tetris Blocks -->
+        <g id="b-cyan"><rect width="10" height="10" fill="#008888"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#00FFFF"/></g>
+        <g id="b-yellow"><rect width="10" height="10" fill="#888800"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#FFFF00"/></g>
+        <g id="b-blue"><rect width="10" height="10" fill="#000088"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#4444FF"/></g>
+        <g id="b-orange"><rect width="10" height="10" fill="#AA5500"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#FF8800"/></g>
+        <g id="b-green"><rect width="10" height="10" fill="#008800"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#00FF00"/></g>
+        <g id="b-red"><rect width="10" height="10" fill="#880000"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#FF0000"/></g>
+        <g id="b-purple"><rect width="10" height="10" fill="#880088"/><use href="#hl"/><use href="#sh"/><rect x="2" y="2" width="6" height="6" fill="#FF00FF"/></g>
+        
+        <!-- Pixel Art "+100" Text Shape (Using 2x2 grid units per pixel) -->
+        <g id="score-shape">
+            <!-- "+" symbol -->
+            <rect x="2" y="2" width="2" height="6" />
+            <rect x="0" y="4" width="6" height="2" />
+            <!-- "1" symbol -->
+            <rect x="10" y="0" width="2" height="10" />
+            <rect x="8" y="2" width="2" height="2" />
+            <!-- "0" symbol -->
+            <rect x="14" y="0" width="2" height="10" />
+            <rect x="18" y="0" width="2" height="10" />
+            <rect x="16" y="0" width="2" height="2" />
+            <rect x="16" y="8" width="2" height="2" />
+            <!-- "0" symbol -->
+            <rect x="22" y="0" width="2" height="10" />
+            <rect x="26" y="0" width="2" height="10" />
+            <rect x="24" y="0" width="2" height="2" />
+            <rect x="24" y="8" width="2" height="2" />
+        </g>
+
+        <!-- Keep falling blocks visually clipped to the bounds of the frame -->
+        <clipPath id="playfield-clip">
+            <rect x="0" y="0" width="120" height="120" />
+        </clipPath>
+    </defs>
+
+    <!-- Overall board fade out to seamlessly loop/reset the animation -->
+    <g>
+        <animate attributeName="opacity" values="1; 1; 0; 0; 1" keyTimes="0; 0.85; 0.90; 0.95; 1" dur="10s" repeatCount="indefinite" />
+        
+        <g clip-path="url(#playfield-clip)">
+            
+            <!-- Garbage Blocks (Sitting on top, drop down when lines clear) -->
+            <g>
+                <animateTransform attributeName="transform" type="translate" values="0,0; 0,0; 0,20; 0,20; 0,0; 0,0" keyTimes="0; 0.20; 0.22; 0.9; 0.95; 1" dur="10s" repeatCount="indefinite" />
+                
+                <!-- Dropping Garbage Left -->
+                <use href="#b-green" x="0" y="90"/>
+                <use href="#b-green" x="10" y="90"/>
+                <use href="#b-red" x="0" y="80"/>
+                <use href="#b-red" x="10" y="80"/>
+                
+                <!-- Dropping Garbage Center -->
+                <use href="#b-purple" x="60" y="90"/>
+                <use href="#b-purple" x="60" y="80"/>
+            </g>
+
+            <!-- Active Rows (The ones that perfectly fill up and get cleared) -->
+            <g>
+                <animate attributeName="opacity" values="1; 1; 0; 0; 1; 1" keyTimes="0; 0.20; 0.21; 0.9; 0.95; 1" dur="10s" repeatCount="indefinite" />
+                
+                <!-- Base Static Blocks in the cleared rows -->
+                <!-- Base O-Piece (Left) -->
+                <use href="#b-yellow" x="0" y="100"/><use href="#b-yellow" x="10" y="100"/>
+                <use href="#b-yellow" x="0" y="110"/><use href="#b-yellow" x="10" y="110"/>
+                
+                <!-- Base I-Piece Bottom Half (Center Left) -->
+                <use href="#b-cyan" x="20" y="110"/><use href="#b-cyan" x="30" y="110"/>
+                <use href="#b-cyan" x="40" y="110"/><use href="#b-cyan" x="50" y="110"/>
+                
+                <!-- Base L-Piece (Center Right) -->
+                <use href="#b-orange" x="60" y="100"/><use href="#b-orange" x="60" y="110"/>
+                <use href="#b-orange" x="70" y="110"/><use href="#b-orange" x="80" y="110"/>
+
+                <!-- Falling Piece 1: J (Blue) - drops cleanly onto the right side -->
+                <g>
+                    <animateTransform attributeName="transform" type="translate" values="0,-140; 0,0; 0,0; 0,-140; 0,-140" keyTimes="0; 0.10; 0.9; 0.95; 1" dur="10s" repeatCount="indefinite" />
+                    <use href="#b-blue" x="70" y="100"/>
+                    <use href="#b-blue" x="80" y="100"/>
+                    <use href="#b-blue" x="90" y="100"/>
+                    <use href="#b-blue" x="90" y="110"/>
+                </g>
+
+                <!-- Falling Piece 2: O (Yellow) - drops cleanly onto the far right -->
+                <g>
+                    <animateTransform attributeName="transform" type="translate" values="0,-140; 0,-140; 0,0; 0,0; 0,-140; 0,-140" keyTimes="0; 0.05; 0.15; 0.9; 0.95; 1" dur="10s" repeatCount="indefinite" />
+                    <use href="#b-yellow" x="100" y="100"/>
+                    <use href="#b-yellow" x="110" y="100"/>
+                    <use href="#b-yellow" x="100" y="110"/>
+                    <use href="#b-yellow" x="110" y="110"/>
+                </g>
+
+                <!-- Falling Piece 3: I (Cyan) - the final satisfying piece completing the horizontal lock -->
+                <g>
+                    <animateTransform attributeName="transform" type="translate" values="0,-140; 0,-140; 0,0; 0,0; 0,-140; 0,-140" keyTimes="0; 0.10; 0.20; 0.9; 0.95; 1" dur="10s" repeatCount="indefinite" />
+                    <use href="#b-cyan" x="20" y="100"/>
+                    <use href="#b-cyan" x="30" y="100"/>
+                    <use href="#b-cyan" x="40" y="100"/>
+                    <use href="#b-cyan" x="50" y="100"/>
+                </g>
+            </g>
+            
+            <!-- Impact Flash when lines fully connect -->
+            <rect x="0" y="100" width="120" height="20" fill="#FFFFFF" opacity="0">
+                <animate attributeName="opacity" values="0; 0; 0.9; 0; 0" keyTimes="0; 0.19; 0.20; 0.23; 1" dur="10s" repeatCount="indefinite" />
+            </rect>
+            
+        </g>
+    </g>
+    
+    <!-- Floating +100 Score Popup -->
+    <g opacity="0">
+        <!-- Fade in precisely when lines clear, hold, then fade out -->
+        <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.20; 0.21; 0.40; 0.50; 1" dur="10s" repeatCount="indefinite" />
+        <!-- Starts just above the cleared lines and floats upwards -->
+        <animateTransform attributeName="transform" type="translate" values="46,80; 46,80; 46,40; 46,40" keyTimes="0; 0.20; 0.50; 1" dur="10s" repeatCount="indefinite" />
+        
+        <!-- Drop Shadow / Outer Edge -->
+        <use href="#score-shape" x="1" y="1" fill="#FF5500" opacity="0.8" />
+        <!-- Main Yellow Score Text -->
+        <use href="#score-shape" x="0" y="0" fill="#FFFF00" />
+    </g>
+
+</svg>
