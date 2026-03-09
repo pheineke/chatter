@@ -169,7 +169,7 @@ async def server_ws(
     try:
         while True:
             await ws.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         await manager.disconnect(room, ws)
@@ -241,7 +241,7 @@ async def personal_ws(
                     await ws.send_text('{"type":"pong"}')
             except (json.JSONDecodeError, Exception):
                 pass
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         await manager.disconnect(room, ws)
@@ -306,7 +306,7 @@ async def bot_gateway_ws(
                     await ws.send_text('{"type":"pong"}')
             except (json.JSONDecodeError, Exception):
                 pass
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         for room in rooms:

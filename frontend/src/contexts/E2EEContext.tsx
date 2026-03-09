@@ -44,6 +44,34 @@ import {
 } from '../api/e2ee'
 import { importKeyBackup, type KeyBackup } from '../crypto'
 
+// ─── Module-level dedup for keypair initialisation ─────────────────────────
+// Prevents React Strict Mode double-mount from generating two different keypairs
+// that race against each other in IndexedDB and the server.
+
+const _ensureKeyPairPromises = new Map<string, Promise<{ pair: CryptoKeyPair; fingerprint: string; pubB64: string }>>()
+
+function ensureKeyPair(userId: string): Promise<{ pair: CryptoKeyPair; fingerprint: string; pubB64: string }> {
+  let p = _ensureKeyPairPromises.get(userId)
+  if (!p) {
+    p = (async () => {
+      let pair = await loadKeyPair(userId)
+      let fp: string
+      if (!pair) {
+        const result = await generateAndSaveKeyPair(userId)
+        pair = result.pair
+        fp = result.fingerprint
+      } else {
+        fp = await keyFingerprint(pair.publicKey)
+      }
+      const pubB64 = await exportPublicKey(pair.publicKey)
+      return { pair, fingerprint: fp, pubB64 }
+    })()
+    _ensureKeyPairPromises.set(userId, p)
+    p.finally(() => _ensureKeyPairPromises.delete(userId))
+  }
+  return p
+}
+
 // ─── Context shape ─────────────────────────────────────────────────────────
 
 export interface E2EEContextValue {
@@ -114,24 +142,18 @@ export function E2EEProvider({ userId, children }: Props) {
     async function init() {
       setInitialising(true)
       try {
-        let pair = await loadKeyPair(userId)
+        // ensureKeyPair is deduped at module level so concurrent calls
+        // (e.g. React Strict Mode double-mount) share the same promise
+        // and always get the same keypair.
+        const { pair, fingerprint: fp, pubB64 } = await ensureKeyPair(userId)
 
-        if (!pair) {
-          // First run: generate, persist, and publish
-          const { pair: newPair, fingerprint: fp } = await generateAndSaveKeyPair(userId)
-          pair = newPair
-          const pubB64 = await exportPublicKey(newPair.publicKey)
-          await publishPublicKey(pubB64, fp)
-          if (!cancelled) {
-            setFingerprint(fp)
-          }
-        } else {
-          const fp = await keyFingerprint(pair.publicKey)
-          if (!cancelled) setFingerprint(fp)
-        }
+        // Publish unconditionally — handles fresh generation AND
+        // re-sync after server DB resets / key drift.
+        try { await publishPublicKey(pubB64, fp) } catch { /* non-fatal */ }
 
         if (!cancelled) {
           keyPairRef.current = pair
+          setFingerprint(fp)
           setIsEnabled(true)
           setReady(true)
         }
@@ -235,6 +257,7 @@ export function E2EEProvider({ userId, children }: Props) {
     await deleteKeyPair(userId)
     sharedKeyCache.current.clear()
     keyPairRef.current = null
+    _ensureKeyPairPromises.delete(userId) // allow fresh generation
     const { pair, fingerprint: fp } = await generateAndSaveKeyPair(userId)
     keyPairRef.current = pair
     setFingerprint(fp)

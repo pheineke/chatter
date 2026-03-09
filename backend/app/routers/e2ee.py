@@ -16,6 +16,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select, delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.auth import create_access_token, generate_refresh_token
 from app.dependencies import CurrentUser, DB
@@ -226,27 +227,28 @@ async def upsert_own_e2ee_key(body: E2EEPublicKeyWrite, current_user: CurrentUse
     leaves the client—it lives in IndexedDB and is transferred device-to-device
     through the encrypted QR login flow.
     """
+    now = datetime.now(timezone.utc)
+    stmt = pg_insert(UserE2EEKey).values(
+        user_id=current_user.id,
+        public_key=body.public_key,
+        fingerprint=body.fingerprint,
+        created_at=now,
+        updated_at=now,
+    ).on_conflict_do_update(
+        index_elements=[UserE2EEKey.user_id],
+        set_={
+            "public_key": body.public_key,
+            "fingerprint": body.fingerprint,
+            "updated_at": now,
+        },
+    )
+    await db.execute(stmt)
+    await db.commit()
+
     result = await db.execute(
         select(UserE2EEKey).where(UserE2EEKey.user_id == current_user.id)
     )
-    key_row = result.scalar_one_or_none()
-    now = datetime.now(timezone.utc)
-    if key_row is None:
-        key_row = UserE2EEKey(
-            user_id=current_user.id,
-            public_key=body.public_key,
-            fingerprint=body.fingerprint,
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(key_row)
-    else:
-        key_row.public_key = body.public_key
-        key_row.fingerprint = body.fingerprint
-        key_row.updated_at = now
-
-    await db.commit()
-    await db.refresh(key_row)
+    key_row = result.scalar_one()
     return E2EEPublicKeyRead(
         user_id=key_row.user_id,
         public_key=key_row.public_key,

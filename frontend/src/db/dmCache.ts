@@ -40,6 +40,11 @@ class DMCacheDB extends Dexie {
       dmConversations: 'channel_id',
       dmOutbox: 'localId, channelId',
     })
+    this.version(2).stores({
+      dmMessages: '[channel_id+id], channel_id, created_at',
+      dmConversations: 'channel_id',
+      dmOutbox: 'localId, channelId, created_at',
+    })
   }
 }
 
