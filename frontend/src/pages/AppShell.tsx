@@ -94,7 +94,7 @@ export default function AppShell() {
             {/* ── Left panel: server icons + channel/DM list ──────────────
                 Mobile (<md): fixed off-screen, slides in from left.
                 Desktop (md+): static in-flow columns, floating card.   */}
-            <div className={`flex flex-col fixed inset-y-0 left-0 z-40 w-[312px] bg-sp-sidebar transition-transform duration-200 shadow-sp-3 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 md:m-3 md:rounded-[28px] md:h-[calc(100vh-24px)] overflow-hidden ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className={`flex flex-col fixed inset-y-0 left-0 z-40 w-[312px] bg-sp-sidebar transition-transform duration-200 shadow-sp-3 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 md:shadow-none panel-nav ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
               
               {/* Top area: Split into Server List (left) and Channel List (right) */}
               <div className="flex flex-1 min-h-0 overflow-hidden relative">
@@ -138,8 +138,8 @@ export default function AppShell() {
             </div>
 
             {/* Main area — always full-width on mobile */}
-            <div className="flex flex-col flex-1 min-w-0 bg-sp-bg md:p-3 relative z-0">
-              <div className="flex-1 min-h-0 overflow-hidden bg-sp-surface md:rounded-[28px] md:shadow-sp-3 shadow-none flex flex-col relative isolation-isolate">
+            <div className="flex flex-col flex-1 min-w-0 bg-sp-bg md:p-1.5 relative z-0">
+              <div className="flex-1 min-h-0 bg-sp-surface panel-content flex flex-col relative isolation-isolate">
                 <Routes>
                   <Route index element={<Navigate to="@me" replace />} />
                   <Route path="@me" element={<FriendsPane onOpenNav={() => setShowLeftDrawer(true)} />} />

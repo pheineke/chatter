@@ -16,6 +16,7 @@ import { InviteModal } from '../components/InviteModal'
 import { useAuth } from '../contexts/AuthContext'
 import type { Member, Role } from '../api/types'
 import type { ServerInvite } from '../api/invites'
+import { LayoutShell, NavPanel, ContentPanel } from '../components/LayoutShell'
 
 type Tab = 'overview' | 'members' | 'roles' | 'invites' | 'word-filters' | 'bans'
 
@@ -70,9 +71,9 @@ export function ServerSettingsPage() {
   const visibleTabs = NAV.filter(n => !n.adminOnly || isAdmin)
 
   return (
-    <div className="flex h-screen w-full bg-sp-bg text-sp-text overflow-hidden">
+    <LayoutShell>
       {/* Left nav */}
-      <div className="w-[218px] shrink-0 bg-sp-sidebar flex flex-col px-2 py-6 overflow-y-auto md:m-3 md:rounded-[28px] md:shadow-sp-3 md:h-[calc(100vh-24px)] border-r border-sp-divider/20 md:border-none relative z-10">
+      <NavPanel className="w-[218px] px-2 py-6">
         <div className="mb-4">
           <div className="px-2 mb-1 text-[11px] font-bold text-sp-muted uppercase tracking-wide truncate">
             {server.title}
@@ -120,36 +121,34 @@ export function ServerSettingsPage() {
             </button>
           )}
         </div>
-      </div>
+      </NavPanel>
 
       {/* Content */}
-      <div className="flex flex-col flex-1 min-w-0 bg-sp-bg md:p-3 relative z-0 md:pl-0">
-        <div className="flex flex-1 min-w-0 overflow-hidden bg-sp-surface md:rounded-[28px] md:shadow-sp-3 shadow-none relative isolation-isolate">
-          <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            <div className="max-w-2xl mx-auto">
-              {tab === 'overview'      && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
-              {tab === 'members'       && <MembersTab  serverId={serverId} members={members} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
-              {tab === 'roles'         && <RolesTab    serverId={serverId} />}
-              {tab === 'invites'       && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
-              {tab === 'word-filters'  && <WordFiltersTab serverId={serverId} />}
-              {tab === 'bans'          && <BansTab serverId={serverId} />}
-            </div>
-          </div>
-
-          {/* Close button */}
-          <div className="p-4 shrink-0 flex flex-col items-center gap-1 relative z-10">
-            <button
-              onClick={close}
-              className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-muted/30 flex items-center justify-center transition-colors group"
-              title="Close (Esc)"
-            >
-              <Icon name="close" size={20} className="text-sp-muted group-hover:text-sp-text" />
-            </button>
-            <span className="text-[10px] text-sp-muted">ESC</span>
+      <ContentPanel>
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-2xl mx-auto">
+            {tab === 'overview'      && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
+            {tab === 'members'       && <MembersTab  serverId={serverId} members={members} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
+            {tab === 'roles'         && <RolesTab    serverId={serverId} />}
+            {tab === 'invites'       && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
+            {tab === 'word-filters'  && <WordFiltersTab serverId={serverId} />}
+            {tab === 'bans'          && <BansTab serverId={serverId} />}
           </div>
         </div>
-      </div>
-    </div>
+
+        {/* Close button */}
+        <div className="p-4 shrink-0 flex flex-col items-center gap-1 relative z-10">
+          <button
+            onClick={close}
+            className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-muted/30 flex items-center justify-center transition-colors group"
+            title="Close (Esc)"
+          >
+            <Icon name="close" size={20} className="text-sp-muted group-hover:text-sp-text" />
+          </button>
+          <span className="text-[10px] text-sp-muted">ESC</span>
+        </div>
+      </ContentPanel>
+    </LayoutShell>
   )
 }
 

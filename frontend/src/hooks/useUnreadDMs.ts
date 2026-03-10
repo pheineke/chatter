@@ -61,6 +61,24 @@ export function useUnreadDMs(): boolean {
 
   const { send } = useWebSocket('/ws/me', {
     onMessage(msg) {
+      if (msg.type === 'friend_request.received') {
+        qc.invalidateQueries({ queryKey: ['friendRequests'] })
+        return
+      }
+      if (msg.type === 'friend_request.accepted') {
+        qc.invalidateQueries({ queryKey: ['friends'] })
+        qc.invalidateQueries({ queryKey: ['friendRequests'] })
+        return
+      }
+      if (msg.type === 'friend_request.declined' || msg.type === 'friend_request.cancelled') {
+        qc.invalidateQueries({ queryKey: ['friendRequests'] })
+        return
+      }
+      if (msg.type === 'friend.removed') {
+        qc.invalidateQueries({ queryKey: ['friends'] })
+        return
+      }
+
       if (msg.type === 'user.status_changed') {
         const { user_id, status } = msg.data as { user_id: string; status: UserStatus }
         // If this is our own status being restored after a reconnect, patch AuthContext

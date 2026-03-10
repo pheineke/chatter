@@ -195,10 +195,10 @@ export default function QRLoginPage() {
 
   return (
     <div className="flex h-screen items-center justify-center bg-sp-bg">
-      <div className="flex w-full max-w-4xl overflow-hidden rounded-2xl bg-sp-sidebar shadow-2xl">
+      <div className="flex w-full max-w-4xl overflow-hidden rounded-sp-xl bg-sp-popup border border-sp-divider/50" style={{ boxShadow: 'var(--sp-shadow-2)' }}>
         {/* Left panel */}
         <div className="flex w-1/2 flex-col items-center justify-center gap-6 bg-sp-bg px-8 py-12">
-          <h2 className="text-2xl font-bold text-white text-center">Log in with QR Code</h2>
+          <h2 className="text-2xl font-bold text-sp-text text-center">Log in with QR Code</h2>
           <p className="text-center text-sm text-sp-muted leading-relaxed">
             Scan this code with your phone.<br />
             Logging in this way gives the new device your E2EE key — no password needed.

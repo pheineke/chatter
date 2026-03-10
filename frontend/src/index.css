@@ -101,6 +101,20 @@ input.input {
   @apply bg-sp-sidebar border border-sp-divider/40 rounded-sp-md;
 }
 
+/* ── Layout panel tiles – centralized styles for floating panel cards ─── */
+/*   nav panel: desktop floating card with margin + large radius            */
+.panel-nav {
+  @apply md:m-1.5 md:rounded-[28px] md:h-[calc(100vh-12px)] md:border md:border-sp-divider/50 overflow-hidden;
+}
+/*   content panel: full-height card inset from the edge                   */
+.panel-content {
+  @apply md:rounded-[28px] md:border md:border-sp-divider/50 overflow-hidden;
+}
+/*   settings section card: inner card used for grouping settings fields   */
+.settings-section {
+  @apply bg-sp-sidebar rounded-sp-lg border border-sp-divider/30 p-4;
+}
+
 /* Hide scrollbar but keep scroll */
 .scrollbar-none {
   scrollbar-width: none;

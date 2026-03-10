@@ -101,9 +101,15 @@ async def accept_request(request_id: uuid.UUID, current_user: CurrentUser, db: D
         .where(FriendRequest.id == request_id)
     )
     fr = result.scalar_one()
+    fr_data = FriendRequestRead.model_validate(fr).model_dump(mode="json")
     await manager.broadcast_user(
         sender_id,
-        {"type": "friend_request.accepted", "data": FriendRequestRead.model_validate(fr).model_dump(mode="json")},
+        {"type": "friend_request.accepted", "data": fr_data},
+    )
+    # Also notify the recipient (acceptor) so their own queries refresh
+    await manager.broadcast_user(
+        current_user.id,
+        {"type": "friend_request.accepted", "data": fr_data},
     )
     return fr
 
@@ -151,8 +157,13 @@ async def cancel_request(request_id: uuid.UUID, current_user: CurrentUser, db: D
         raise HTTPException(status_code=403, detail="Cannot cancel a request you did not send")
     if fr.status != FriendRequestStatus.pending:
         raise HTTPException(status_code=400, detail="Request is no longer pending")
+    recipient_id = fr.recipient_id
     await db.delete(fr)
     await db.commit()
+    await manager.broadcast_user(
+        recipient_id,
+        {"type": "friend_request.cancelled", "data": {"request_id": str(request_id)}},
+    )
 
 
 @router.get("/", response_model=List[FriendRead])
@@ -199,5 +210,10 @@ async def remove_friend(user_id: uuid.UUID, current_user: CurrentUser, db: DB):
     fr = result.scalar_one_or_none()
     if not fr:
         raise HTTPException(status_code=404, detail="Friend not found")
+    other_id = fr.recipient_id if fr.sender_id == current_user.id else fr.sender_id
     await db.delete(fr)
     await db.commit()
+    await manager.broadcast_user(
+        other_id,
+        {"type": "friend.removed", "data": {"user_id": str(current_user.id)}},
+    )

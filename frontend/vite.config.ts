@@ -88,21 +88,28 @@ export default defineConfig({
             (err.code != null && IGNORE_CODES.has(err.code)) ||
             IGNORE_MSGS.some((m) => err.message?.includes(m))
 
-          // Proxy-level errors (e.g. backend unreachable)
-          proxy.on('error', (err: NodeJS.ErrnoException) => {
-            if (!suppress(err)) console.error('[ws proxy]', err.message)
+          // Remove Vite's built-in proxy error listener (logs "[vite] ws proxy error:")
+          // and replace it with our filtered version so disconnect noise is silenced.
+          proxy.removeAllListeners('error')
+          proxy.on('error', (err: NodeJS.ErrnoException, _req, socket) => {
+            if (suppress(err)) return
+            console.error('[ws proxy]', err.message)
+            if (socket && typeof (socket as any).destroy === 'function') (socket as any).destroy()
           })
 
-          // Socket-level write errors from the proxy → backend socket.
-          // These fire as "write ECONNABORTED" when the browser disconnects
-          // while the proxy is still writing — completely normal, just noise.
+          // Proxy → backend socket errors (write ECONNABORTED on browser disconnect).
           proxy.on('open', (proxySocket: NodeJS.EventEmitter) => {
             proxySocket.on('error', () => { /* suppress normal disconnect errors */ })
           })
 
-          // Socket-level errors on the browser → proxy socket.
+          // Browser → proxy socket: this listener runs AFTER Vite's own proxyReqWs
+          // handler (which adds the listener that logs "[vite] ws proxy socket error:"),
+          // so we can remove Vite's socket error listener and replace it with ours.
           proxy.on('proxyReqWs', (_proxyReq, _req, socket: NodeJS.EventEmitter) => {
-            socket.on('error', () => { /* suppress normal disconnect errors */ })
+            socket.removeAllListeners('error')
+            socket.on('error', (err: NodeJS.ErrnoException) => {
+              if (!suppress(err)) console.error('[ws proxy socket]', err.message)
+            })
           })
         },
       },
