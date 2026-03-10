@@ -105,6 +105,20 @@ export function DMSidebar() {
               x: e.clientX,
               y: e.clientY,
               items: [
+                ...(hasUnread ? [{
+                  label: 'Mark as Read',
+                  icon: 'check-circle',
+                  onClick: () => {
+                    const now = new Date().toISOString()
+                    setLastRead(prev => {
+                      const next = { ...prev, [conv.channel_id]: now }
+                      saveLastRead(next)
+                      // Notify useUnreadDMs in the same tab (storage event is cross-tab only)
+                      window.dispatchEvent(new StorageEvent('storage', { key: LAST_READ_KEY }))
+                      return next
+                    })
+                  },
+                }, { separator: true as const }] : []),
                 {
                   label: isMuted ? 'Unmute Conversation' : 'Mute Conversation',
                   icon: isMuted ? 'bell' : 'bell-off',

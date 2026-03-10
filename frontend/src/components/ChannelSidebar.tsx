@@ -38,7 +38,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const qc = useQueryClient()
 
   useServerWS(serverId ?? null, channelId)
-  const { unreadChannels } = useUnreadChannels()
+  const { unreadChannels, markRead } = useUnreadChannels()
   const { channelLevel, setChannelLevel } = useNotificationSettings()
 
   const { data: server } = useQuery({
@@ -156,6 +156,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     e.preventDefault()
     e.stopPropagation()
     const currentLevel = channelLevel(ch.id)
+    const markReadItem: ContextMenuItem[] = (ch.type === 'text' && unreadChannels.has(ch.id)) ? [
+      {
+        label: 'Mark as Read',
+        icon: 'check-circle',
+        onClick: () => markRead(ch.id),
+      },
+      { separator: true },
+    ] : []
     const notifItems: ContextMenuItem[] = [
       {
         label: currentLevel === 'all' ? '✓ All Messages' : 'All Messages',
@@ -189,7 +197,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
-      items: [...notifItems, ...adminItems],
+      items: [...markReadItem, ...notifItems, ...adminItems],
     })
   }
 
@@ -439,6 +447,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   onJoinVoice={onJoinVoice}
                   onLeaveVoice={onLeaveVoice}
                   navigate={navigate}
+                  onContextMenu={e => openChannelContextMenu(e, ch)}
                 />
               )
             })}

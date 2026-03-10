@@ -33,7 +33,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
   const notifBtnRef = useRef<HTMLButtonElement>(null)
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const scrollToMessageRef = useRef<((id: string) => void) | null>(null)
-  const { markRead, markServerRead } = useUnreadChannels()
+  const { markRead } = useUnreadChannels()
   const qc = useQueryClient()
 
   // Search state
@@ -57,11 +57,11 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
     setShowNotifMenu(false)
   }
 
-  // Mark channel + server as read when the user opens a channel
+  // Mark channel as read when the user opens it.
+  // The server dot auto-clears once all its channels are read.
   useEffect(() => {
     if (channelId) markRead(channelId)
-    if (serverId) markServerRead(serverId)
-  }, [channelId, serverId, markRead, markServerRead])
+  }, [channelId, markRead])
 
   // Ctrl+F / Cmd+F → focus search
   useEffect(() => {

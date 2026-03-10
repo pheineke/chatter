@@ -117,7 +117,7 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           // This fires for ALL server members via broadcast_server — including the sender.
           // The sender is in `currentChannelId`, so the check correctly skips them.
           if (channel_id !== currentChannelId && channelLevel(channel_id) !== 'mute' && serverLevel(serverId ?? '') !== 'mute') {
-            notifyMessage(channel_id)
+            notifyMessage(channel_id, serverId ?? undefined)
             if (serverId) notifyServer(serverId)
             playSound('notificationSound')
           }

@@ -67,9 +67,29 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; serverId: string } | null>(null)
   const [inviteModalServerId, setInviteModalServerId] = useState<string | null>(null)
 
+  const [dmContextMenu, setDmContextMenu] = useState<{ x: number; y: number } | null>(null)
+
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers })
-  const { unreadServers } = useUnreadChannels()
+  const { unreadServers, markAllServerRead } = useUnreadChannels()
   const { serverLevel, setServerLevel } = useNotificationSettings()
+
+  function handleMarkServerRead(sId: string) {
+    markAllServerRead(sId)
+  }
+
+  function handleMarkAllDMsRead() {
+    const convs = qc.getQueryData<{ channel_id: string; last_message_at: string | null }[]>(['dmConversations']) ?? []
+    if (!convs.length) return
+    const LAST_READ_KEY = 'dmLastRead'
+    const existing: Record<string, string> = (() => {
+      try { return JSON.parse(localStorage.getItem(LAST_READ_KEY) ?? '{}') } catch { return {} }
+    })()
+    const now = new Date().toISOString()
+    const updated = { ...existing }
+    convs.forEach(c => { updated[c.channel_id] = c.last_message_at ?? now })
+    localStorage.setItem(LAST_READ_KEY, JSON.stringify(updated))
+    window.dispatchEvent(new StorageEvent('storage', { key: LAST_READ_KEY }))
+  }
 
   const handleCreateInvite = (sId: string) => {
     setInviteModalServerId(sId)
@@ -106,6 +126,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
         <button
           title="Direct Messages"
           onClick={() => navigate('/channels/@me')}
+          onContextMenu={(e) => { e.preventDefault(); setDmContextMenu({ x: e.clientX, y: e.clientY }) }}
           className={`w-12 h-12 rounded-full flex items-center justify-center bg-sp-input hover:bg-sp-hover transition-all shadow-sp-1 hover:shadow-sp-2 hover:scale-105 text-sp-mention text-xl font-bold`}
         >
           <Icon name="message-circle" size={24} />
@@ -149,6 +170,14 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           items={[
+            ...(unreadServers.has(contextMenu.serverId) ? [
+              {
+                label: 'Mark as Read',
+                icon: 'check-circle',
+                onClick: () => handleMarkServerRead(contextMenu.serverId),
+              },
+              { separator: true },
+            ] : []),
             {
               label: 'Server Settings',
               icon: 'settings',
@@ -167,6 +196,22 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
                 contextMenu.serverId,
                 serverLevel(contextMenu.serverId) === 'mute' ? 'all' : 'mute',
               ),
+            },
+          ]}
+        />
+      )}
+
+      {/* DM nav context menu */}
+      {dmContextMenu && (
+        <ContextMenu
+          x={dmContextMenu.x}
+          y={dmContextMenu.y}
+          onClose={() => setDmContextMenu(null)}
+          items={[
+            {
+              label: 'Mark all as Read',
+              icon: 'check-circle',
+              onClick: handleMarkAllDMsRead,
             },
           ]}
         />

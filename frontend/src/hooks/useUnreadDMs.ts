@@ -113,7 +113,7 @@ export function useUnreadDMs(): boolean {
         if (channel_id === activeChannelId) return
         if (channelLevel(channel_id) === 'mute') return
         if (serverLevel(server_id) === 'mute') return
-        notifyMessage(channel_id)
+        notifyMessage(channel_id, server_id)
         notifyServer(server_id)
         playSound('notificationSound')
         // Desktop notification: look up channel name from cache
