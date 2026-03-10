@@ -14,7 +14,12 @@ import { useNotificationSettings } from '../hooks/useNotificationSettings'
 function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { server: Server; active: boolean; hasUnread: boolean; isMuted: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
   const navigate = useNavigate()
   const [hovered, setHovered] = useState(false)
-  const expanded = active || hovered
+  const [pressing, setPressing] = useState(false)
+
+  // Three visual states: circle → pill (hover) → full-width rectangle (active)
+  const containerWidth = active ? '100%' : hovered ? '64px' : '48px'
+  const containerRadius = active ? '8px' : '9999px'
+
   const initials = server.title
     .split(/\s+/)
     .map((w) => w[0])
@@ -26,19 +31,22 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
     <div
       className="relative w-full py-0.5"
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => { setHovered(false); setPressing(false) }}
     >
       {/* Animated shape container */}
       <div
         style={{
-          width: expanded ? '100%' : '48px',
-          borderRadius: expanded ? '8px' : '9999px',
-          transition: 'width 220ms ease-out, border-radius 220ms ease-out',
+          width: containerWidth,
+          borderRadius: containerRadius,
+          transform: pressing ? 'scale(0.90)' : 'scale(1)',
+          transition: 'width 200ms ease-out, border-radius 200ms ease-out, transform 80ms ease-out',
         }}
         className="relative h-12 mx-auto overflow-hidden"
       >
         <button
           title={server.title}
+          onMouseDown={() => setPressing(true)}
+          onMouseUp={() => setPressing(false)}
           onClick={() => {
             const last = getLastChannel(server.id)
             navigate(last ? `/channels/${server.id}/${last}` : `/channels/${server.id}`)

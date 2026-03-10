@@ -27,7 +27,7 @@
 - ~~**Real-time reactions trigger a full refetch instead of a cache patch**~~ ✅ Fixed — `useChannelWS` now uses `setQueryData` for both `reaction.added` and `reaction.removed`: added reactions are appended with a dedup guard; removed reactions are filtered out by `(user_id, emoji)` pair. No network request is made.
 - ~~**DM list has no online status indicator or unread badge**~~ ✅ Fixed — `DMSidebar` now lists all conversations with `UserAvatar` + `StatusIndicator` per contact. An unread white dot appears next to any conversation with messages newer than the stored `dmLastRead` timestamp. A green dot badge also appears on the DM button in `ServerSidebar` (via `useUnreadDMs`) whenever any DM has unread messages, even while on a server.
 - ~~**Typing indicator not shown in DMs**~~ ✅ Fixed — `DMPane` now calls `useChannelWS(dmChannel?.channel_id)`, wiring `typingUsers` into the animated "X is typing…" bar and passing `sendTyping` to `MessageInput` via `onTyping`. The backend `/ws/channels/{channel_id}` endpoint already handled `typing` events for all channel types; no backend changes were needed.
-- **No notification sound for incoming server channel messages when not in DM sidebar** — `channel.message` handler in `useUnreadDMs` fires `playSound`, but only if the active route is not already the matching channel. Verified working.
+- ~~**No notification sound for incoming server channel messages when not in DM sidebar**~~ ✅ Verified working — `channel.message` handler in `useUnreadDMs` fires `playSound`, but only if the active route is not already the matching channel.
 
 ## 2. Feature Requests: User Profiles
 
@@ -365,3 +365,23 @@ Make the client installable as a desktop/mobile app with a cached static shell a
 - **`after` cursor** (`backend/app/routers/messages.py`, `frontend/src/api/messages.ts`): new `after` query parameter on `GET /channels/{id}/messages` returns messages with `created_at > after_msg.created_at`, used exclusively for gap-sync.
 - **Conversation list offline** (`DMSidebar`): mirrors fetched conversations to IndexedDB via `cacheConversations`; on `offline`, loads `getCachedConversations()` and disables the network query.
 - **Settings** (`SettingsPage` → Privacy & Safety → DM Cache): "Clear DM cache" button calls `clearDMCache()` (wipes messages, conversations, and outbox) with a 3-second "Cache cleared." confirmation.
+
+## 11. UX Polish
+
+### ~~11.1. Mark as Read Context Menus~~ ✅ Implemented
+- Right-clicking a **server icon** shows "Mark as Read" when the server has unread channels; calls `markAllServerRead` to clear the server dot and all channel dots.
+- Right-clicking the **DM nav button** in the server sidebar shows "Mark all as Read"; writes all conversation `lastRead` timestamps to `localStorage` and dispatches a synthetic `StorageEvent` so `useUnreadDMs` picks up the change in the same tab.
+- Right-clicking any **text channel** in `ChannelSidebar` shows "Mark as Read" when that channel has an unread dot; calls `markRead(channelId)`.
+- Right-clicking a **DM conversation row** in `DMSidebar` shows "Mark as Read"; saves `lastRead` for that conversation and dispatches the synthetic event.
+- Fixed DM dot not clearing in the same tab: `storage` events only fire cross-tab, so same-tab writes now dispatch `window.dispatchEvent(new StorageEvent('storage', { key: LAST_READ_KEY }))`.
+- Fixed server dot logic: `markRead(channelId)` auto-cascades and clears the server dot when the last unread channel in a server is read. `markServerRead` only clears the dot itself; `markAllServerRead` clears dot + all channel dots.
+
+### ~~11.2. Server Icon Three-State Animation~~ ✅ Implemented
+- Server icons have three distinct visual states driven by React-controlled hover + press state:
+  - **Rest**: 48 px circle.
+  - **Hover**: 64 px pill (fully rounded capsule — slightly wider than the circle).
+  - **Active** (current server): 100 % full-width rectangle (8 px radius), persists while on that server.
+- On **mousedown** the container scales to 0.90 (80 ms fast in, 200 ms ease-out release) giving a physical "click in place" press feel.
+- `overflow-hidden` on the shape container clips images cleanly at all intermediate states.
+- Active state is driven by `activeServerId` prop passed from `AppShell` (via `useMatch`) rather than `useParams`, which has no `:serverId` segment at the `ServerSidebar` render level.
+- `useMatch('/channels/:serverId')` fallback added so servers navigated to without a remembered last channel (bare `/channels/:id` URL) are also detected as active.
