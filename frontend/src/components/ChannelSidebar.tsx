@@ -358,33 +358,62 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={visibleFlatIds} strategy={verticalListSortingStrategy}>
-              {visibleFlatIds.map(itemId => {
-                if (itemId.startsWith('cat:')) {
-                  const cat = categories.find(c => c.id === itemId.replace('cat:', ''))
-                  if (!cat) return null
-                  return <SortableCatHeader key={itemId} id={itemId} title={cat.title} collapsed={collapsedCats.has(cat.id)} onToggle={() => toggleCat(cat.id)} onContextMenu={e => openCategoryContextMenu(e, cat)} />
-                }
-                const ch = channels.find(c => c.id === itemId.replace('ch:', ''))
-                if (!ch) return null
+              {sortedCats.map(cat => {
+                const catId = `cat:${cat.id}`
+                const collapsed = collapsedCats.has(cat.id)
+                const catChannels = byCategory.get(cat.id) ?? []
                 return (
-                  <SortableChannelItem key={itemId} id={itemId}>
-                    <ChannelRow
-                      channel={ch}
-                      active={ch.id === channelId}
-                      hasUnread={unreadChannels.has(ch.id)}
-                      serverId={serverId!}
-                      voiceSession={voiceSession}
-                      channelPresence={voicePresence[ch.id] ?? []}
-                      members={members}
-                      localUser={user ?? undefined}
-                      onJoinVoice={onJoinVoice}
-                      onLeaveVoice={onLeaveVoice}
-                      navigate={navigate}
-                      onContextMenu={e => openChannelContextMenu(e, ch)}
+                  <div key={cat.id} className="mx-2 mt-2 rounded-lg border border-dashed border-sp-divider/40">
+                    <SortableCatHeader
+                      id={catId}
+                      title={cat.title}
+                      collapsed={collapsed}
+                      onToggle={() => toggleCat(cat.id)}
+                      onContextMenu={e => openCategoryContextMenu(e, cat)}
                     />
-                  </SortableChannelItem>
+                    {!collapsed && catChannels.length > 0 && (
+                      <div className="pb-1">
+                        {catChannels.map(ch => (
+                          <SortableChannelItem key={`ch:${ch.id}`} id={`ch:${ch.id}`}>
+                            <ChannelRow
+                              channel={ch}
+                              active={ch.id === channelId}
+                              hasUnread={unreadChannels.has(ch.id)}
+                              serverId={serverId!}
+                              voiceSession={voiceSession}
+                              channelPresence={voicePresence[ch.id] ?? []}
+                              members={members}
+                              localUser={user ?? undefined}
+                              onJoinVoice={onJoinVoice}
+                              onLeaveVoice={onLeaveVoice}
+                              navigate={navigate}
+                              onContextMenu={e => openChannelContextMenu(e, ch)}
+                            />
+                          </SortableChannelItem>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )
               })}
+              {(byCategory.get(null) ?? []).map(ch => (
+                <SortableChannelItem key={`ch:${ch.id}`} id={`ch:${ch.id}`}>
+                  <ChannelRow
+                    channel={ch}
+                    active={ch.id === channelId}
+                    hasUnread={unreadChannels.has(ch.id)}
+                    serverId={serverId!}
+                    voiceSession={voiceSession}
+                    channelPresence={voicePresence[ch.id] ?? []}
+                    members={members}
+                    localUser={user ?? undefined}
+                    onJoinVoice={onJoinVoice}
+                    onLeaveVoice={onLeaveVoice}
+                    navigate={navigate}
+                    onContextMenu={e => openChannelContextMenu(e, ch)}
+                  />
+                </SortableChannelItem>
+              ))}
             </SortableContext>
             <DragOverlay dropAnimation={null}>
               {dragId && (() => {
@@ -414,43 +443,60 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         ) : (
           /* Non-admin: read-only ordered list */
           <>
-            {visibleFlatIds.map(itemId => {
-              if (itemId.startsWith('cat:')) {
-                const cat = categories.find(c => c.id === itemId.replace('cat:', ''))
-                if (!cat) return null
-                const collapsed = collapsedCats.has(cat.id)
-                return (
+            {sortedCats.map(cat => {
+              const collapsed = collapsedCats.has(cat.id)
+              const catChannels = byCategory.get(cat.id) ?? []
+              return (
+                <div key={cat.id} className="mx-2 mt-2 rounded-lg border border-dashed border-sp-divider/40">
                   <button
-                    key={itemId}
                     onClick={() => toggleCat(cat.id)}
                     onContextMenu={e => openCategoryContextMenu(e, cat)}
-                    className="w-full flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-sp-muted tracking-wider hover:text-sp-text transition-colors select-none"
+                    className="w-full flex items-center gap-1 px-3 py-2 text-xs font-semibold uppercase text-sp-muted tracking-wider hover:text-sp-text transition-colors select-none"
                   >
                     <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
                     {cat.title}
                   </button>
-                )
-              }
-              const ch = channels.find(c => c.id === itemId.replace('ch:', ''))
-              if (!ch) return null
-              return (
-                <ChannelRow
-                  key={itemId}
-                  channel={ch}
-                  active={ch.id === channelId}
-                  hasUnread={unreadChannels.has(ch.id)}
-                  serverId={serverId!}
-                  voiceSession={voiceSession}
-                  channelPresence={voicePresence[ch.id] ?? []}
-                  members={members}
-                  localUser={user ?? undefined}
-                  onJoinVoice={onJoinVoice}
-                  onLeaveVoice={onLeaveVoice}
-                  navigate={navigate}
-                  onContextMenu={e => openChannelContextMenu(e, ch)}
-                />
+                  {!collapsed && catChannels.length > 0 && (
+                    <div className="pb-1">
+                      {catChannels.map(ch => (
+                        <ChannelRow
+                          key={ch.id}
+                          channel={ch}
+                          active={ch.id === channelId}
+                          hasUnread={unreadChannels.has(ch.id)}
+                          serverId={serverId!}
+                          voiceSession={voiceSession}
+                          channelPresence={voicePresence[ch.id] ?? []}
+                          members={members}
+                          localUser={user ?? undefined}
+                          onJoinVoice={onJoinVoice}
+                          onLeaveVoice={onLeaveVoice}
+                          navigate={navigate}
+                          onContextMenu={e => openChannelContextMenu(e, ch)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               )
             })}
+            {(byCategory.get(null) ?? []).map(ch => (
+              <ChannelRow
+                key={ch.id}
+                channel={ch}
+                active={ch.id === channelId}
+                hasUnread={unreadChannels.has(ch.id)}
+                serverId={serverId!}
+                voiceSession={voiceSession}
+                channelPresence={voicePresence[ch.id] ?? []}
+                members={members}
+                localUser={user ?? undefined}
+                onJoinVoice={onJoinVoice}
+                onLeaveVoice={onLeaveVoice}
+                navigate={navigate}
+                onContextMenu={e => openChannelContextMenu(e, ch)}
+              />
+            ))}
           </>
         )}
       </div>
@@ -1022,7 +1068,7 @@ function SortableCatHeader({ id, title, collapsed, onToggle, onContextMenu }: { 
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`group flex items-center gap-1 px-2 pt-3 pb-1 text-xs font-semibold uppercase text-sp-muted tracking-wider select-none cursor-pointer hover:text-sp-text transition-colors ${isDragging ? 'opacity-0' : ''}`}
+      className={`group flex items-center gap-1 px-3 py-2 text-xs font-semibold uppercase text-sp-muted tracking-wider select-none cursor-pointer hover:text-sp-text transition-colors ${isDragging ? 'opacity-0' : ''}`}
       onClick={onToggle}
       onContextMenu={onContextMenu}
       {...attributes}
