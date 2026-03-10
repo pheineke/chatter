@@ -13,6 +13,8 @@ import { useNotificationSettings } from '../hooks/useNotificationSettings'
 
 function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { server: Server; active: boolean; hasUnread: boolean; isMuted: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
   const navigate = useNavigate()
+  const [hovered, setHovered] = useState(false)
+  const expanded = active || hovered
   const initials = server.title
     .split(/\s+/)
     .map((w) => w[0])
@@ -21,30 +23,55 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
     .toUpperCase()
 
   return (
-    <div className="relative">
-      <button
-        title={server.title}
-        onClick={() => {
-          const last = getLastChannel(server.id)
-          navigate(last ? `/channels/${server.id}/${last}` : `/channels/${server.id}`)
+    <div
+      className="relative w-full py-0.5"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Animated shape container */}
+      <div
+        style={{
+          width: expanded ? '100%' : '48px',
+          borderRadius: expanded ? '8px' : '9999px',
+          transition: 'width 220ms ease-out, border-radius 220ms ease-out',
         }}
-        onContextMenu={onContextMenu}
-        className={`w-12 h-12 flex items-center justify-center text-sm font-bold transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] select-none shadow-sm
-          ${active 
-            ? 'rounded-[12px] bg-sp-primary text-sp-on-primary shadow-sp-2 scale-105' 
-            : 'rounded-[24px] bg-sp-surface-variant text-sp-on-surface hover:rounded-[12px] hover:bg-sp-primary/20 hover:text-sp-primary hover:shadow-sp-2 hover:scale-105'}`}
+        className="relative h-12 mx-auto overflow-hidden"
       >
-        {server.image ? (
-          <img src={`/api/static/${server.image}`} alt={server.title} className="w-full h-full rounded-[inherit] object-cover" />
-        ) : (
-          initials
-        )}
-      </button>
+        <button
+          title={server.title}
+          onClick={() => {
+            const last = getLastChannel(server.id)
+            navigate(last ? `/channels/${server.id}/${last}` : `/channels/${server.id}`)
+          }}
+          onContextMenu={onContextMenu}
+          className={`absolute inset-0 w-full h-full flex items-center justify-center text-sm font-bold select-none transition-colors duration-150
+            ${active
+              ? 'bg-sp-primary/20 text-sp-on-primary'
+              : hovered
+                ? 'bg-sp-primary/15 text-sp-primary'
+                : 'bg-sp-surface-variant/80 text-sp-on-surface'}`}
+        >
+          {server.image ? (
+            <>
+              <img
+                src={`/api/static/${server.image}`}
+                alt={server.title}
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-150"
+                style={{ opacity: active ? 0.7 : hovered ? 0.6 : 1 }}
+              />
+              {active && <div className="absolute inset-0 bg-sp-primary/20 pointer-events-none" />}
+            </>
+          ) : (
+            initials
+          )}
+        </button>
+      </div>
+
       {hasUnread && !active && (
-        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-white border-2 border-sp-servers pointer-events-none" />
+        <span className="absolute bottom-1 right-3 w-2.5 h-2.5 rounded-full bg-white border-2 border-sp-servers pointer-events-none" />
       )}
       {isMuted && (
-        <span className="absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full bg-sp-servers flex items-center justify-center pointer-events-none">
+        <span className="absolute top-1 left-3 w-4 h-4 rounded-full bg-sp-servers flex items-center justify-center pointer-events-none">
           <Icon name="bell-off" size={10} className="text-sp-muted" />
         </span>
       )}
@@ -54,10 +81,12 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
 
 interface ServerSidebarProps {
   hasUnreadDMs?: boolean
+  activeServerId: string | null
 }
 
-export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
+export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSidebarProps) {
   const { serverId } = useParams<{ serverId: string }>()
+  const effectiveServerId = activeServerId ?? serverId
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
@@ -142,7 +171,7 @@ export function ServerSidebar({ hasUnreadDMs = false }: ServerSidebarProps) {
         <ServerIcon
           key={s.id}
           server={s}
-          active={s.id === serverId}
+          active={s.id === effectiveServerId}
           hasUnread={unreadServers.has(s.id)}
           isMuted={serverLevel(s.id) === 'mute'}
           onContextMenu={(e) => {

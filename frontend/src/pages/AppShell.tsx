@@ -47,7 +47,8 @@ export default function AppShell() {
 
   // Build channel path list for Alt+↑/↓ navigation
   const channelMatch = useMatch('/channels/:serverId/:channelId')
-  const currentServerId = channelMatch?.params.serverId
+  const serverOnlyMatch = useMatch('/channels/:serverId')
+  const currentServerId = channelMatch?.params.serverId ?? serverOnlyMatch?.params.serverId
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers, staleTime: 60_000 })
   const { data: channels = [] } = useQuery({
     queryKey: ['channels', currentServerId],
@@ -99,7 +100,7 @@ export default function AppShell() {
               {/* Top area: Split into Server List (left) and Channel List (right) */}
               <div className="flex flex-1 min-h-0 overflow-hidden relative">
                 {/* Far-left: server icons */}
-                <ServerSidebar hasUnreadDMs={hasUnreadDMs} />
+                <ServerSidebar hasUnreadDMs={hasUnreadDMs} activeServerId={currentServerId ?? null} />
 
                 {/* Second column: channel/DM list */}
                 <div className="flex flex-col flex-1 min-w-0 bg-sp-channels overflow-hidden">
