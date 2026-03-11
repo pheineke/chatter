@@ -92,18 +92,19 @@ export default function AppShell() {
               />
             )}
 
-            {/* ── Left panel: server icons + channel/DM list ──────────────
+            {/* ── Left panel: server tabs (outside) + channel card (bordered tile) ──
                 Mobile (<md): fixed off-screen, slides in from left.
-                Desktop (md+): static in-flow columns, floating card.   */}
-            <div className={`flex flex-col fixed inset-y-0 left-0 z-40 w-[312px] bg-sp-sidebar transition-transform duration-200 shadow-sp-3 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 md:shadow-none panel-nav ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
-              
-              {/* Top area: Split into Server List (left) and Channel List (right) */}
-              <div className="flex flex-1 min-h-0 overflow-hidden relative">
-                {/* Far-left: server icons */}
-                <ServerSidebar hasUnreadDMs={hasUnreadDMs} activeServerId={currentServerId ?? null} />
+                Desktop (md+): flex row — tabs sit outside the rounded card.   */}
+            <div className={`flex fixed inset-y-0 left-0 z-40 w-[312px] bg-sp-bg transition-transform duration-200 shadow-sp-3 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 md:shadow-none md:m-1.5 md:h-[calc(100vh-12px)] ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
 
-                {/* Second column: channel/DM list */}
-                <div className="flex flex-col flex-1 min-w-0 bg-sp-channels overflow-hidden">
+              {/* Server icon tabs — outside/left of the card */}
+              <ServerSidebar hasUnreadDMs={hasUnreadDMs} activeServerId={currentServerId ?? null} />
+
+              {/* Channel card — rounded, bordered tile */}
+              <div className="flex flex-col flex-1 min-w-0 bg-sp-channels overflow-hidden md:rounded-[14px] md:border md:border-sp-divider/50">
+
+                {/* Channel/DM list */}
+                <div className="flex-1 min-h-0 overflow-hidden">
                   <Routes>
                     <Route path="@me/*" element={<DMSidebar />} />
                     <Route
@@ -118,23 +119,23 @@ export default function AppShell() {
                     />
                   </Routes>
                 </div>
-              </div>
 
-              {/* Bottom area: Voice + User panel — single floating card */}
-              <div
-                className="mx-2 mb-2 mt-1 rounded-sp-lg border border-sp-divider/40 overflow-hidden shrink-0 z-50 bg-sp-user"
-                style={{ boxShadow: 'var(--m3-shadow-1)' }}
-              >
-                {voiceSession && (
-                  <>
-                    <VoiceChannelBar
-                      session={voiceSession}
-                      onLeave={handleLeaveVoice}
-                    />
-                    <div className="border-b border-sp-divider/50 mx-0" />
-                  </>
-                )}
-                <UserPanel />
+                {/* Voice + User panel */}
+                <div
+                  className="mx-2 mb-2 mt-1 rounded-sp-lg border border-sp-divider/40 overflow-hidden shrink-0 z-50 bg-sp-user"
+                  style={{ boxShadow: 'var(--m3-shadow-1)' }}
+                >
+                  {voiceSession && (
+                    <>
+                      <VoiceChannelBar
+                        session={voiceSession}
+                        onLeave={handleLeaveVoice}
+                      />
+                      <div className="border-b border-sp-divider/50 mx-0" />
+                    </>
+                  )}
+                  <UserPanel />
+                </div>
               </div>
             </div>
 

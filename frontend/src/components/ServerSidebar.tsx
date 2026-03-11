@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { getLastChannel } from '../utils/lastChannel'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -11,14 +11,62 @@ import type { Server } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useNotificationSettings } from '../hooks/useNotificationSettings'
 
+function DMTab({ active, hasUnread, onClick, onContextMenu }: { active: boolean; hasUnread: boolean; onClick: () => void; onContextMenu: (e: React.MouseEvent) => void }) {
+  const [hovered, setHovered] = useState(false)
+  const [pressing, setPressing] = useState(false)
+
+  const containerWidth = active ? '72px' : '52px'
+
+  return (
+    <div
+      className="relative w-full py-0.5"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setPressing(false) }}
+    >
+      <div
+        className="h-12 overflow-hidden relative"
+        style={{
+          width: containerWidth,
+          marginLeft: 'auto',
+          borderRadius: '6px 0px 0px 6px',
+          transition: 'width 120ms ease-out',
+        }}
+      >
+        <button
+          title="Direct Messages"
+          onMouseDown={() => setPressing(true)}
+          onMouseUp={() => setPressing(false)}
+          onClick={onClick}
+          onContextMenu={onContextMenu}
+          style={{
+            transform: pressing ? 'scale(0.92)' : 'scale(1)',
+            transformOrigin: 'right center',
+            transition: 'color 150ms ease-out, background-color 150ms ease-out, transform 80ms ease-out',
+          }}
+          className={`absolute inset-0 w-full h-full flex items-center justify-center select-none
+            ${active
+              ? 'bg-sp-primary/20 text-sp-mention'
+              : hovered
+                ? 'bg-sp-primary/15 text-sp-mention'
+                : 'bg-sp-surface-variant/80 text-sp-muted'}`}
+        >
+          <Icon name="message-circle" size={24} />
+        </button>
+      </div>
+      {hasUnread && !active && (
+        <span className="absolute bottom-1 right-0.5 w-2.5 h-2.5 rounded-full bg-sp-online border-2 border-sp-servers pointer-events-none" />
+      )}
+    </div>
+  )
+}
+
 function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { server: Server; active: boolean; hasUnread: boolean; isMuted: boolean; onContextMenu: (e: React.MouseEvent) => void }) {
   const navigate = useNavigate()
   const [hovered, setHovered] = useState(false)
   const [pressing, setPressing] = useState(false)
 
-  // Three visual states: circle → pill (hover) → full-width rectangle (active)
-  const containerWidth = active ? '100%' : hovered ? '64px' : '48px'
-  const containerRadius = active ? '8px' : '9999px'
+  // Bookmark tab anchored to right wall: grows leftward on active
+  const containerWidth = active ? '72px' : '52px'
 
   const initials = server.title
     .split(/\s+/)
@@ -33,15 +81,15 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setPressing(false) }}
     >
-      {/* Animated shape container */}
+      {/* Tab container — right-aligned, grows left */}
       <div
+        className="h-12 overflow-hidden relative"
         style={{
           width: containerWidth,
-          borderRadius: containerRadius,
-          transform: pressing ? 'scale(0.90)' : 'scale(1)',
-          transition: 'width 200ms ease-out, border-radius 200ms ease-out, transform 80ms ease-out',
+          marginLeft: 'auto',
+          borderRadius: '6px 0px 0px 6px',
+          transition: 'width 120ms ease-out',
         }}
-        className="relative h-12 mx-auto overflow-hidden"
       >
         <button
           title={server.title}
@@ -52,7 +100,12 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
             navigate(last ? `/channels/${server.id}/${last}` : `/channels/${server.id}`)
           }}
           onContextMenu={onContextMenu}
-          className={`absolute inset-0 w-full h-full flex items-center justify-center text-sm font-bold select-none transition-colors duration-150
+          style={{
+            transform: pressing ? 'scale(0.92)' : 'scale(1)',
+            transformOrigin: 'right center',
+            transition: 'color 150ms ease-out, background-color 150ms ease-out, transform 80ms ease-out',
+          }}
+          className={`absolute inset-0 w-full h-full flex items-center justify-center text-sm font-bold select-none relative
             ${active
               ? 'bg-sp-primary/20 text-sp-on-primary'
               : hovered
@@ -64,8 +117,8 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
               <img
                 src={`/api/static/${server.image}`}
                 alt={server.title}
-                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-150"
-                style={{ opacity: active ? 0.7 : hovered ? 0.6 : 1 }}
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ opacity: active ? 0.7 : hovered ? 0.6 : 1, transition: 'opacity 150ms ease-out' }}
               />
               {active && <div className="absolute inset-0 bg-sp-primary/20 pointer-events-none" />}
             </>
@@ -76,10 +129,10 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
       </div>
 
       {hasUnread && !active && (
-        <span className="absolute bottom-1 right-3 w-2.5 h-2.5 rounded-full bg-white border-2 border-sp-servers pointer-events-none" />
+        <span className="absolute bottom-1 right-0.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-sp-servers pointer-events-none" />
       )}
       {isMuted && (
-        <span className="absolute top-1 left-3 w-4 h-4 rounded-full bg-sp-servers flex items-center justify-center pointer-events-none">
+        <span className="absolute top-1 right-0.5 w-4 h-4 rounded-full bg-sp-bg flex items-center justify-center pointer-events-none">
           <Icon name="bell-off" size={10} className="text-sp-muted" />
         </span>
       )}
@@ -95,6 +148,8 @@ interface ServerSidebarProps {
 export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSidebarProps) {
   const { serverId } = useParams<{ serverId: string }>()
   const effectiveServerId = activeServerId ?? serverId
+  const location = useLocation()
+  const isDMActive = location.pathname.startsWith('/channels/@me')
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
@@ -157,21 +212,14 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
   })
 
   return (
-    <div className="flex flex-col items-center gap-2 py-3 w-[72px] bg-sp-servers overflow-y-auto scrollbar-none border-r border-sp-divider/60">
-      {/* DMs */}
-      <div className="relative">
-        <button
-          title="Direct Messages"
-          onClick={() => navigate('/channels/@me')}
-          onContextMenu={(e) => { e.preventDefault(); setDmContextMenu({ x: e.clientX, y: e.clientY }) }}
-          className={`w-12 h-12 rounded-full flex items-center justify-center bg-sp-input hover:bg-sp-hover transition-all shadow-sp-1 hover:shadow-sp-2 hover:scale-105 text-sp-mention text-xl font-bold`}
-        >
-          <Icon name="message-circle" size={24} />
-        </button>
-        {hasUnreadDMs && (
-          <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-sp-online border-2 border-sp-servers" />
-        )}
-      </div>
+    <div className="flex flex-col items-center gap-2 py-3 w-[72px] overflow-y-auto scrollbar-none">
+      {/* DMs — bookmark tab style */}
+      <DMTab
+        active={isDMActive}
+        hasUnread={hasUnreadDMs}
+        onClick={() => navigate('/channels/@me')}
+        onContextMenu={(e) => { e.preventDefault(); setDmContextMenu({ x: e.clientX, y: e.clientY }) }}
+      />
 
       <div className="w-8 h-px bg-sp-divider/60" />
 

@@ -596,9 +596,9 @@ function AppearanceTab() {
               >
                 {/* Sidebar */}
                 <div className="w-[20%] h-full shrink-0 flex flex-col items-center py-2 gap-1.5" style={{ backgroundColor: preset.servers }}>
-                  <div className="w-5 h-5 rounded-[8px]" style={{ backgroundColor: preset.accent }} />
-                  <div className="w-5 h-5 rounded-[10px] opacity-40" style={{ backgroundColor: preset.muted }} />
-                  <div className="w-5 h-5 rounded-[10px] opacity-40" style={{ backgroundColor: preset.muted }} />
+                  <div className="w-5 h-5 rounded-[4px]" style={{ backgroundColor: preset.accent }} />
+                  <div className="w-5 h-5 rounded-[5px] opacity-40" style={{ backgroundColor: preset.muted }} />
+                  <div className="w-5 h-5 rounded-[5px] opacity-40" style={{ backgroundColor: preset.muted }} />
                 </div>
                 {/* Channel List */}
                 <div className="w-[25%] h-full shrink-0 flex flex-col py-3 px-1.5 gap-2" style={{ backgroundColor: preset.sidebar }}>

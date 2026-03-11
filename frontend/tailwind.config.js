@@ -35,17 +35,17 @@ export default {
       },
       borderRadius: {
         // Soft Pop radius scale – generous curves everywhere
-        'sp-xs': '4px',
-        'sp-sm': '8px',
-        'sp-md': '12px',
-        'sp-lg': '16px',
-        'sp-xl': '24px',
+        'sp-xs': '2px',
+        'sp-sm': '4px',
+        'sp-md': '6px',
+        'sp-lg': '8px',
+        'sp-xl': '12px',
         'sp-full': '9999px',
         // keep m3 aliases so old refs don't break
-        'm3-sm': '6px',
-        'm3-md': '10px',
-        'm3-lg': '14px',
-        'm3-xl': '20px',
+        'm3-sm': '3px',
+        'm3-md': '5px',
+        'm3-lg': '7px',
+        'm3-xl': '10px',
       },
       boxShadow: {
         // Soft Pop – light, warm-tinted shadows

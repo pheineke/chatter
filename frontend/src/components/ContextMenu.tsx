@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './Icon'
 
@@ -16,10 +16,18 @@ interface Props {
   y: number
   items: ContextMenuItem[]
   onClose: () => void
+  slideDown?: boolean
+  width?: number
 }
 
-export function ContextMenu({ x, y, items, onClose }: Props) {
+export function ContextMenu({ x, y, items, onClose, slideDown, width }: Props) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const [closing, setClosing] = useState(false)
+
+  const triggerClose = useCallback(() => {
+    if (!slideDown) { onClose(); return }
+    setClosing(true)
+  }, [slideDown, onClose])
 
   // Adjust position so menu stays within viewport
   useEffect(() => {
@@ -38,11 +46,11 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose()
+        triggerClose()
       }
     }
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') triggerClose()
     }
     document.addEventListener('mousedown', handleClick)
     document.addEventListener('keydown', handleKey)
@@ -50,13 +58,18 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
       document.removeEventListener('mousedown', handleClick)
       document.removeEventListener('keydown', handleKey)
     }
-  }, [onClose])
+  }, [triggerClose])
 
   return createPortal(
     <div
       ref={menuRef}
-      style={{ top: y, left: x }}
-      className="fixed z-[9999] min-w-[180px] bg-sp-popup border border-sp-divider/60 rounded-sp-lg shadow-sp-3 py-1.5 text-sm"
+      style={{ top: y, left: x, ...(width ? { width } : {}) }}
+      onAnimationEnd={closing ? onClose : undefined}
+      className={`fixed z-[9999] bg-sp-popup border border-sp-divider/60 shadow-sp-3 py-1.5 text-sm${
+        slideDown
+          ? ` border-t-0 rounded-b-sp-lg ${closing ? 'context-slide-up' : 'context-slide-down'}`
+          : ' min-w-[180px] rounded-sp-lg'
+      }`}
     >
       {items.map((item, i) => (
         item.separator

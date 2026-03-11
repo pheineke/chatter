@@ -83,7 +83,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [showAddChannel, setShowAddChannel] = useState(false)
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelType, setNewChannelType] = useState<'text' | 'voice'>('text')
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[]; slideDown?: boolean; width?: number } | null>(null)
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
   const [editChannel, setEditChannel] = useState<Channel | null>(null)
   const [editChannelName, setEditChannelName] = useState('')
@@ -124,7 +124,9 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setContextMenu({
       x: rect.left,
-      y: rect.bottom + 4,
+      y: rect.bottom,
+      slideDown: true,
+      width: rect.width,
       items: [
         { label: 'Server Settings', icon: 'settings', onClick: () => navigate(`/channels/${serverId}/settings`) },
         { label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite },
@@ -589,6 +591,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
           y={contextMenu.y}
           items={contextMenu.items}
           onClose={() => setContextMenu(null)}
+          slideDown={contextMenu.slideDown}
+          width={contextMenu.width}
         />
       )}
 
@@ -1002,8 +1006,8 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
           ${active 
             ? 'bg-sp-hover font-bold text-sp-text shadow-sm' 
             : hasUnread
-              ? 'text-sp-text font-semibold hover:bg-sp-hover/60 hover:scale-[1.01]'
-              : 'text-sp-muted hover:bg-sp-hover/60 hover:text-sp-text hover:scale-[1.01]'}`}
+              ? 'text-sp-text font-semibold hover:bg-sp-hover/60 hover:-translate-x-1'
+              : 'text-sp-muted hover:bg-sp-hover/60 hover:text-sp-text hover:-translate-x-1'}`}
       >
         <Icon name={isVoice ? 'headphones' : 'hash'} size={18} className={`shrink-0 transition-colors ${active ? 'text-sp-primary' : 'opacity-70'}`} />
         <span className="truncate">{channel.title}</span>
