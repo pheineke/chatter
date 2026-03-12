@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, UserPublicRead
 
 
 class AttachmentRead(BaseModel):
@@ -116,5 +116,5 @@ class PinnedMessageRead(BaseModel):
 
 class DMConversationRead(BaseModel):
     channel_id: uuid.UUID
-    other_user: UserRead
+    other_user: UserPublicRead
     last_message_at: datetime | None = None

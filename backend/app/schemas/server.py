@@ -4,7 +4,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, UserPublicRead
 from app.utils.sanitize import strip_html
 
 class ServerBase(BaseModel):
@@ -75,7 +75,7 @@ class MemberRead(BaseModel):
 
     user_id: uuid.UUID
     server_id: uuid.UUID
-    user: UserRead
+    user: UserPublicRead
     joined_at: datetime
     nickname: str | None = None
     roles: list[RoleRead] = []

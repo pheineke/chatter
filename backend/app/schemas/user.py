@@ -28,6 +28,13 @@ class UserCreate(BaseModel):
             raise ValueError('Username cannot exceed 50 characters')
         return cleaned
 
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        return v
+
 
 class UserUpdate(BaseModel):
     description: str | None = None
@@ -44,17 +51,22 @@ class UserUpdate(BaseModel):
         return strip_html(v)
 
 
-class UserRead(UserBase):
+class UserPublicRead(UserBase):
+    """Public profile view — excludes private preference fields."""
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     avatar: str | None
     banner: str | None
     avatar_decoration: str | None = None
-    preferred_status: UserStatus = UserStatus.online
     dm_permission: DMPermission = DMPermission.everyone
-    hide_status: bool = False
     created_at: datetime
+
+
+class UserRead(UserPublicRead):
+    """Full profile view — only returned for the authenticated user themselves."""
+    preferred_status: UserStatus = UserStatus.online
+    hide_status: bool = False
 
 
 class Token(BaseModel):

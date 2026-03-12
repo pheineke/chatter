@@ -14,7 +14,7 @@ import time
 from collections import defaultdict, deque
 from typing import Deque, Dict
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 
 from app.config import settings
 from app.dependencies import CurrentUser
@@ -47,6 +47,43 @@ async def rate_limit_messages(current_user: CurrentUser) -> None:
             raise HTTPException(
                 status_code=429,
                 detail="You are sending messages too quickly. Please slow down!",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        dq.append(now)
+
+
+# ---------------------------------------------------------------------------
+# IP-based auth rate limiter (register / login)
+# ---------------------------------------------------------------------------
+# 10 attempts per 60-second window per IP address.
+_AUTH_LIMIT = 10
+_AUTH_WINDOW = 60.0
+
+_auth_windows: Dict[str, Deque[float]] = defaultdict(deque)
+_auth_lock = asyncio.Lock()
+
+
+async def rate_limit_auth(request: Request) -> None:
+    """FastAPI dependency – raises HTTP 429 when the IP exceeds the auth attempt quota."""
+    if not settings.ratelimit_enabled:
+        return
+
+    ip = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+
+    async with _auth_lock:
+        dq = _auth_windows[ip]
+
+        # Evict timestamps outside the rolling window
+        while dq and now - dq[0] > _AUTH_WINDOW:
+            dq.popleft()
+
+        if len(dq) >= _AUTH_LIMIT:
+            retry_after = max(1, int(_AUTH_WINDOW - (now - dq[0])) + 1)
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests. Please try again later.",
                 headers={"Retry-After": str(retry_after)},
             )
 

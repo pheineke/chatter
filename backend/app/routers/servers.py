@@ -23,7 +23,7 @@ from app.schemas.server import (
     WordFilterRead,
     ServerBanRead,
 )
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, UserPublicRead
 from app.ws_manager import manager
 from models.server import Server, ServerMember, Role, UserRole
 from models.user import User, UserStatus
@@ -190,10 +190,10 @@ async def list_members(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
             user_id=m.user_id,
             server_id=m.server_id,
             user=(
-                lambda u: UserRead.model_validate(u).model_copy(update={'status': UserStatus.offline})
-                if u.hide_status and u.id != current_user.id
-                else UserRead.model_validate(u)
-            )(m.user),
+                UserPublicRead.model_validate(m.user).model_copy(update={'status': UserStatus.offline})
+                if m.user.hide_status and m.user.id != current_user.id
+                else UserPublicRead.model_validate(m.user)
+            ),
             joined_at=m.joined_at,
             roles=sorted(user_role_map.get(m.user_id, []), key=lambda r: r.position, reverse=True),
         )
@@ -277,7 +277,7 @@ async def update_member_nick(
         user_id=member.user_id,
         server_id=member.server_id,
         nickname=member.nickname,
-        user=UserRead.model_validate(member.user),
+        user=UserPublicRead.model_validate(member.user),
         joined_at=member.joined_at,
         roles=[],
     )

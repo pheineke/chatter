@@ -18,7 +18,7 @@ async def test_register_success(client: AsyncClient):
 
 
 async def test_register_duplicate_username(client: AsyncClient):
-    payload = {"username": "dup", "password": "pass"}
+    payload = {"username": "dup", "password": "passw0rd"}
     await client.post("/auth/register", json=payload)
     r = await client.post("/auth/register", json=payload)
     assert r.status_code == 400
@@ -30,8 +30,8 @@ async def test_register_duplicate_username(client: AsyncClient):
 # ---------------------------------------------------------------------------
 
 async def test_login_success(client: AsyncClient):
-    await client.post("/auth/register", json={"username": "loginuser", "password": "mypass"})
-    r = await client.post("/auth/login", data={"username": "loginuser", "password": "mypass"})
+    await client.post("/auth/register", json={"username": "loginuser", "password": "mypass12"})
+    r = await client.post("/auth/login", data={"username": "loginuser", "password": "mypass12"})
     assert r.status_code == 200
     data = r.json()
     assert "access_token" in data
@@ -39,7 +39,7 @@ async def test_login_success(client: AsyncClient):
 
 
 async def test_login_wrong_password(client: AsyncClient):
-    await client.post("/auth/register", json={"username": "u1", "password": "correct"})
+    await client.post("/auth/register", json={"username": "u1", "password": "correctly"})
     r = await client.post("/auth/login", data={"username": "u1", "password": "wrong"})
     assert r.status_code == 401
 

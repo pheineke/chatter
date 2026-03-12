@@ -10,7 +10,7 @@ from app.auth import hash_password, verify_password
 from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.presence import broadcast_presence
-from app.schemas.user import UserRead, UserUpdate
+from app.schemas.user import UserRead, UserUpdate, UserPublicRead
 from app.utils.file_validation import verify_image_magic_with_dims, AVATAR_MAX, BANNER_MAX
 from app.utils.rate_limiter import image_limiter, profile_limiter
 from models.user import User, UserStatus
@@ -20,9 +20,12 @@ from models.decoration_code import DecorationCode
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def _mask_user_read(user: "User", viewer_id: uuid.UUID) -> "UserRead":
-    """Return a UserRead for `user`, hiding status if hide_status is set and viewer != user."""
-    read = UserRead.model_validate(user)
+def _mask_user_read(user: "User", viewer_id: uuid.UUID) -> "UserPublicRead":
+    """Return a public UserRead for `user`, hiding status if hide_status is set.
+    Private preference fields (preferred_status, hide_status) are never exposed
+    to third parties — callers must use GET /users/me for their own full profile.
+    """
+    read = UserPublicRead.model_validate(user)
     if user.hide_status and user.id != viewer_id:
         read = read.model_copy(update={'status': UserStatus.offline})
     return read
@@ -148,7 +151,7 @@ async def upload_banner(
     return current_user
 
 
-@router.get("/search", response_model=UserRead)
+@router.get("/search", response_model=UserPublicRead)
 async def search_user_by_username(
     username: str,
     db: DB,
@@ -162,7 +165,7 @@ async def search_user_by_username(
     return _mask_user_read(user, current_user.id)
 
 
-@router.get("/{user_id}", response_model=UserRead)
+@router.get("/{user_id}", response_model=UserPublicRead)
 async def get_user(user_id: uuid.UUID, db: DB, current_user: CurrentUser):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

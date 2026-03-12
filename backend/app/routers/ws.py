@@ -29,6 +29,8 @@ from app.database import AsyncSessionLocal
 from app.presence import broadcast_presence
 from app.ws_manager import manager
 from models.api_token import ApiToken
+from models.channel import Channel, ChannelType
+from models.dm_channel import DMChannel
 from models.server import ServerMember
 from models.user import User, UserStatus
 
@@ -92,6 +94,36 @@ async def channel_ws(
     user_id = await _authenticate_ws(ws, token)
     if user_id is None:
         return
+
+    # Verify the caller is allowed to read this channel.
+    async with AsyncSessionLocal() as db:
+        channel = await db.get(Channel, channel_id)
+        if channel is None:
+            await ws.close(code=4004, reason="Channel not found")
+            return
+
+        if channel.server_id is not None:
+            # Server channel — caller must be a member of the server.
+            row = await db.execute(
+                select(ServerMember).where(
+                    ServerMember.server_id == channel.server_id,
+                    ServerMember.user_id == user_id,
+                )
+            )
+            if row.scalar_one_or_none() is None:
+                await ws.close(code=4003, reason="Not a member of this server")
+                return
+        elif channel.type == ChannelType.dm:
+            # DM channel — caller must be one of the two participants.
+            row = await db.execute(
+                select(DMChannel).where(
+                    DMChannel.channel_id == channel_id,
+                    (DMChannel.user_a_id == user_id) | (DMChannel.user_b_id == user_id),
+                )
+            )
+            if row.scalar_one_or_none() is None:
+                await ws.close(code=4003, reason="Not a participant of this DM")
+                return
 
     room = manager.channel_room(channel_id)
     await manager.connect(room, ws)

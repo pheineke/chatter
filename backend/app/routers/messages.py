@@ -72,10 +72,7 @@ async def _apply_word_filters(
         if action == "warn":
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"Your message was blocked: it matched the server's content filter "
-                    f"(pattern: {wf.pattern!r}). Please review the server rules."
-                ),
+                detail="Your message was blocked: it matched the server's content filter. Please review the server rules.",
             )
 
         if action in ("kick", "ban"):
@@ -101,7 +98,7 @@ async def _apply_word_filters(
                     db.add(ServerBan(
                         server_id=server_id,
                         user_id=author_id,
-                        reason=f"Auto-ban: message matched word filter pattern {wf.pattern!r}",
+                    reason="Auto-ban: message matched the server word filter.",
                     ))
 
             await db.commit()

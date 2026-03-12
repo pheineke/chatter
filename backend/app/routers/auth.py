@@ -16,6 +16,7 @@ from app.auth import (
 )
 from app.config import settings
 from app.dependencies import CurrentUser, DB
+from app.rate_limiter import rate_limit_auth
 from app.schemas.user import UserCreate, UserRead, Token
 from models.refresh_token import RefreshToken
 from models.user import User
@@ -50,7 +51,7 @@ async def _issue_token_pair(user_id, db, *, user_agent: str | None = None) -> To
 # ── Auth endpoints ─────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def register(body: UserCreate, db: DB):
+async def register(request: Request, body: UserCreate, db: DB, _rl: None = Depends(rate_limit_auth)):
     result = await db.execute(select(User).where(User.username == body.username))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already taken")
@@ -67,6 +68,7 @@ async def login(
     request: Request,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: DB,
+    _rl: None = Depends(rate_limit_auth),
 ):
     result = await db.execute(select(User).where(User.username == form.username))
     user = result.scalar_one_or_none()

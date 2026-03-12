@@ -5,14 +5,14 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import and_, or_, select
 
 from app.dependencies import CurrentUser, DB
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, UserPublicRead
 from models.block import UserBlock
 from models.user import User
 
 router = APIRouter(tags=["blocks"])
 
 
-@router.get("/users/me/blocks", response_model=List[UserRead])
+@router.get("/users/me/blocks", response_model=List[UserPublicRead])
 async def list_blocks(current_user: CurrentUser, db: DB):
     """Return all users the current user has blocked."""
     result = await db.execute(

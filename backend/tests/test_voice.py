@@ -213,7 +213,7 @@ def voice_app():
     asyncio.run(_teardown())
 
 
-def _token(tc: TestClient, user: str, pw: str = "pass123") -> str:
+def _token(tc: TestClient, user: str, pw: str = "pass1234") -> str:
     tc.post("/auth/register", json={"username": user, "password": pw})
     r = tc.post("/auth/login", data={"username": user, "password": pw})
     return r.json()["access_token"]

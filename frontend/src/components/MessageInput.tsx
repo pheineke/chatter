@@ -125,7 +125,8 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       }
       return sendMessage(channelId, content, replyTo?.id)
     },
-    onSuccess: () => {
+    onSuccess: (_data, _variables) => {
+      setText('')
       qc.invalidateQueries({ queryKey: ['messages', channelId] })
       onCancelReply?.()
       // Start client-side cooldown so the user sees the countdown immediately
@@ -133,7 +134,9 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
         setCooldownUntil(Date.now() + slowmodeDelay * 1000)
       }
     },
-    onError: (err) => {
+    onError: (err, variables) => {
+      // Restore the typed text so the user can retry or edit
+      setText(variables)
       // Handle 429 from both global rate-limiter and per-channel slowmode
       if (axios.isAxiosError(err) && err.response?.status === 429) {
         const retryAfter = Number(err.response.headers?.['retry-after'] ?? 5)
@@ -145,7 +148,13 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
   const uploadMut = useMutation({
     mutationFn: async ({ file, content }: { file: File; content: string | null }) => {
       messageSentRef.current = false
-      const msg = await sendMessage(channelId, content, replyTo?.id)
+      // Encrypt the text portion for E2EE DM channels (same logic as sendMut)
+      let encrypted: { ciphertext: string; nonce: string } | undefined
+      if (partnerId && e2ee.isEnabled && content) {
+        const enc = await e2ee.encryptForUser(partnerId, content)
+        if (enc) encrypted = enc
+      }
+      const msg = await sendMessage(channelId, encrypted ? null : content, replyTo?.id, encrypted)
       messageSentRef.current = true
       return uploadAttachment(channelId, msg.id, file)
     },
@@ -185,7 +194,6 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       return
     }
     sendMut.mutate(trimmed)
-    setText('')
     setMentionQuery(null)
   }
 

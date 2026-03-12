@@ -147,7 +147,7 @@ def ws_app():
     asyncio.run(_teardown())
 
 
-def _get_token(ws_app: TestClient, username: str, password: str = "pass123") -> str:
+def _get_token(ws_app: TestClient, username: str, password: str = "pass1234") -> str:
     ws_app.post("/auth/register", json={"username": username, "password": password})
     r = ws_app.post("/auth/login", data={"username": username, "password": password})
     return r.json()["access_token"]

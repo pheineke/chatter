@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB
 from app.schemas.message import DMConversationRead
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, UserPublicRead
 from models.block import UserBlock
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
@@ -60,7 +60,7 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
         last_msg = last_msg_map.get(ch.channel_id)
         convs.append(DMConversationRead(
             channel_id=ch.channel_id,
-            other_user=UserRead.model_validate(other),
+            other_user=UserPublicRead.model_validate(other),
             last_message_at=last_msg.created_at if last_msg else None,
         ))
 
