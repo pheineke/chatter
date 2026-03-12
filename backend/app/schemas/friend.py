@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.schemas.user import UserRead
+from app.schemas.user import UserListRead
 from models.friend import FriendRequestStatus
 
 
@@ -15,8 +15,8 @@ class FriendRequestRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    sender: UserRead
-    recipient: UserRead
+    sender: UserListRead
+    recipient: UserListRead
     status: FriendRequestStatus
     created_at: datetime
 
@@ -24,4 +24,4 @@ class FriendRequestRead(BaseModel):
 class FriendRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    user: UserRead
+    user: UserListRead

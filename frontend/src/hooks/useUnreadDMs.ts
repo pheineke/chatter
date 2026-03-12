@@ -63,11 +63,23 @@ export function useUnreadDMs(): boolean {
     onMessage(msg) {
       if (msg.type === 'friend_request.received') {
         qc.invalidateQueries({ queryKey: ['friendRequests'] })
+        playSound('notificationSound')
+        notify({
+          title: 'Friend request received',
+          body: 'Someone sent you a friend request',
+          channelPath: '/channels/@me',
+        })
         return
       }
       if (msg.type === 'friend_request.accepted') {
         qc.invalidateQueries({ queryKey: ['friends'] })
         qc.invalidateQueries({ queryKey: ['friendRequests'] })
+        playSound('notificationSound')
+        notify({
+          title: 'Friend request accepted',
+          body: 'You are now friends',
+          channelPath: '/channels/@me',
+        })
         return
       }
       if (msg.type === 'friend_request.declined' || msg.type === 'friend_request.cancelled') {

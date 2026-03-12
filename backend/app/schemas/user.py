@@ -63,6 +63,17 @@ class UserPublicRead(UserBase):
     created_at: datetime
 
 
+class UserListRead(BaseModel):
+    """Lightweight user payload for high-volume list views (friends, requests)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    username: str
+    avatar: str | None
+    avatar_decoration: str | None = None
+    status: UserStatus = UserStatus.offline
+
+
 class UserRead(UserPublicRead):
     """Full profile view — only returned for the authenticated user themselves."""
     preferred_status: UserStatus = UserStatus.online

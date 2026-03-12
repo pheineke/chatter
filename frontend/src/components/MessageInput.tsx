@@ -44,6 +44,7 @@ function findMentionTrigger(text: string, cursorPos: number): { query: string; t
 }
 
 export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Send a message…', replyTo, onCancelReply, onTyping, slowmodeDelay = 0, isOffline = false, onOfflineSubmit }: Props) {
+  const MAX_MESSAGE_LEN = 2000
   const [text, setText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -77,6 +78,8 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
   }, [cooldownUntil])
 
   const inCooldown = cooldownSecs > 0
+  const textLen = text.length
+  const overLimit = textLen > MAX_MESSAGE_LEN
 
   // @mention autocomplete state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -141,7 +144,10 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       if (axios.isAxiosError(err) && err.response?.status === 429) {
         const retryAfter = Number(err.response.headers?.['retry-after'] ?? 5)
         setCooldownUntil(Date.now() + retryAfter * 1000)
+        return
       }
+      const detail = axios.isAxiosError(err) ? (err.response?.data?.detail ?? err.message) : String(err)
+      setUploadError(`Failed to send: ${detail}`)
     },
   })
 
@@ -187,6 +193,10 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     if (inCooldown) return
     const trimmed = text.trim()
     if (!trimmed) return
+    if (trimmed.length > MAX_MESSAGE_LEN) {
+      setUploadError(`Message is too long (${trimmed.length}/${MAX_MESSAGE_LEN}).`)
+      return
+    }
     if (isOffline && onOfflineSubmit) {
       onOfflineSubmit(trimmed)
       setText('')
@@ -381,6 +391,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
           className={`flex-1 bg-transparent resize-none outline-none text-sm text-sp-text placeholder:text-sp-muted max-h-36 leading-6 py-0 mx-2 ${inCooldown ? 'opacity-50 cursor-not-allowed' : ''}`}
           rows={1}
           value={text}
+          maxLength={MAX_MESSAGE_LEN}
           placeholder={inCooldown ? `Slowmode — wait ${cooldownSecs}s…` : placeholder}
           disabled={inCooldown}
           onChange={(e) => {
@@ -414,18 +425,23 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
           <Icon name="smiling-face" size={20} />
         </button>
 
-        {/* Send button */}
         <button
           onClick={handleSend}
-          disabled={!text.trim() || sendMut.isPending || inCooldown}
+          disabled={!text.trim() || sendMut.isPending || inCooldown || overLimit}
           className={`shrink-0 mt-[2px] w-8 h-8 rounded-full flex items-center justify-center transition-all
-            ${text.trim() && !inCooldown
+            ${text.trim() && !inCooldown && !overLimit
               ? 'bg-sp-mention text-white hover:bg-sp-mention/85 active:scale-90 shadow-sp-1'
               : 'text-sp-muted opacity-40 cursor-not-allowed'}`}
           title={inCooldown ? `Slowmode — wait ${cooldownSecs}s` : 'Send'}
         >
           <Icon name="paper-plane" size={20} />
         </button>
+      </div>
+
+      <div className="px-3 pb-2 text-right">
+        <span className={`text-[11px] ${textLen > 1800 ? 'text-red-400' : 'text-sp-muted'}`}>
+          {textLen}/{MAX_MESSAGE_LEN}
+        </span>
       </div>
 
       </div>

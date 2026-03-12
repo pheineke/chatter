@@ -50,3 +50,12 @@ image_limiter = RateLimiter(max_calls=2, window_seconds=600)
 
 #: Bio / pronouns changes: max 5 per 10 minutes per user.
 profile_limiter = RateLimiter(max_calls=5, window_seconds=600)
+
+#: Friend request sends: max 10 per minute per user.
+friend_request_limiter = RateLimiter(max_calls=10, window_seconds=60)
+
+#: Reaction add/remove actions: max 30 per minute per user.
+reaction_limiter = RateLimiter(max_calls=30, window_seconds=60)
+
+#: DM channel create/get attempts: max 20 per minute per user.
+dm_channel_limiter = RateLimiter(max_calls=20, window_seconds=60)

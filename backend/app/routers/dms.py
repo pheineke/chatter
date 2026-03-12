@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.dependencies import CurrentUser, DB
 from app.schemas.message import DMConversationRead
 from app.schemas.user import UserRead, UserPublicRead
+from app.utils.rate_limiter import dm_channel_limiter
 from models.block import UserBlock
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
@@ -74,6 +75,14 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
 @router.get("/{user_id}/channel")
 async def get_or_create_dm_channel(user_id: uuid.UUID, current_user: CurrentUser, db: DB):
     """Get or create a shared DM channel for two users. Returns { channel_id }."""
+    allowed, retry_after = dm_channel_limiter.check(f"dm-channel:{current_user.id}")
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"You're opening DMs too quickly. Please wait {retry_after} seconds.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot DM yourself")
 
@@ -119,19 +128,38 @@ async def get_or_create_dm_channel(user_id: uuid.UUID, current_user: CurrentUser
                     detail="This user only accepts direct messages from friends",
                 )
         elif target_user.dm_permission == DMPermission.server_members_only:
-            shared_result = await db.execute(
-                select(ServerMember).where(
-                    ServerMember.user_id == current_user.id,
-                    ServerMember.server_id.in_(
-                        select(ServerMember.server_id).where(ServerMember.user_id == user_id)
+            # Friends are always allowed regardless of shared-server restriction.
+            fr_result = await db.execute(
+                select(FriendRequest).where(
+                    FriendRequest.status == FriendRequestStatus.accepted,
+                    or_(
+                        and_(
+                            FriendRequest.sender_id == current_user.id,
+                            FriendRequest.recipient_id == user_id,
+                        ),
+                        and_(
+                            FriendRequest.sender_id == user_id,
+                            FriendRequest.recipient_id == current_user.id,
+                        ),
                     ),
                 ).limit(1)
             )
-            if not shared_result.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=403,
-                    detail="This user only accepts direct messages from people in shared servers",
+            if fr_result.scalar_one_or_none():
+                pass
+            else:
+                shared_result = await db.execute(
+                    select(ServerMember).where(
+                        ServerMember.user_id == current_user.id,
+                        ServerMember.server_id.in_(
+                            select(ServerMember.server_id).where(ServerMember.user_id == user_id)
+                        ),
+                    ).limit(1)
                 )
+                if not shared_result.scalar_one_or_none():
+                    raise HTTPException(
+                        status_code=403,
+                        detail="This user only accepts direct messages from friends or people in shared servers",
+                    )
 
     # Normalise pair so (a,b) and (b,a) always map to the same row
     a, b = sorted([current_user.id, user_id])

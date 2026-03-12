@@ -51,6 +51,26 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           )
           break
         }
+        case 'category.created': {
+          const created = msg.data as Category
+          qc.setQueryData<Category[]>(['categories', serverId], (old = []) => [...old, created])
+          break
+        }
+        case 'category.updated': {
+          const updated = msg.data as Category
+          qc.setQueryData<Category[]>(['categories', serverId], (old = []) =>
+            old.map((c) => (c.id === updated.id ? updated : c)),
+          )
+          break
+        }
+        case 'server.updated': {
+          const updated = msg.data as { id: string }
+          qc.setQueryData<{ id: string }[]>(['servers'], (old = []) =>
+            old.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)),
+          )
+          qc.setQueryData(['server', serverId], updated)
+          break
+        }
         case 'channel.deleted': {
           const { channel_id } = msg.data as { channel_id: string }
           qc.setQueryData<Channel[]>(['channels', serverId], (old = []) =>

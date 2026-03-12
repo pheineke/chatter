@@ -111,6 +111,10 @@ async def update_server(server_id: uuid.UUID, body: ServerUpdate, current_user: 
         server.description = body.description
     await db.commit()
     await db.refresh(server)
+    await manager.broadcast_server(
+        server_id,
+        {"type": "server.updated", "data": ServerRead.model_validate(server).model_dump(mode="json")},
+    )
     return server
 
 

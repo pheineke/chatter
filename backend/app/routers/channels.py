@@ -46,6 +46,10 @@ async def create_category(
     db.add(category)
     await db.commit()
     await db.refresh(category)
+    await manager.broadcast_server(
+        server_id,
+        {"type": "category.created", "data": CategoryRead.model_validate(category).model_dump(mode="json")},
+    )
     return category
 
 
@@ -98,6 +102,10 @@ async def update_category(
         cat.position = body.position
     await db.commit()
     await db.refresh(cat)
+    await manager.broadcast_server(
+        server_id,
+        {"type": "category.updated", "data": CategoryRead.model_validate(cat).model_dump(mode="json")},
+    )
     return cat
 
 
@@ -221,6 +229,10 @@ async def update_channel(
         channel.bitrate = max(8000, body.bitrate)  # floor at 8 kbps
     await db.commit()
     await db.refresh(channel)
+    await manager.broadcast_server(
+        server_id,
+        {"type": "channel.updated", "data": ChannelRead.model_validate(channel).model_dump(mode="json")},
+    )
     return channel
 
 

@@ -59,6 +59,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
   const [cardPos, setCardPos] = useState<{ x: number; y: number } | null>(null)
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   // E2EE: decrypt the message content if it was sent encrypted
   const [decryptedContent, setDecryptedContent] = useState<string | null>(null)
@@ -99,6 +100,10 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
   const pinMut = useMutation({
     mutationFn: () => isPinned ? unpinMessage(channelId, msg.id) : pinMessage(channelId, msg.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pins', channelId] }),
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to update pin.'
+      setActionError(String(detail))
+    },
   })
 
   const handleUserClick = useCallback((e: React.MouseEvent) => {
@@ -114,21 +119,37 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
       // message.updated arrives via channel WS and updates the cache in real time
       setEditing(false)
     },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to edit message.'
+      setActionError(String(detail))
+    },
   })
 
   const deleteMut = useMutation({
     mutationFn: () => deleteMessage(channelId, msg.id),
     // message.deleted arrives via channel WS and removes the message from cache
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to delete message.'
+      setActionError(String(detail))
+    },
   })
 
   const reactMut = useMutation({
     mutationFn: (emoji: string) => addReaction(channelId, msg.id, emoji),
     // reaction.added arrives via channel WS
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to add reaction.'
+      setActionError(String(detail))
+    },
   })
 
   const unreactMut = useMutation({
     mutationFn: (emoji: string) => removeReaction(channelId, msg.id, emoji),
     // reaction.removed arrives via channel WS
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to remove reaction.'
+      setActionError(String(detail))
+    },
   })
 
   // Blocked-user early return (all hooks already called above)
@@ -331,6 +352,16 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
             </div>
           )
         })()}
+
+        {actionError && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-red-400">
+            <Icon name="alert-circle" size={12} />
+            <span className="truncate">{actionError}</span>
+            <button className="ml-auto text-sp-muted hover:text-sp-text" onClick={() => setActionError(null)}>
+              <Icon name="x" size={12} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Action toolbar on hover */}

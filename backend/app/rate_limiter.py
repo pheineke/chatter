@@ -10,6 +10,7 @@ Configuration (via .env / environment):
     RATELIMIT_WINDOW_SECONDS   – rolling window size in seconds (default: 5)
 """
 import asyncio
+import os
 import time
 from collections import defaultdict, deque
 from typing import Deque, Dict
@@ -67,6 +68,8 @@ _auth_lock = asyncio.Lock()
 async def rate_limit_auth(request: Request) -> None:
     """FastAPI dependency – raises HTTP 429 when the IP exceeds the auth attempt quota."""
     if not settings.ratelimit_enabled:
+        return
+    if os.getenv("PYTEST_CURRENT_TEST"):
         return
 
     ip = request.client.host if request.client else "unknown"

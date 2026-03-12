@@ -24,16 +24,16 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 | # | Issue | Area |
 |---|-------|------|
 | 9 | **Status indicator updates not propagated to friends in real time** | Real-time |
-| 10 | **`PATCH channel` never broadcasts `channel.updated`** — rename/settings invisible to others | Real-time |
-| 11 | **`PATCH server` never broadcasts** — name/description changes require page reload | Real-time |
-| 12 | **`POST/PATCH categories` have no broadcast** — new/renamed categories invisible in real time | Real-time |
-| 13 | **No notification when a friend request is received or accepted** | UX / Discovery |
-| 14 | **"Server members only" DM setting incorrectly blocks already-friended users** | Bug |
-| 15 | **No feedback when message exceeds 2000-char limit** — message silently vanishes | UX |
-| 16 | **Cannot pin messages in private DMs** | Feature gap |
-| 17 | **`reactMut`, `editMut`, `deleteMut`, `pinMut` all lack `onError`** — failures completely silent | Error handling |
-| 18 | **No rate limiting on friend requests, reactions, or DM channel creation** | Security / DoS |
-| 19 | **Friends/pending list lags** — full user objects (incl. about-me blob) passed into list rows; no virtualisation | Performance |
+| 10 | ✅ **`PATCH channel` never broadcasts `channel.updated`** — rename/settings invisible to others | Real-time |
+| 11 | ✅ **`PATCH server` never broadcasts** — name/description changes require page reload | Real-time |
+| 12 | ✅ **`POST/PATCH categories` have no broadcast** — new/renamed categories invisible in real time | Real-time |
+| 13 | ✅ **No notification when a friend request is received or accepted** | UX / Discovery |
+| 14 | ✅ **"Server members only" DM setting incorrectly blocks already-friended users** | Bug |
+| 15 | ✅ **No feedback when message exceeds 2000-char limit** — message silently vanishes | UX |
+| 16 | ✅ **Cannot pin messages in private DMs** | Feature gap |
+| 17 | ✅ **`reactMut`, `editMut`, `deleteMut`, `pinMut` all lack `onError`** — failures completely silent | Error handling |
+| 18 | ✅ **No rate limiting on friend requests, reactions, or DM channel creation** | Security / DoS |
+| 19 | ✅ **Friends/pending list lags** — full user objects (incl. about-me blob) passed into list rows; no virtualisation | Performance |
 | 20 | **In-memory rate limiter breaks under multiple workers** — each worker gives `N×` the quota | Backend |
 
 ### 🟡 P2 — Medium (noticeable, degrades experience)

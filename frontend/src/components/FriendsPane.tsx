@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Icon } from './Icon'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import {
   getFriends, getFriendRequests,
@@ -22,6 +22,9 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
   const [addUsername, setAddUsername] = useState('')
   const [addError, setAddError] = useState('')
   const [addSuccess, setAddSuccess] = useState('')
+  const listViewportRef = useRef<HTMLDivElement>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(0)
 
   const { data: friends = [] } = useQuery({ queryKey: ['friends'], queryFn: getFriends })
   const { data: requests = [] } = useQuery({ queryKey: ['friendRequests'], queryFn: getFriendRequests })
@@ -74,6 +77,25 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
   const incoming = pending.filter((r) => r.recipient.id === currentUser?.id)
   const outgoing = pending.filter((r) => r.sender.id === currentUser?.id)
 
+  const ROW_HEIGHT = 64
+  const OVERSCAN = 8
+  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
+  const visibleCount = Math.ceil((viewportHeight || 520) / ROW_HEIGHT) + OVERSCAN * 2
+  const endIndex = Math.min(displayed.length, startIndex + visibleCount)
+  const visibleFriends = displayed.slice(startIndex, endIndex)
+  const padTop = startIndex * ROW_HEIGHT
+  const padBottom = (displayed.length - endIndex) * ROW_HEIGHT
+
+  useEffect(() => {
+    const el = listViewportRef.current
+    if (!el) return
+    const measure = () => setViewportHeight(el.clientHeight)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -105,7 +127,11 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div
+        ref={listViewportRef}
+        className="flex-1 overflow-y-auto p-4"
+        onScroll={(e) => setScrollTop((e.currentTarget as HTMLDivElement).scrollTop)}
+      >
         {tab === 'add' ? (
           <div className="max-w-md">
             <h3 className="font-semibold mb-1">Add Friend</h3>
@@ -172,7 +198,8 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
             <p className="text-xs uppercase font-semibold text-sp-muted mb-2">
               {tab === 'online' ? 'Online' : 'All Friends'} — {displayed.length}
             </p>
-            {displayed.map((f) => (
+            <div style={{ paddingTop: padTop, paddingBottom: padBottom }}>
+            {visibleFriends.map((f) => (
               <div key={f.user.id} data-avatar-ring className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group cursor-pointer"
                 style={{ '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#26272c' } as React.CSSProperties}
                 onClick={() => navigate(`/channels/@me/${f.user.id}`)}>
@@ -191,6 +218,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         )}
       </div>
