@@ -1,3 +1,4 @@
+import { markDMRead } from '../api/dms'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { getLastChannel } from '../utils/lastChannel'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -169,18 +170,26 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
     markAllServerRead(sId)
   }
 
-  function handleMarkAllDMsRead() {
-    const convs = qc.getQueryData<{ channel_id: string; last_message_at: string | null }[]>(['dmConversations']) ?? []
-    if (!convs.length) return
-    const LAST_READ_KEY = 'dmLastRead'
-    const existing: Record<string, string> = (() => {
-      try { return JSON.parse(localStorage.getItem(LAST_READ_KEY) ?? '{}') } catch { return {} }
-    })()
-    const now = new Date().toISOString()
-    const updated = { ...existing }
-    convs.forEach(c => { updated[c.channel_id] = c.last_message_at ?? now })
-    localStorage.setItem(LAST_READ_KEY, JSON.stringify(updated))
-    window.dispatchEvent(new StorageEvent('storage', { key: LAST_READ_KEY }))
+  async function handleMarkAllDMsRead() {
+    const convs = qc.getQueryData<{
+      channel_id: string
+      last_message_at: string | null
+      last_read_at?: string | null
+    }[]>(['dmConversations']) ?? []
+    const unread = convs.filter(c => c.last_message_at && (!c.last_read_at || c.last_message_at > c.last_read_at))
+    if (!unread.length) return
+
+    await Promise.all(
+      unread.map(c => markDMRead(c.channel_id, c.last_message_at ?? undefined).catch(() => null))
+    )
+
+    qc.setQueryData(['dmConversations'], (old: any[] | undefined) =>
+      old?.map(c => {
+        const target = unread.find(u => u.channel_id === c.channel_id)
+        if (!target) return c
+        return { ...c, last_read_at: target.last_message_at ?? c.last_read_at ?? new Date().toISOString() }
+      })
+    )
   }
 
   const handleCreateInvite = (sId: string) => {
@@ -296,7 +305,7 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
             {
               label: 'Mark all as Read',
               icon: 'check-circle',
-              onClick: handleMarkAllDMsRead,
+              onClick: () => { void handleMarkAllDMsRead() },
             },
           ]}
         />

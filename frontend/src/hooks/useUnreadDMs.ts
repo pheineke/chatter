@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMatch } from 'react-router-dom'
 import { useWebSocket } from './useWebSocket'
@@ -10,12 +10,6 @@ import { useNotificationSettings } from './useNotificationSettings'
 import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
 import { getConversations } from '../api/dms'
 import type { Channel, DMConversation, Friend, Message, UserStatus } from '../api/types'
-
-const LAST_READ_KEY = 'dmLastRead'
-
-function loadLastRead(): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(LAST_READ_KEY) ?? '{}') } catch { return {} }
-}
 
 /**
  * Always-on hook (call from AppShell) that:
@@ -35,7 +29,6 @@ export function useUnreadDMs(): boolean {
   const activeDmUserId = match?.params.dmUserId ?? null
   const activeChannelId = channelMatch?.params.channelId ?? null
   const activeServerId = channelMatch?.params.serverId ?? null
-  const [lastRead, setLastRead] = useState<Record<string, string>>(loadLastRead)
 
   // useQuery makes this component re-render whenever the cache changes
   const { data: conversations = [] } = useQuery<DMConversation[]>({
@@ -43,20 +36,6 @@ export function useUnreadDMs(): boolean {
     queryFn: getConversations,
     staleTime: 30_000,
   })
-
-  // Re-sync lastRead from localStorage whenever it changes (DMSidebar writes it)
-  useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key === LAST_READ_KEY) setLastRead(loadLastRead())
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
-
-  // Also sync whenever the active DM changes (same-tab writes don't fire storage event)
-  useEffect(() => {
-    setLastRead(loadLastRead())
-  }, [activeDmUserId])
 
   const { send } = useWebSocket('/ws/me', {
     onMessage(msg) {
@@ -159,6 +138,18 @@ export function useUnreadDMs(): boolean {
         return
       }
 
+      if (msg.type === 'dm.read_updated') {
+        const { channel_id, last_read_at } = msg.data as { channel_id: string; last_read_at: string }
+        qc.setQueryData<DMConversation[]>(['dmConversations'], old =>
+          old?.map(c =>
+            c.channel_id === channel_id
+              ? { ...c, last_read_at }
+              : c
+          )
+        )
+        return
+      }
+
       if (msg.type !== 'message.created') return
       const data = msg.data as Message
 
@@ -202,7 +193,7 @@ export function useUnreadDMs(): boolean {
 
   return conversations.some(conv => {
     const isActive = conv.other_user.id === activeDmUserId
-    const lr = lastRead[conv.channel_id]
+    const lr = conv.last_read_at
     return !!conv.last_message_at && (!lr || conv.last_message_at > lr) && !isActive
   })
 }

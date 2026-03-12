@@ -3,22 +3,29 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB
 from app.rate_limiter import rate_limit_dm_channel
-from app.schemas.message import DMConversationRead
+from app.schemas.message import DMConversationRead, DMReadStateRead
 from app.schemas.user import UserRead, UserPublicRead
+from app.ws_manager import manager
 from models.block import UserBlock
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
+from models.dm_read_state import DMReadState
 from models.friend import FriendRequest, FriendRequestStatus
 from models.message import Message
 from models.server import ServerMember
 from models.user import DMPermission, User
 
 router = APIRouter(prefix="/dms", tags=["direct_messages"])
+
+
+class DMReadUpdate(BaseModel):
+    last_read_at: datetime | None = None
 
 
 @router.get("/conversations", response_model=List[DMConversationRead])
@@ -55,6 +62,16 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
         m.channel_id: m for m in last_msgs_result.scalars().all()
     }
 
+    read_rows_result = await db.execute(
+        select(DMReadState).where(
+            DMReadState.user_id == current_user.id,
+            DMReadState.channel_id.in_(channel_ids),
+        )
+    )
+    read_map: dict[uuid.UUID, datetime] = {
+        row.channel_id: row.last_read_at for row in read_rows_result.scalars().all()
+    }
+
     convs: list[DMConversationRead] = []
     for ch in channels:
         other = ch.user_b if ch.user_a_id == current_user.id else ch.user_a
@@ -63,6 +80,7 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
             channel_id=ch.channel_id,
             other_user=UserPublicRead.model_validate(other),
             last_message_at=last_msg.created_at if last_msg else None,
+            last_read_at=read_map.get(ch.channel_id),
         ))
 
     convs.sort(
@@ -70,6 +88,52 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
         reverse=True,
     )
     return convs
+
+
+@router.put("/channels/{channel_id}/read", response_model=DMReadStateRead)
+async def mark_dm_read(
+    channel_id: uuid.UUID,
+    body: DMReadUpdate,
+    current_user: CurrentUser,
+    db: DB,
+):
+    dm_result = await db.execute(
+        select(DMChannel).where(
+            DMChannel.channel_id == channel_id,
+            or_(DMChannel.user_a_id == current_user.id, DMChannel.user_b_id == current_user.id),
+        )
+    )
+    dm_channel = dm_result.scalar_one_or_none()
+    if not dm_channel:
+        raise HTTPException(status_code=404, detail="DM channel not found")
+
+    read_at = body.last_read_at or datetime.now(timezone.utc)
+
+    state_result = await db.execute(
+        select(DMReadState).where(
+            DMReadState.user_id == current_user.id,
+            DMReadState.channel_id == channel_id,
+        )
+    )
+    state = state_result.scalar_one_or_none()
+    if state:
+        state.last_read_at = read_at
+    else:
+        state = DMReadState(user_id=current_user.id, channel_id=channel_id, last_read_at=read_at)
+        db.add(state)
+
+    await db.commit()
+    await manager.broadcast_user(
+        current_user.id,
+        {
+            "type": "dm.read_updated",
+            "data": {
+                "channel_id": channel_id,
+                "last_read_at": read_at,
+            },
+        },
+    )
+    return DMReadStateRead(channel_id=channel_id, last_read_at=read_at)
 
 
 @router.get("/{user_id}/channel")

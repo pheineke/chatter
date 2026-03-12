@@ -51,7 +51,7 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 | 29 | ✅ **No `user.updated` WS event for username/avatar changes** — friend lists go stale | Real-time |
 | 30 | ✅ **Server image/banner uploads emit no WS event** | Real-time |
 | 31 | ✅ **Status change not broadcast to user's own other open tabs** | Real-time |
-| 32 | **DM unread state is device-local only** (`localStorage`) — no cross-device sync | Feature gap |
+| 32 | ✅ **DM unread state is device-local only** (`localStorage`) — no cross-device sync | Feature gap |
 | 33 | ✅ **Silent failure on channel/category creation** — no try/catch, no error toast | Error handling |
 | 34 | ✅ **`FriendsPane` shows no error state when fetch fails** — empty list with no message | Error handling |
 | 35 | ✅ **`UserPanel` status-change has no try/catch** — unhandled promise rejection | Error handling |

@@ -118,3 +118,9 @@ class DMConversationRead(BaseModel):
     channel_id: uuid.UUID
     other_user: UserPublicRead
     last_message_at: datetime | None = None
+    last_read_at: datetime | None = None
+
+
+class DMReadStateRead(BaseModel):
+    channel_id: uuid.UUID
+    last_read_at: datetime

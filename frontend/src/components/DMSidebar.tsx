@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useMatch } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import type { MouseEvent } from 'react'
-import { getConversations } from '../api/dms'
+import { getConversations, markDMRead } from '../api/dms'
 import { updateMe } from '../api/users'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotificationSettings } from '../hooks/useNotificationSettings'
@@ -13,28 +13,30 @@ import type { ContextMenuItem } from './ContextMenu'
 import type { DMConversation } from '../api/types'
 import { cacheConversations, getCachedConversations } from '../db/dmCache'
 
-const LAST_READ_KEY = 'dmLastRead'
-
-function loadLastRead(): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(LAST_READ_KEY) ?? '{}') } catch { return {} }
-}
-
-function saveLastRead(data: Record<string, string>) {
-  localStorage.setItem(LAST_READ_KEY, JSON.stringify(data))
-}
-
 interface DMSidebarProps {}
 
 export function DMSidebar() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const { user, refreshUser } = useAuth()
   const match = useMatch('/channels/@me/:dmUserId')
   const activeDmUserId = match?.params.dmUserId ?? null
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
-  const [lastRead, setLastRead] = useState<Record<string, string>>(loadLastRead)
   const { channelLevel, setChannelLevel } = useNotificationSettings()
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [cachedConversations, setCachedConversations] = useState<DMConversation[]>([])
+
+  const markReadMut = useMutation({
+    mutationFn: ({ channelId, lastReadAt }: { channelId: string; lastReadAt?: string }) =>
+      markDMRead(channelId, lastReadAt),
+    onSuccess: ({ channel_id, last_read_at }) => {
+      qc.setQueryData<DMConversation[]>(['dmConversations'], old =>
+        old?.map(c =>
+          c.channel_id === channel_id ? { ...c, last_read_at } : c
+        )
+      )
+    },
+  })
 
   // Track online/offline
   useEffect(() => {
@@ -75,13 +77,10 @@ export function DMSidebar() {
     if (!activeDmUserId) return
     const conv = conversations.find(c => c.other_user.id === activeDmUserId)
     if (!conv) return
-    const now = new Date().toISOString()
-    setLastRead(prev => {
-      const next = { ...prev, [conv.channel_id]: now }
-      saveLastRead(next)
-      return next
-    })
-  }, [activeDmUserId, conversations])
+    if (!conv.last_message_at) return
+    if (conv.last_read_at && conv.last_read_at >= conv.last_message_at) return
+    markReadMut.mutate({ channelId: conv.channel_id, lastReadAt: conv.last_message_at })
+  }, [activeDmUserId, conversations, markReadMut])
 
   return (
     <div className="flex flex-col h-full">
@@ -91,7 +90,7 @@ export function DMSidebar() {
       <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
         {conversations.map(conv => {
           const isActive = conv.other_user.id === activeDmUserId
-          const lr = lastRead[conv.channel_id]
+          const lr = conv.last_read_at
           // Show unread badge if there are messages after the last read time (and not currently viewing)
           const hasUnread =
             !!conv.last_message_at && (!lr || conv.last_message_at > lr) && !isActive
@@ -108,13 +107,9 @@ export function DMSidebar() {
                   label: 'Mark as Read',
                   icon: 'check-circle',
                   onClick: () => {
-                    const now = new Date().toISOString()
-                    setLastRead(prev => {
-                      const next = { ...prev, [conv.channel_id]: now }
-                      saveLastRead(next)
-                      // Notify useUnreadDMs in the same tab (storage event is cross-tab only)
-                      window.dispatchEvent(new StorageEvent('storage', { key: LAST_READ_KEY }))
-                      return next
+                    markReadMut.mutate({
+                      channelId: conv.channel_id,
+                      lastReadAt: conv.last_message_at ?? new Date().toISOString(),
                     })
                   },
                 }, { separator: true as const }] : []),

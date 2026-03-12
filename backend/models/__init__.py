@@ -4,6 +4,7 @@ from models.server import Server, ServerMember, Role, UserRole
 from models.channel import Category, Channel, ChannelType, ChannelPerm, ChannelPermission, MutedChannel
 from models.message import Message, Attachment, Reaction, Mention
 from models.dm_channel import DMChannel
+from models.dm_read_state import DMReadState
 from models.friend import FriendRequest, FriendRequestStatus
 from models.invite import ServerInvite
 from models.note import UserNote
@@ -39,6 +40,7 @@ __all__ = [
     "Reaction",
     "Mention",
     "DMChannel",
+    "DMReadState",
     "FriendRequest",
     "FriendRequestStatus",
     "ServerInvite",

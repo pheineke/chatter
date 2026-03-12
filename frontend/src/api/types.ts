@@ -169,6 +169,7 @@ export interface DMConversation {
   channel_id: string
   other_user: User
   last_message_at: string | null
+  last_read_at: string | null
 }
 
 // ---- Friends ---------------------------------------------------------------

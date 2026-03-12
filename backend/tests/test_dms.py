@@ -71,3 +71,36 @@ async def test_conversation_has_expected_fields(client: AsyncClient, alice_heade
     assert "channel_id" in conv
     assert "other_user" in conv
     assert "last_message_at" in conv
+    assert "last_read_at" in conv
+
+
+async def test_mark_dm_read_persists_to_conversations(client: AsyncClient, alice_headers, bob_headers):
+    bob_id = (await client.get("/users/me", headers=bob_headers)).json()["id"]
+    dm = await client.get(f"/dms/{bob_id}/channel", headers=alice_headers)
+    channel_id = dm.json()["channel_id"]
+
+    sent = await client.post(
+        f"/messages?channel_id={channel_id}",
+        json={"content": "hello bob"},
+        headers=alice_headers,
+    )
+    assert sent.status_code == 201
+
+    convs_before = await client.get("/dms/conversations", headers=alice_headers)
+    assert convs_before.status_code == 200
+    conv_before = next(c for c in convs_before.json() if c["channel_id"] == channel_id)
+    assert conv_before["last_message_at"] is not None
+
+    mark = await client.put(
+        f"/dms/channels/{channel_id}/read",
+        json={"last_read_at": conv_before["last_message_at"]},
+        headers=alice_headers,
+    )
+    assert mark.status_code == 200
+    assert mark.json()["channel_id"] == channel_id
+    assert mark.json()["last_read_at"] == conv_before["last_message_at"]
+
+    convs_after = await client.get("/dms/conversations", headers=alice_headers)
+    assert convs_after.status_code == 200
+    conv_after = next(c for c in convs_after.json() if c["channel_id"] == channel_id)
+    assert conv_after["last_read_at"] == conv_before["last_message_at"]
