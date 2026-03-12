@@ -108,7 +108,7 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
 
             <div className="mt-3 border-t border-sp-input pt-3">
               <div className="text-xs font-bold text-sp-muted uppercase mb-1 tracking-wider">About Me</div>
-              <div className="text-sm text-sp-text/90 whitespace-pre-wrap leading-relaxed">
+              <div className="text-sm text-sp-text/90 whitespace-pre-wrap break-words leading-relaxed">
                 {user.description
                   ? <Linkified text={user.description} noMentions />
                   : <span className="italic text-sp-muted">No bio yet.</span>}

@@ -118,6 +118,18 @@ export function useChannelWS(
           })
           break
         }
+        case 'user.updated': {
+          const updatedUser = msg.data as Message['author']
+          qc.setQueryData<InfMessages>(key, (old) => {
+            if (!old) return old
+            return mapPages(old, (m) =>
+              m.author.id === updatedUser.id
+                ? { ...m, author: { ...m.author, ...updatedUser } }
+                : m
+            )
+          })
+          break
+        }
         case 'typing.start': {
           const { user_id, username } = msg.data as { user_id: string; username: string }
           setTypingUsers((prev) => {

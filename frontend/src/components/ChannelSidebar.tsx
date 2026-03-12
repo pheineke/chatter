@@ -77,7 +77,6 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     queryFn: () => getServerVoicePresence(serverId!),
     enabled: !!serverId,
     staleTime: 10_000,
-    refetchInterval: 10_000,  // Fallback: poll every 10s in case WS events are missed
   })
 
   const [showAddChannel, setShowAddChannel] = useState(false)
@@ -102,6 +101,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const [dragId, setDragId] = useState<string | null>(null)
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(() => {
     const stored = serverId ? localStorage.getItem(`cats_collapsed_${serverId}`) : null
     return stored ? new Set(stored.split(',').filter(Boolean)) : new Set()
@@ -113,8 +113,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     e.preventDefault()
     const items: ContextMenuItem[] = []
     if (isAdmin) {
-      items.push({ label: 'Create Channel', icon: 'hash', onClick: () => setShowAddChannel(true) })
-      items.push({ label: 'Create Category', icon: 'folder', onClick: () => setShowAddCategory(true) })
+      items.push({ label: 'Create Channel', icon: 'hash', onClick: () => { setCreateError(null); setShowAddChannel(true) } })
+      items.push({ label: 'Create Category', icon: 'folder', onClick: () => { setCreateError(null); setShowAddCategory(true) } })
     }
     items.push({ label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite })
     setContextMenu({ x: e.clientX, y: e.clientY, items })
@@ -140,18 +140,30 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
   async function handleCreateChannel() {
     if (!serverId || !newChannelName.trim()) return
-    await createChannel(serverId, { title: newChannelName, type: newChannelType })
-    qc.invalidateQueries({ queryKey: ['channels', serverId] })
-    setShowAddChannel(false)
-    setNewChannelName('')
+    try {
+      await createChannel(serverId, { title: newChannelName, type: newChannelType })
+      qc.invalidateQueries({ queryKey: ['channels', serverId] })
+      setShowAddChannel(false)
+      setNewChannelName('')
+      setCreateError(null)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to create channel.'
+      setCreateError(String(detail))
+    }
   }
 
   async function handleCreateCategory() {
     if (!serverId || !newCategoryName.trim()) return
-    await createCategory(serverId, newCategoryName.trim())
-    qc.invalidateQueries({ queryKey: ['categories', serverId] })
-    setShowAddCategory(false)
-    setNewCategoryName('')
+    try {
+      await createCategory(serverId, newCategoryName.trim())
+      qc.invalidateQueries({ queryKey: ['categories', serverId] })
+      setShowAddCategory(false)
+      setNewCategoryName('')
+      setCreateError(null)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to create category.'
+      setCreateError(String(detail))
+    }
   }
 
   function openChannelContextMenu(e: React.MouseEvent, ch: Channel) {
@@ -533,9 +545,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
       {/* Add category modal */}
       {showAddCategory && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddCategory(false)}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAddCategory(false); setCreateError(null) }}>
           <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Create Category</h2>
+            {createError && <div className="mb-2 text-sm text-red-400">{createError}</div>}
             <input
               autoFocus
               className="input w-full mb-3"
@@ -553,9 +566,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
       {/* Add channel modal */}
       {showAddChannel && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddChannel(false)}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAddChannel(false); setCreateError(null) }}>
           <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Add Channel</h2>
+            {createError && <div className="mb-2 text-sm text-red-400">{createError}</div>}
             <div className="flex gap-2 mb-3">
               {(['text', 'voice'] as const).map((t) => (
                 <button

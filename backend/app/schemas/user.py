@@ -50,6 +50,13 @@ class UserUpdate(BaseModel):
     def sanitize_text_fields(cls, v):
         return strip_html(v)
 
+    @field_validator('description')
+    @classmethod
+    def validate_description_length(cls, v: str | None) -> str | None:
+        if v is not None and len(v) > 2000:
+            raise ValueError('About Me cannot exceed 2000 characters')
+        return v
+
 
 class UserPublicRead(UserBase):
     """Public profile view — excludes private preference fields."""

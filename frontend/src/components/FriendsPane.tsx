@@ -26,8 +26,8 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(0)
 
-  const { data: friends = [] } = useQuery({ queryKey: ['friends'], queryFn: getFriends })
-  const { data: requests = [] } = useQuery({ queryKey: ['friendRequests'], queryFn: getFriendRequests })
+  const { data: friends = [], isError: friendsError } = useQuery({ queryKey: ['friends'], queryFn: getFriends })
+  const { data: requests = [], isError: requestsError } = useQuery({ queryKey: ['friendRequests'], queryFn: getFriendRequests })
 
   const acceptMut = useMutation({
     mutationFn: acceptFriendRequest,
@@ -154,6 +154,9 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
           </div>
         ) : tab === 'pending' ? (
           <div className="space-y-2">
+            {requestsError && (
+              <p className="text-sm text-red-400">Could not load friend requests. Please try again.</p>
+            )}
             {incoming.length > 0 && (
               <>
                 <p className="text-xs uppercase font-semibold text-sp-muted mb-2">Incoming — {incoming.length}</p>
@@ -164,7 +167,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
                       <p className="font-semibold text-sm">{r.sender.username}</p>
                       <p className="text-xs text-sp-muted">Incoming Friend Request</p>
                     </div>
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-2">
                       <button onClick={() => acceptMut.mutate(r.id)} className="btn text-sm py-1 px-3" title="Accept"><Icon name="checkmark-circle" size={16} /></button>
                       <button onClick={() => declineMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-sp-input hover:bg-red-500" title="Decline"><Icon name="close-circle" size={16} /></button>
                     </div>
@@ -182,7 +185,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
                       <p className="font-semibold text-sm">{r.recipient.username}</p>
                       <p className="text-xs text-sp-muted">Outgoing Friend Request</p>
                     </div>
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-2">
                       <button onClick={() => cancelMut.mutate(r.id)} className="btn text-sm py-1 px-3 bg-sp-input hover:bg-red-500" title="Cancel"><Icon name="close-circle" size={16} /></button>
                     </div>
                   </div>
@@ -195,6 +198,9 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
           </div>
         ) : (
           <div className="space-y-1">
+            {friendsError && (
+              <p className="text-sm text-red-400 mb-2">Could not load friends list. Please try again.</p>
+            )}
             <p className="text-xs uppercase font-semibold text-sp-muted mb-2">
               {tab === 'online' ? 'Online' : 'All Friends'} — {displayed.length}
             </p>
@@ -212,7 +218,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
                     f.user.status === 'online' ? 'Online' : 'Offline'
                   }</p>
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2">
                   <button onClick={(e) => { e.stopPropagation(); navigate(`/channels/@me/${f.user.id}`) }} className="btn text-sm py-1 px-3" title="Message"><Icon name="message-circle" size={16} /></button>
                   <button onClick={(e) => { e.stopPropagation(); removeMut.mutate(f.user.id) }} className="btn text-sm py-1 px-2 bg-sp-input hover:bg-red-500" title="Remove"><Icon name="close" size={16} /></button>
                 </div>

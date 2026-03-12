@@ -41,6 +41,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchResults, setSearchResults] = useState<Message[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchCardRef = useRef<HTMLDivElement>(null)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -78,7 +79,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
   // Search debounce
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
-    if (!channelId) { setSearchResults([]); setSearchLoading(false); return }
+    if (!channelId) { setSearchResults([]); setSearchLoading(false); setSearchError(null); return }
 
     // Parse filter prefixes: from:user  mentions:user  has:link|file|embed
     const fromMatch = searchQuery.match(/\bfrom:\s*(\S+)/i)
@@ -91,9 +92,10 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
       .trim()
     const hasFilters = !!(fromMatch || mentionsMatch || hasMatch)
 
-    if (!plainQ && !hasFilters) { setSearchResults([]); setSearchLoading(false); return }
+    if (!plainQ && !hasFilters) { setSearchResults([]); setSearchLoading(false); setSearchError(null); return }
 
     setSearchLoading(true)
+    setSearchError(null)
     searchDebounceRef.current = setTimeout(async () => {
       try {
         const msgs = await searchMessages(channelId, plainQ, {
@@ -102,7 +104,10 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
           has: hasMatch?.[1],
         })
         setSearchResults(msgs)
-      } catch { setSearchResults([]) }
+      } catch {
+        setSearchResults([])
+        setSearchError('Search failed. Please try again.')
+      }
       finally { setSearchLoading(false) }
     }, 300)
     return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current) }
@@ -112,6 +117,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
     setSearchFocused(false)
     setSearchQuery('')
     setSearchResults([])
+    setSearchError(null)
   }
 
   const handleReply = useCallback((msg: Message) => setReplyTo(msg), [])
@@ -345,6 +351,8 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
                 </>
               ) : searchLoading ? (
                 <div className="px-4 py-6 text-sm text-sp-muted text-center">Searching…</div>
+              ) : searchError ? (
+                <div className="px-4 py-6 text-sm text-red-400 text-center">{searchError}</div>
               ) : searchResults.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-sp-muted text-center">No results for <strong className="text-sp-text">{searchQuery}</strong></div>
               ) : (

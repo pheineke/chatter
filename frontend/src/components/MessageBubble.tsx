@@ -1,5 +1,5 @@
 import { format, isToday, isYesterday } from 'date-fns'
-import { useState, useEffect, useCallback } from 'react'
+import { memo, useState, useEffect, useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { editMessage, deleteMessage, addReaction, removeReaction, pinMessage, unpinMessage } from '../api/messages'
 import { UserAvatar } from './UserAvatar'
@@ -43,7 +43,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function MessageBubble({ message: msg, channelId, partnerId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
+export const MessageBubble = memo(function MessageBubble({ message: msg, channelId, partnerId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
   const { user } = useAuth()
   const { blockedIds } = useBlocks()
   const qc = useQueryClient()
@@ -52,7 +52,6 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
   const [showBlocked, setShowBlocked] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content ?? '')
-  const [hovered, setHovered] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const closePreview = useCallback(() => setPreviewUrl(null), [])
   const [dismissed, setDismissed] = useState<Set<string>>(() => getDismissed(msg.id))
@@ -176,18 +175,18 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
     <>
     <div
       className={`group flex gap-3 px-4 py-0.5 hover:bg-sp-hover/40 relative ${compact ? 'mt-0' : 'mt-3'}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
     >
       {/* Avatar / timestamp column */}
-      <div className="w-10 shrink-0 flex justify-center select-none cursor-pointer" onClick={handleUserClick}>
+      <div className="w-10 shrink-0 flex justify-center select-none">
         {compact ? (
           <span className="text-[10px] text-sp-muted opacity-0 group-hover:opacity-100 mt-1 leading-tight select-none">
             {format(new Date(msg.created_at), 'HH:mm')}
           </span>
         ) : (
-          <UserAvatar user={msg.author} size={40} className="mt-0.5" />
+          <button className="cursor-pointer" onClick={handleUserClick} aria-label={`Open ${msg.author.username} profile`}>
+            <UserAvatar user={msg.author} size={40} className="mt-0.5" />
+          </button>
         )}
       </div>
 
@@ -235,6 +234,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
               className="input w-full resize-none text-sm"
               rows={2}
               value={editText}
+              maxLength={2000}
               onChange={(e) => setEditText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); editMut.mutate() }
@@ -365,8 +365,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
       </div>
 
       {/* Action toolbar on hover */}
-      {hovered && (
-        <div className="absolute right-4 top-0 -translate-y-1/2 flex items-center gap-1 bg-sp-popup border border-sp-divider/60 rounded-sp-sm px-1 py-0.5 shadow-sp-2">
+      <div className="absolute right-4 top-0 -translate-y-1/2 flex items-center gap-1 bg-sp-popup border border-sp-divider/60 rounded-sp-sm px-1 py-0.5 shadow-sp-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity">
           <ActionBtn
             title="Add Reaction"
             onClick={(e) => {
@@ -388,8 +387,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
           </ActionBtn>
           {isOwn && <ActionBtn title="Edit" onClick={() => { setEditing(true); setEditText(displayContent ?? msg.content ?? '') }}><Icon name="edit-2" size={16} /></ActionBtn>}
           {isOwn && <ActionBtn title="Delete" onClick={() => deleteMut.mutate()} className="hover:text-red-400"><Icon name="trash-2" size={16} /></ActionBtn>}
-        </div>
-      )}
+      </div>
     </div>
     {previewUrl && <ImagePreviewModal url={previewUrl} onClose={closePreview} />}
     {cardPos && (
@@ -440,7 +438,7 @@ export function MessageBubble({ message: msg, channelId, partnerId, compact = fa
     )}
   </>
   )
-}
+})
 
 function ActionBtn({ title, onClick, className = '', children }: { title: string; onClick: (e: React.MouseEvent) => void; className?: string; children: React.ReactNode }) {
   return (

@@ -1212,6 +1212,7 @@ function NotificationsTab() {
 // ─── Shared EditableField ─────────────────────────────────────────────────────
 
 function EditableField({ label, value, placeholder, readOnly, multiline, isEditing, editValue, setEditValue, onEdit, onSave, onCancel, disabled }: any) {
+  const maxLen = label === 'About Me' ? 2000 : undefined
   return (
     <div className="flex flex-col gap-1 py-2">
       <div className="flex items-start justify-between gap-4">
@@ -1220,7 +1221,12 @@ function EditableField({ label, value, placeholder, readOnly, multiline, isEditi
           {isEditing ? (
             <div className="mt-1">
               {multiline ? (
-                <textarea className="input w-full min-h-[90px] resize-y" value={editValue} placeholder={placeholder} onChange={e => setEditValue(e.target.value)} autoFocus />
+                <>
+                  <textarea className="input w-full min-h-[90px] resize-y" value={editValue} placeholder={placeholder} onChange={e => setEditValue(e.target.value)} maxLength={maxLen} autoFocus />
+                  {maxLen && (
+                    <div className="mt-1 text-right text-xs text-sp-muted">{editValue.length}/{maxLen}</div>
+                  )}
+                </>
               ) : (
                 <input className="input w-full" value={editValue} placeholder={placeholder} onChange={e => setEditValue(e.target.value)} autoFocus onKeyDown={e => { if (e.key === 'Enter') onSave() }} />
               )}

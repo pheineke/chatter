@@ -57,7 +57,6 @@ export function DMSidebar() {
     queryKey: ['dmConversations'],
     queryFn: getConversations,
     staleTime: 30_000,
-    refetchInterval: 60_000,
     enabled: !isOffline,
   })
 

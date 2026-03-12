@@ -40,27 +40,27 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 
 | # | Issue | Area |
 |---|-------|------|
-| 21 | **`MessageInput` and edit textarea have no `maxLength`** — no proactive cap at UI level | UX |
-| 22 | **Message input stays expanded after sending a long message** — doesn't reset height | UX |
-| 23 | **DM header username/avatar not clickable to open full profile** | UX |
-| 24 | **About Me has no character limit** — no `max_length=2000` on backend or frontend counter | UX |
-| 25 | **About Me text does not wrap** — overflows horizontally | UX |
-| 26 | **Accept/Decline buttons hidden with `opacity-0`** — inaccessible to touch/keyboard users | Accessibility |
-| 27 | **Clicking timestamp on follow-up messages opens profile card** — wrong trigger | UX |
-| 28 | **`UserPanel` click area is a non-focusable `div`** — should be a `button` | Accessibility |
-| 29 | **No `user.updated` WS event for username/avatar changes** — friend lists go stale | Real-time |
-| 30 | **Server image/banner uploads emit no WS event** | Real-time |
-| 31 | **Status change not broadcast to user's own other open tabs** | Real-time |
+| 21 | ✅ **`MessageInput` and edit textarea have no `maxLength`** — no proactive cap at UI level | UX |
+| 22 | ✅ **Message input stays expanded after sending a long message** — doesn't reset height | UX |
+| 23 | ✅ **DM header username/avatar not clickable to open full profile** | UX |
+| 24 | ✅ **About Me has no character limit** — no `max_length=2000` on backend or frontend counter | UX |
+| 25 | ✅ **About Me text does not wrap** — overflows horizontally | UX |
+| 26 | ✅ **Accept/Decline buttons hidden with `opacity-0`** — inaccessible to touch/keyboard users | Accessibility |
+| 27 | ✅ **Clicking timestamp on follow-up messages opens profile card** — wrong trigger | UX |
+| 28 | ✅ **`UserPanel` click area is a non-focusable `div`** — should be a `button` | Accessibility |
+| 29 | ✅ **No `user.updated` WS event for username/avatar changes** — friend lists go stale | Real-time |
+| 30 | ✅ **Server image/banner uploads emit no WS event** | Real-time |
+| 31 | ✅ **Status change not broadcast to user's own other open tabs** | Real-time |
 | 32 | **DM unread state is device-local only** (`localStorage`) — no cross-device sync | Feature gap |
-| 33 | **Silent failure on channel/category creation** — no try/catch, no error toast | Error handling |
-| 34 | **`FriendsPane` shows no error state when fetch fails** — empty list with no message | Error handling |
-| 35 | **`UserPanel` status-change has no try/catch** — unhandled promise rejection | Error handling |
-| 36 | **MessagePane search conflates "no results" with "search error"** | UX |
-| 37 | **No list virtualisation in `MessageList`** — DOM grows indefinitely as pages load | Performance |
-| 38 | **`MessageBubble` not memoized** — all bubbles re-render on every new WS message | Performance |
-| 39 | **`_slowmode_last` dict never pruned** — grows forever in memory | Backend / Memory |
-| 40 | **Redundant polling on DM conversations** — `refetchInterval` alongside live WS | Performance |
-| 41 | **Voice presence polls every 10 s** — WS already handles join/leave in real time | Performance |
+| 33 | ✅ **Silent failure on channel/category creation** — no try/catch, no error toast | Error handling |
+| 34 | ✅ **`FriendsPane` shows no error state when fetch fails** — empty list with no message | Error handling |
+| 35 | ✅ **`UserPanel` status-change has no try/catch** — unhandled promise rejection | Error handling |
+| 36 | ✅ **MessagePane search conflates "no results" with "search error"** | UX |
+| 37 | ✅ **No list virtualisation in `MessageList`** — DOM grows indefinitely as pages load | Performance |
+| 38 | ✅ **`MessageBubble` not memoized** — all bubbles re-render on every new WS message | Performance |
+| 39 | ✅ **`_slowmode_last` dict never pruned** — grows forever in memory | Backend / Memory |
+| 40 | ✅ **Redundant polling on DM conversations** — `refetchInterval` alongside live WS | Performance |
+| 41 | ✅ **Voice presence polls every 10 s** — WS already handles join/leave in real time | Performance |
 
 ### 🟢 P3 — Polish (low urgency, nice to have)
 

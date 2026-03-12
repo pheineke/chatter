@@ -4,7 +4,7 @@ import uuid
 import aiofiles
 from fastapi import APIRouter, HTTPException, Response, UploadFile, File, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from app.auth import hash_password, verify_password
 from app.config import settings
@@ -13,6 +13,9 @@ from app.presence import broadcast_presence
 from app.schemas.user import UserRead, UserUpdate, UserPublicRead
 from app.utils.file_validation import verify_image_magic_with_dims, AVATAR_MAX, BANNER_MAX
 from app.utils.rate_limiter import image_limiter, profile_limiter
+from app.ws_manager import manager
+from models.friend import FriendRequest, FriendRequestStatus
+from models.server import ServerMember
 from models.user import User, UserStatus
 from models.note import UserNote
 from models.decoration_code import DecorationCode
@@ -29,6 +32,30 @@ def _mask_user_read(user: "User", viewer_id: uuid.UUID) -> "UserPublicRead":
     if user.hide_status and user.id != viewer_id:
         read = read.model_copy(update={'status': UserStatus.offline})
     return read
+
+
+async def _broadcast_user_updated(user: "User", db: DB) -> None:
+    payload = UserPublicRead.model_validate(user).model_dump(mode="json")
+    event = {"type": "user.updated", "data": payload}
+
+    # User's own room
+    await manager.broadcast_user(user.id, event)
+
+    # Servers the user is in
+    server_rows = await db.execute(select(ServerMember.server_id).where(ServerMember.user_id == user.id))
+    for server_id in server_rows.scalars().all():
+        await manager.broadcast_server(server_id, event)
+
+    # Friends' personal rooms
+    fr_rows = await db.execute(
+        select(FriendRequest).where(
+            FriendRequest.status == FriendRequestStatus.accepted,
+            or_(FriendRequest.sender_id == user.id, FriendRequest.recipient_id == user.id),
+        )
+    )
+    for fr in fr_rows.scalars().all():
+        friend_id = fr.recipient_id if fr.sender_id == user.id else fr.sender_id
+        await manager.broadcast_user(friend_id, event)
 
 
 @router.get("/me", response_model=UserRead)
@@ -85,6 +112,7 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
     if status_changed or hide_status_changed:
         broadcast_status = "offline" if current_user.hide_status else current_user.status.value
         await broadcast_presence(current_user.id, broadcast_status, db)
+    await _broadcast_user_updated(current_user, db)
 
     return current_user
 
@@ -117,6 +145,7 @@ async def upload_avatar(
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
+    await _broadcast_user_updated(current_user, db)
     return current_user
 
 
@@ -148,6 +177,7 @@ async def upload_banner(
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
+    await _broadcast_user_updated(current_user, db)
     return current_user
 
 

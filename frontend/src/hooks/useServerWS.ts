@@ -162,6 +162,15 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           )
           break
         }
+        case 'user.updated': {
+          const updatedUser = msg.data as Member['user']
+          qc.setQueryData<Member[]>(['members', serverId], (old = []) =>
+            old.map(m =>
+              m.user.id === updatedUser.id ? { ...m, user: { ...m.user, ...updatedUser } } : m
+            )
+          )
+          break
+        }
         case 'server.member_joined':
         case 'server.member_left':
         case 'server.member_kicked':

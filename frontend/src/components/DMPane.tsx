@@ -8,6 +8,7 @@ import { getMessages, sendMessage } from '../api/messages'
 import { useAuth } from '../contexts/AuthContext'
 import { useChannelWS } from '../hooks/useChannelWS'
 import { AvatarWithStatus } from './AvatarWithStatus'
+import { ProfileCard } from './ProfileCard'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { Icon } from './Icon'
@@ -34,6 +35,7 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [cachedMsgs, setCachedMsgs] = useState<Message[]>([])
   const [outboxMsgs, setOutboxMsgs] = useState<OutboxMessage[]>([])
+  const [profilePos, setProfilePos] = useState<{ x: number; y: number } | null>(null)
   const handleReply = useCallback((msg: Message) => setReplyTo(msg), [])
   const handleCancelReply = useCallback(() => setReplyTo(null), [])
   const scrollToMessageRef = useRef<((id: string) => void) | null>(null)
@@ -152,8 +154,26 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
             <Icon name="menu" size={22} />
           </button>
         )}
-        <AvatarWithStatus user={otherUser ?? null} size={32} ringColor="#1a1a1e" />
-        <span className="font-bold">{otherUser?.username ?? '…'}</span>
+        <button
+          className="rounded-full"
+          onClick={(e) => {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setProfilePos({ x: rect.right + 12, y: rect.top })
+          }}
+          aria-label={otherUser ? `Open ${otherUser.username} profile` : 'Open profile'}
+        >
+          <AvatarWithStatus user={otherUser ?? null} size={32} ringColor="#1a1a1e" />
+        </button>
+        <button
+          className="font-bold hover:underline"
+          onClick={(e) => {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setProfilePos({ x: rect.right + 12, y: rect.top })
+          }}
+          aria-label={otherUser ? `Open ${otherUser.username} profile` : 'Open profile'}
+        >
+          {otherUser?.username ?? '…'}
+        </button>
         {partnerFingerprint && (
           <span
             className="ml-1 flex items-center gap-1 text-xs text-green-400 font-mono bg-green-400/10 px-2 py-0.5 rounded cursor-help shrink-0"
@@ -250,6 +270,14 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
             />
           )}
         </>
+      )}
+
+      {otherUser && profilePos && (
+        <ProfileCard
+          userId={otherUser.id}
+          onClose={() => setProfilePos(null)}
+          position={profilePos}
+        />
       )}
     </div>
   )

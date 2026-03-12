@@ -11,15 +11,18 @@ export function UserPanel() {
   const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
 
   if (!user) return null
 
   return (
     <>
     <div className="px-2 py-1.5 flex items-center gap-1 shrink-0">
-      <div 
+      <button
+        type="button"
         className="flex items-center gap-2 flex-1 min-w-0 hover:bg-sp-hover rounded-full px-2 py-1 cursor-pointer transition-all group"
         onClick={(e) => {
+          setStatusError(null)
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
           const statuses: { label: string; value: string; icon: string }[] = [
             { label: 'Online',  value: 'online',  icon: 'ellipse' },
@@ -35,12 +38,17 @@ export function UserPanel() {
               icon: s.icon,
               active: user.status === s.value,
               onClick: async () => {
-                await updateMe({ status: s.value as any })
-                await refreshUser()
+                try {
+                  await updateMe({ status: s.value as any })
+                  await refreshUser()
+                } catch {
+                  setStatusError('Failed to update status. Please try again.')
+                }
               },
             })),
           })
         }}
+        aria-label="Open status menu"
       >
         <AvatarWithStatus user={user} size={32} className="ml-1" />
         <div className="min-w-0 flex flex-col justify-center">
@@ -49,7 +57,7 @@ export function UserPanel() {
             {user.status === 'dnd' ? 'Do Not Disturb' : user.status}
           </div>
         </div>
-      </div>
+      </button>
       
       <div className="flex items-center">
         <button
@@ -62,6 +70,10 @@ export function UserPanel() {
       </div>
       
     </div>
+
+    {statusError && (
+      <div className="px-3 pb-1 text-xs text-red-400">{statusError}</div>
+    )}
 
     {contextMenu && (
         <ContextMenu

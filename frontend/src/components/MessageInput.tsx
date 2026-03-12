@@ -60,6 +60,12 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
   const [uploadError, setUploadError] = useState<string | null>(null)
   const messageSentRef = useRef(false)
 
+  const resetComposerHeight = useCallback(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+  }, [])
+
   // Tick the countdown every second
   useEffect(() => {
     if (!cooldownUntil) return
@@ -130,6 +136,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     },
     onSuccess: (_data, _variables) => {
       setText('')
+      resetComposerHeight()
       qc.invalidateQueries({ queryKey: ['messages', channelId] })
       onCancelReply?.()
       // Start client-side cooldown so the user sees the countdown immediately
@@ -167,6 +174,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['messages', channelId] })
       setText('')
+      resetComposerHeight()
       onCancelReply?.()
       setUploadError(null)
       if (slowmodeDelay > 0) {
@@ -200,6 +208,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     if (isOffline && onOfflineSubmit) {
       onOfflineSubmit(trimmed)
       setText('')
+      resetComposerHeight()
       setMentionQuery(null)
       return
     }

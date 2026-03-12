@@ -147,6 +147,10 @@ async def upload_server_image(
     server.image = await _upload_server_image(server_id, file, "image", db)
     await db.commit()
     await db.refresh(server)
+    await manager.broadcast_server(
+        server_id,
+        {"type": "server.updated", "data": ServerRead.model_validate(server).model_dump(mode="json")},
+    )
     return server
 
 
@@ -159,6 +163,10 @@ async def upload_server_banner(
     server.banner = await _upload_server_image(server_id, file, "banner", db)
     await db.commit()
     await db.refresh(server)
+    await manager.broadcast_server(
+        server_id,
+        {"type": "server.updated", "data": ServerRead.model_validate(server).model_dump(mode="json")},
+    )
     return server
 
 

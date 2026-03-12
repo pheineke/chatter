@@ -42,7 +42,6 @@ export function useUnreadDMs(): boolean {
     queryKey: ['dmConversations'],
     queryFn: getConversations,
     staleTime: 30_000,
-    refetchInterval: 60_000,
   })
 
   // Re-sync lastRead from localStorage whenever it changes (DMSidebar writes it)
@@ -108,6 +107,26 @@ export function useUnreadDMs(): boolean {
           old?.map(c =>
             c.other_user.id === user_id
               ? { ...c, other_user: { ...c.other_user, status } }
+              : c
+          )
+        )
+        return
+      }
+
+      if (msg.type === 'user.updated') {
+        const updatedUser = msg.data as Friend['user']
+        if (user && updatedUser.id === user.id) {
+          updateUser(updatedUser)
+        }
+        qc.setQueryData<Friend[]>(['friends'], old =>
+          old?.map(f =>
+            f.user.id === updatedUser.id ? { ...f, user: { ...f.user, ...updatedUser } } : f
+          )
+        )
+        qc.setQueryData<DMConversation[]>(['dmConversations'], old =>
+          old?.map(c =>
+            c.other_user.id === updatedUser.id
+              ? { ...c, other_user: { ...c.other_user, ...updatedUser } }
               : c
           )
         )

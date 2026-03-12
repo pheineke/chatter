@@ -129,11 +129,20 @@ async def check_and_set_slowmode(channel_key: str, user_key: str, delay_seconds:
 
     # In-memory fallback
     async with _slowmode_lock:
-        last = _slowmode_last[channel_key].get(user_key, 0.0)
+        channel_bucket = _slowmode_last[channel_key]
+        prune_before = now - max(delay_seconds * 4, 300)
+        stale_users = [uid for uid, ts in channel_bucket.items() if ts < prune_before]
+        for uid in stale_users:
+            channel_bucket.pop(uid, None)
+        if not channel_bucket:
+            _slowmode_last.pop(channel_key, None)
+            channel_bucket = _slowmode_last[channel_key]
+
+        last = channel_bucket.get(user_key, 0.0)
         elapsed = now - last
         if elapsed < delay_seconds:
             return max(1, int(delay_seconds - elapsed) + 1)
-        _slowmode_last[channel_key][user_key] = now
+        channel_bucket[user_key] = now
     return 0
 
 

@@ -8,6 +8,8 @@ import { cachePutMessages } from '../db/dmCache'
 
 const COMPACT_THRESHOLD_MS = 7 * 60 * 1000 // 7 minutes
 const PAGE_SIZE = 50
+const ESTIMATED_ROW_HEIGHT = 92
+const WINDOW_OVERSCAN = 30
 
 interface Props {
   channelId: string
@@ -35,6 +37,7 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
   const prevScrollHeight = useRef<number>(0)
   const isFirstLoad = useRef(true)
   const [showScrollDown, setShowScrollDown] = useState(false)
+  const [viewport, setViewport] = useState({ scrollTop: 0, clientHeight: 0 })
 
   const {
     data,
@@ -130,15 +133,40 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
 
   // Show/hide the "jump to bottom" pill based on scroll distance
   useEffect(() => {
-    const el = scrollContainerRef.current
-    if (!el) return
+    const node = scrollContainerRef.current
+    if (!node) return
     function onScroll() {
-      const dist = el!.scrollHeight - el!.scrollTop - el!.clientHeight
+      const current = scrollContainerRef.current
+      if (!current) return
+      const dist = current.scrollHeight - current.scrollTop - current.clientHeight
       setShowScrollDown(dist > 200)
+      setViewport({ scrollTop: current.scrollTop, clientHeight: current.clientHeight })
     }
-    el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
+    setViewport({ scrollTop: node.scrollTop, clientHeight: node.clientHeight })
+    node.addEventListener('scroll', onScroll, { passive: true })
+    return () => node.removeEventListener('scroll', onScroll)
   }, [])
+
+  useEffect(() => {
+    const onResize = () => {
+      const current = scrollContainerRef.current
+      if (!current) return
+      setViewport({ scrollTop: current.scrollTop, clientHeight: current.clientHeight })
+    }
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const total = messages.length
+  const startIdx = Math.max(0, Math.floor(viewport.scrollTop / ESTIMATED_ROW_HEIGHT) - WINDOW_OVERSCAN)
+  const endIdx = Math.min(
+    total,
+    Math.ceil((viewport.scrollTop + Math.max(viewport.clientHeight, 1)) / ESTIMATED_ROW_HEIGHT) + WINDOW_OVERSCAN,
+  )
+  const visibleMessages = messages.slice(startIdx, endIdx)
+  const topSpacer = startIdx * ESTIMATED_ROW_HEIGHT
+  const bottomSpacer = Math.max(0, (total - endIdx) * ESTIMATED_ROW_HEIGHT)
 
   const scrollToMessage = useCallback((id: string) => {
     const el = bubbleRefs.current.get(id)
@@ -146,8 +174,20 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       el.classList.add('highlight-flash')
       setTimeout(() => el.classList.remove('highlight-flash'), 1500)
+      return
     }
-  }, [])
+    const idx = messages.findIndex((m) => m.id === id)
+    if (idx >= 0 && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: idx * ESTIMATED_ROW_HEIGHT, behavior: 'smooth' })
+      setTimeout(() => {
+        const target = bubbleRefs.current.get(id)
+        if (!target) return
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        target.classList.add('highlight-flash')
+        setTimeout(() => target.classList.remove('highlight-flash'), 1500)
+      }, 250)
+    }
+  }, [messages])
 
   useEffect(() => {
     onRegisterScrollTo?.(scrollToMessage)
@@ -190,7 +230,10 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
         </div>
       ) : null}
 
-      {messages.map((msg, idx) => {
+      {topSpacer > 0 && <div style={{ height: topSpacer }} />}
+
+      {visibleMessages.map((msg, visibleIdx) => {
+        const idx = startIdx + visibleIdx
         const prev = idx > 0 ? messages[idx - 1] : null
         const compact = !!prev && isSameAuthorAndRecent(prev, msg) && !msg.reply_to_id
         return (
@@ -207,6 +250,7 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
           </div>
         )
       })}
+      {bottomSpacer > 0 && <div style={{ height: bottomSpacer }} />}
       <div ref={bottomRef} />
       </div>
 
