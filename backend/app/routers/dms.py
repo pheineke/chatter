@@ -123,17 +123,15 @@ async def mark_dm_read(
         db.add(state)
 
     await db.commit()
+    payload = DMReadStateRead(channel_id=channel_id, last_read_at=read_at).model_dump(mode="json")
     await manager.broadcast_user(
         current_user.id,
         {
             "type": "dm.read_updated",
-            "data": {
-                "channel_id": channel_id,
-                "last_read_at": read_at,
-            },
+            "data": payload,
         },
     )
-    return DMReadStateRead(channel_id=channel_id, last_read_at=read_at)
+    return DMReadStateRead(**payload)
 
 
 @router.get("/{user_id}/channel")

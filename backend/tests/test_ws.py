@@ -8,6 +8,7 @@ with a disposable in-memory SQLite database.
 import asyncio
 import threading
 import uuid
+from datetime import datetime
 
 import pytest
 from starlette.testclient import TestClient
@@ -242,3 +243,38 @@ def test_ws_channel_receives_message_event(ws_app):
     assert len(event_holder) == 1
     assert event_holder[0]["type"] == "message.created"
     assert event_holder[0]["data"]["content"] == "broadcast test"
+
+
+def test_ws_me_receives_dm_read_updated_event(ws_app):
+    """Marking a DM as read should broadcast dm.read_updated to the user's personal WS."""
+    alice_token = _get_token(ws_app, "ws_dm_read_alice")
+    bob_token = _get_token(ws_app, "ws_dm_read_bob")
+    alice_headers = {"Authorization": f"Bearer {alice_token}"}
+    bob_headers = {"Authorization": f"Bearer {bob_token}"}
+
+    bob_id = ws_app.get("/users/me", headers=bob_headers).json()["id"]
+    dm = ws_app.get(f"/dms/{bob_id}/channel", headers=alice_headers)
+    channel_id = dm.json()["channel_id"]
+
+    event_holder: list[dict] = []
+    read_at = "2026-03-12T00:00:00+00:00"
+
+    with ws_app.websocket_connect(f"/ws/me?token={alice_token}") as ws:
+        def _mark_read():
+            ws_app.put(
+                f"/dms/channels/{channel_id}/read",
+                json={"last_read_at": read_at},
+                headers=alice_headers,
+            )
+
+        t = threading.Thread(target=_mark_read)
+        t.start()
+
+        event = ws.receive_json()
+        event_holder.append(event)
+        t.join()
+
+    assert len(event_holder) == 1
+    assert event_holder[0]["type"] == "dm.read_updated"
+    assert event_holder[0]["data"]["channel_id"] == channel_id
+    assert datetime.fromisoformat(event_holder[0]["data"]["last_read_at"].replace("Z", "+00:00")) == datetime.fromisoformat(read_at)
