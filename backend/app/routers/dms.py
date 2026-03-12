@@ -2,14 +2,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB
+from app.rate_limiter import rate_limit_dm_channel
 from app.schemas.message import DMConversationRead
 from app.schemas.user import UserRead, UserPublicRead
-from app.utils.rate_limiter import dm_channel_limiter
 from models.block import UserBlock
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
@@ -73,16 +73,13 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
 
 
 @router.get("/{user_id}/channel")
-async def get_or_create_dm_channel(user_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def get_or_create_dm_channel(
+    user_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_dm_channel),
+):
     """Get or create a shared DM channel for two users. Returns { channel_id }."""
-    allowed, retry_after = dm_channel_limiter.check(f"dm-channel:{current_user.id}")
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail=f"You're opening DMs too quickly. Please wait {retry_after} seconds.",
-            headers={"Retry-After": str(retry_after)},
-        )
-
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot DM yourself")
 

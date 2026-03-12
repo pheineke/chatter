@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     ratelimit_enabled: bool = True
     ratelimit_messages: int = 10    # max messages per window
     ratelimit_window_seconds: int = 5  # rolling window size
+    ratelimit_redis_url: str | None = None
 
 
 settings = Settings()

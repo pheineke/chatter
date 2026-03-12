@@ -15,7 +15,8 @@ from models.friend import FriendRequest, FriendRequestStatus
 
 async def broadcast_presence(user_id: uuid.UUID, new_status: str, db: AsyncSession) -> None:
     """
-    Emit a ``user.status_changed`` event to:
+        Emit a ``user.status_changed`` event to:
+            - the user's own personal WS room (multi-tab sync)
       - every server the user belongs to  (member list updates)
       - every accepted friend's personal WS room  (friend list updates)
     """
@@ -23,6 +24,9 @@ async def broadcast_presence(user_id: uuid.UUID, new_status: str, db: AsyncSessi
         "type": "user.status_changed",
         "data": {"user_id": str(user_id), "status": new_status},
     }
+
+    # User's own room (keeps multiple open tabs in sync instantly)
+    await manager.broadcast_user(user_id, event)
 
     # Servers
     result = await db.execute(

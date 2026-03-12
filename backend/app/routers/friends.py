@@ -1,13 +1,13 @@
 import uuid
 from typing import List
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB
+from app.rate_limiter import rate_limit_friend_requests
 from app.schemas.friend import FriendRequestCreate, FriendRequestRead, FriendRead
-from app.utils.rate_limiter import friend_request_limiter
 from app.ws_manager import manager
 from models.friend import FriendRequest, FriendRequestStatus
 from models.user import User
@@ -33,14 +33,12 @@ async def list_requests(current_user: CurrentUser, db: DB):
 
 
 @router.post("/requests", response_model=FriendRequestRead, status_code=status.HTTP_201_CREATED)
-async def send_request(body: FriendRequestCreate, current_user: CurrentUser, db: DB):
-    allowed, retry_after = friend_request_limiter.check(f"friend-request:{current_user.id}")
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail=f"You're sending friend requests too quickly. Please wait {retry_after} seconds.",
-            headers={"Retry-After": str(retry_after)},
-        )
+async def send_request(
+    body: FriendRequestCreate,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_friend_requests),
+):
 
     if body.recipient_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot send a friend request to yourself")

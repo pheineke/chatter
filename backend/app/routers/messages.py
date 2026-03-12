@@ -19,10 +19,9 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.dependencies import CurrentUser, DB
-from app.rate_limiter import rate_limit_messages
+from app.rate_limiter import rate_limit_messages, rate_limit_reactions, check_and_set_slowmode
 from app.routers.servers import _require_member, _require_admin, _get_server_or_404
 from app.schemas.message import MessageCreate, MessageUpdate, MessageRead, PinnedMessageRead
-from app.utils.rate_limiter import reaction_limiter
 from app.utils.file_validation import verify_attachment_magic
 from app.ws_manager import manager
 from models.channel import Channel, ChannelType
@@ -119,10 +118,6 @@ async def _apply_word_filters(
 
         # Unknown action — fall through silently
         break
-
-# Per-channel per-user slowmode tracker: channel_id_str -> user_id_str -> last_send_time
-_slowmode_last: Dict[str, Dict[str, float]] = defaultdict(dict)
-
 
 async def _enrich_message_read(msg: Message, server_id: 'uuid.UUID | None', db) -> MessageRead:
     """Return a MessageRead with author_nickname populated when msg is in a server channel."""
@@ -326,17 +321,13 @@ async def send_message(
     if getattr(channel, 'slowmode_delay', 0) and channel.slowmode_delay > 0:
         ch_key = str(channel_id)
         user_key = str(current_user.id)
-        now = time.monotonic()
-        last = _slowmode_last[ch_key].get(user_key, 0.0)
-        elapsed = now - last
-        if elapsed < channel.slowmode_delay:
-            retry_after = max(1, int(channel.slowmode_delay - elapsed) + 1)
+        retry_after = await check_and_set_slowmode(ch_key, user_key, channel.slowmode_delay)
+        if retry_after > 0:
             raise HTTPException(
                 status_code=429,
                 detail=f"Slowmode is enabled. Please wait {retry_after} second(s) before sending another message.",
                 headers={"Retry-After": str(retry_after)},
             )
-        _slowmode_last[ch_key][user_key] = now
 
     # Enforce per-server word filters (server channels only)
     if channel.server_id and body.content:
@@ -550,16 +541,13 @@ async def upload_attachment(
 
 @router.post("/messages/{message_id}/reactions/{emoji}", status_code=status.HTTP_204_NO_CONTENT)
 async def add_reaction(
-    channel_id: uuid.UUID, message_id: uuid.UUID, emoji: str, current_user: CurrentUser, db: DB
+    channel_id: uuid.UUID,
+    message_id: uuid.UUID,
+    emoji: str,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_reactions),
 ):
-    allowed, retry_after = reaction_limiter.check(f"reaction:{current_user.id}")
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail=f"You're adding reactions too quickly. Please wait {retry_after} seconds.",
-            headers={"Retry-After": str(retry_after)},
-        )
-
     msg = await _get_message_or_404(message_id, db)
     if msg.channel_id != channel_id:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -588,16 +576,13 @@ async def add_reaction(
 
 @router.delete("/messages/{message_id}/reactions/{emoji}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_reaction(
-    channel_id: uuid.UUID, message_id: uuid.UUID, emoji: str, current_user: CurrentUser, db: DB
+    channel_id: uuid.UUID,
+    message_id: uuid.UUID,
+    emoji: str,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_reactions),
 ):
-    allowed, retry_after = reaction_limiter.check(f"reaction:{current_user.id}")
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail=f"You're removing reactions too quickly. Please wait {retry_after} seconds.",
-            headers={"Retry-After": str(retry_after)},
-        )
-
     result = await db.execute(
         select(Reaction).where(
             Reaction.message_id == message_id,
