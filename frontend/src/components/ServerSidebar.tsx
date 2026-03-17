@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { getLastChannel } from '../utils/lastChannel'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { getMyServers, createServer } from '../api/servers'
+import { getMyServers, createServer, leaveServer } from '../api/servers'
 import { joinViaInvite } from '../api/invites'
 import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
@@ -11,6 +11,7 @@ import { InviteModal } from './InviteModal'
 import type { Server } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useNotificationSettings } from '../hooks/useNotificationSettings'
+import { useAuth } from '../contexts/AuthContext'
 
 function DMTab({ active, hasUnread, onClick, onContextMenu }: { active: boolean; hasUnread: boolean; onClick: () => void; onContextMenu: (e: React.MouseEvent) => void }) {
   const [hovered, setHovered] = useState(false)
@@ -146,6 +147,7 @@ interface ServerSidebarProps {
 }
 
 export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSidebarProps) {
+  const { user } = useAuth()
   const { serverId } = useParams<{ serverId: string }>()
   const effectiveServerId = activeServerId ?? serverId
   const location = useLocation()
@@ -158,6 +160,7 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
   const [inviteCode, setInviteCode] = useState('')
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; serverId: string } | null>(null)
   const [inviteModalServerId, setInviteModalServerId] = useState<string | null>(null)
+  const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null)
 
   const [dmContextMenu, setDmContextMenu] = useState<{ x: number; y: number } | null>(null)
 
@@ -216,6 +219,18 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
       setShowJoin(false)
       setInviteCode('')
       navigate(`/channels/${server_id}`)
+    },
+  })
+
+  const leaveMut = useMutation({
+    mutationFn: (sId: string) => leaveServer(sId, user?.id ?? ''),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['servers'] })
+      setConfirmLeaveId(null)
+      // If we were on that server, go home
+      if (serverId === confirmLeaveId || effectiveServerId === confirmLeaveId) {
+        navigate('/channels/@me')
+      }
     },
   })
 
@@ -290,6 +305,20 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
                 serverLevel(contextMenu.serverId) === 'mute' ? 'all' : 'mute',
               ),
             },
+            { separator: true },
+            {
+              label: 'Copy ID',
+              icon: 'copy',
+              onClick: () => navigator.clipboard.writeText(contextMenu.serverId).catch(console.error),
+            },
+            ...(servers.find(s => s.id === contextMenu.serverId)?.owner_id !== user?.id ? [
+              {
+                label: 'Leave Server',
+                icon: 'log-out',
+                danger: true,
+                onClick: () => setConfirmLeaveId(contextMenu.serverId),
+              },
+            ] : []),
           ]}
         />
       )}
@@ -317,6 +346,24 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
           serverName={servers.find((s) => s.id === inviteModalServerId)?.title ?? 'Server'}
           onClose={() => setInviteModalServerId(null)}
         />
+      )}
+
+      {/* Confirm Leave Modal */}
+      {confirmLeaveId && (
+        <Modal title="Leave Server" onClose={() => setConfirmLeaveId(null)}>
+          <p className="mb-4 text-sp-text/80">
+            Are you sure you want to leave <span className="font-bold text-sp-text">{servers.find(s => s.id === confirmLeaveId)?.title ?? 'this server'}</span>?
+            You won't be able to rejoin unless you are invited again.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button className="btn bg-sp-input hover:bg-sp-hover text-sp-text" onClick={() => setConfirmLeaveId(null)}>
+              Cancel
+            </button>
+            <button className="btn bg-red-500 hover:bg-red-600 text-white" onClick={() => { leaveMut.mutate(confirmLeaveId); setConfirmLeaveId(null) }}>
+              Leave Server
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* Create server modal */}

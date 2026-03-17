@@ -40,8 +40,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const qc = useQueryClient()
 
   useServerWS(serverId ?? null, channelId)
-  const { unreadChannels, markRead } = useUnreadChannels()
-  const { channelLevel, setChannelLevel } = useNotificationSettings()
+  const { unreadChannels, markRead, markAllServerRead } = useUnreadChannels()
+  const { channelLevel, setChannelLevel, serverLevel, setServerLevel } = useNotificationSettings()
 
   const { data: server } = useQuery({
     queryKey: ['server', serverId],
@@ -109,6 +109,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     const stored = serverId ? localStorage.getItem(`cats_collapsed_${serverId}`) : null
     return stored ? new Set(stored.split(',').filter(Boolean)) : new Set()
   })
+  const [hideMuted, setHideMuted] = useState(() => {
+    return localStorage.getItem('hideMutedChannels') === 'true'
+  })
+
+  // Persist hideMuted
+  useEffect(() => {
+    localStorage.setItem('hideMutedChannels', String(hideMuted))
+  }, [hideMuted])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -122,6 +130,65 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     items.push({ label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite })
     setContextMenu({ x: e.clientX, y: e.clientY, items })
   }, [isAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleHeaderContextMenu(e: React.MouseEvent) {
+    if (!server) return
+    e.preventDefault()
+    e.stopPropagation()
+    const items: ContextMenuItem[] = []
+
+    // Mark as Read
+    items.push({
+      label: 'Mark As Read',
+      icon: 'check-circle',
+      disabled: unreadChannels.size === 0, // rough check, ideally filter for this server
+      onClick: () => markAllServerRead(server.id),
+    })
+
+    items.push({ separator: true })
+
+    // Mute Server
+    const isMuted = serverLevel(server.id) === 'mute'
+    items.push({
+      label: isMuted ? 'Unmute Server' : 'Mute Server',
+      icon: isMuted ? 'bell' : 'bell-off',
+      onClick: () => setServerLevel(server.id, isMuted ? 'all' : 'mute'),
+    })
+
+    // Hide Muted Channels
+    items.push({
+      label: hideMuted ? 'Show Muted Channels' : 'Hide Muted Channels',
+      icon: hideMuted ? 'eye' : 'eye-off',
+      onClick: () => setHideMuted(!hideMuted),
+    })
+
+    // Privacy Settings
+    items.push({
+      label: 'Privacy Settings',
+      icon: 'lock',
+      onClick: () => alert('Privacy Settings: TODO'), 
+    })
+
+    items.push({ separator: true })
+
+    if (isAdmin) {
+      items.push({
+        label: 'Server Settings',
+        icon: 'settings',
+        onClick: () => navigate(`/channels/${serverId}/settings`),
+      })
+    }
+
+    /* // Copy ID is added below by default? No. */
+    items.push({ separator: true })
+    items.push({
+      label: 'Copy ID',
+      icon: 'copy',
+      onClick: () => navigator.clipboard.writeText(server.id).catch(console.error),
+    })
+
+    setContextMenu({ x: e.clientX, y: e.clientY, items })
+  }
 
   function handleHeaderClick(e: React.MouseEvent) {
     e.preventDefault()
@@ -217,34 +284,53 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         onClick: () => setConfirmDelete({ kind: 'channel', id: ch.id, name: ch.title }),
       },
     ] : []
+    const copyIdItem: ContextMenuItem = {
+      label: 'Copy ID',
+      icon: 'copy',
+      onClick: () => { navigator.clipboard.writeText(ch.id).catch(console.error) },
+    }
+    const editCatItems: ContextMenuItem[] = []
+    if (isAdmin && ch.category_id) {
+       // Optional: could add Move to Category? Or handled via drag.
+       // "Edit Channel" already covers most.
+    }
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
-      items: [...markReadItem, ...notifItems, ...adminItems],
+      items: [...markReadItem, ...notifItems, { separator: true }, ...adminItems, { separator: !!adminItems.length }, copyIdItem],
     })
   }
 
   function openCategoryContextMenu(e: React.MouseEvent, cat: { id: string; title: string }) {
-    if (!isAdmin) return
     e.preventDefault()
     e.stopPropagation()
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items: [
-        {
-          label: 'Edit Category',
-          icon: 'edit-2',
-          onClick: () => { setEditCategory(cat); setEditCategoryName(cat.title) },
-        },
-        {
-          label: 'Delete Category',
-          icon: 'trash-2',
-          danger: true,
-          onClick: () => setConfirmDelete({ kind: 'category', id: cat.id, name: cat.title }),
-        },
-      ],
+    const items: ContextMenuItem[] = []
+    
+    // Admin actions
+    if (isAdmin) {
+      items.push({
+        label: 'Edit Category',
+        icon: 'edit-2',
+        onClick: () => { setEditCategory(cat); setEditCategoryName(cat.title) },
+      })
+      items.push({
+        label: 'Delete Category',
+        icon: 'trash-2',
+        danger: true,
+        onClick: () => setConfirmDelete({ kind: 'category', id: cat.id, name: cat.title }),
+      })
+      items.push({ separator: true })
+    }
+
+    // Common actions
+    // Mute category? Mark category read? (TODO)
+    items.push({
+      label: 'Copy ID',
+      icon: 'copy',
+      onClick: () => { navigator.clipboard.writeText(cat.id).catch(console.error) },
     })
+
+    setContextMenu({ x: e.clientX, y: e.clientY, items })
   }
 
   async function handleSaveEditChannel() {
@@ -278,6 +364,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   const flatIds: string[] = []
   const visibleFlatIds: string[] = []
   byCategory.get(null)?.forEach(ch => {
+    if (hideMuted && channelLevel(ch.id) === 'mute' && !unreadChannels.has(ch.id) && ch.id !== channelId) return
     flatIds.push(`ch:${ch.id}`)
     visibleFlatIds.push(`ch:${ch.id}`)
   })
@@ -285,6 +372,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     flatIds.push(`cat:${cat.id}`)
     visibleFlatIds.push(`cat:${cat.id}`)
     byCategory.get(cat.id)?.forEach(ch => {
+      if (hideMuted && channelLevel(ch.id) === 'mute' && !unreadChannels.has(ch.id) && ch.id !== channelId) return
       flatIds.push(`ch:${ch.id}`)
       if (!collapsedCats.has(cat.id)) visibleFlatIds.push(`ch:${ch.id}`)
     })
@@ -386,7 +474,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {/* Server name header */}
       <div
         className="px-4 font-bold border-b border-sp-divider/50 flex items-center justify-between cursor-pointer hover:bg-sp-hover/60 transition-colors select-none h-12 shrink-0"
-        onMouseDown={handleHeaderClick}
+        onMouseDown={e => { if (e.button === 0) handleHeaderClick(e) }}
+        onContextMenu={handleHeaderContextMenu}
       >
         <span className="truncate">{server?.title ?? 'Server'}</span>
         <Icon name="chevron-down" size={16} className="text-sp-muted shrink-0" />
