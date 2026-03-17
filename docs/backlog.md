@@ -35,6 +35,9 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 | 18 | ✅ **No rate limiting on friend requests, reactions, or DM channel creation** | Security / DoS |
 | 19 | ✅ **Friends/pending list lags** — full user objects (incl. about-me blob) passed into list rows; no virtualisation | Performance |
 | 20 | ✅ **In-memory rate limiter breaks under multiple workers** — each worker gives `N×` the quota | Backend |
+| 53 | ✅ **Category dragging bug** — Cannot move a category with channels under a parentless channel; reordering is finicky. | Bug |
+| 54 | ✅ **Modals constraint to sidebar** — Invite/Create modals function inside the sidebar context instead of being centered viewport overlays. | UX |
+| 65 | ✅ **Control Center Redesign** — Visual "vertical tab" style extending from bottom of sidebar; expands upward for voice controls. | Visual |
 
 ### 🟡 P2 — Medium (noticeable, degrades experience)
 
@@ -61,6 +64,15 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 | 39 | ✅ **`_slowmode_last` dict never pruned** — grows forever in memory | Backend / Memory |
 | 40 | ✅ **Redundant polling on DM conversations** — `refetchInterval` alongside live WS | Performance |
 | 41 | ✅ **Voice presence polls every 10 s** — WS already handles join/leave in real time | Performance |
+| 55 | **Rich Channel Context Menu** — Right-click text channel: Mute, Notification settings, Edit (Admin), Copy ID. | Feature |
+| 56 | **"Edit Channel" Full Page** — Replace edit modal with a full settings page (Text & Voice). | Feature |
+| 57 | **Channel User Limit** — Add `user_limit` to voice channels in the new edit page. | Feature |
+| 58 | **Server Header Context Menu** — Right-click header: Mark read, Mute server, Notification settings, Hide muted, Server Settings, Privacy, Copy ID. | Feature |
+| 59 | **User Context Menu** — Right-click user: Profile, Message, Ignore, Block, Kick (Admin), Copy ID. | Feature |
+| 62 | **Server Icon Context Menu** — Right-click server icon: Leave Server, Mute, etc. | Feature |
+| 63 | **DM Notification / Active Indicators** — DM icon should show unread count; specific user DMs should appear as "tabs" or list items that can be "closed" (hidden until new msg). | UX |
+| 64 | **"Friends" Dashboard Button** — Quick access button above the DM list to open Friends view. | UX |
+| 66 | **Server header / search toggle bug** — Clicking header to close it causes a rapid close/reopen glitch. | Bug |
 
 ### 🟢 P3 — Polish (low urgency, nice to have)
 
@@ -76,6 +88,9 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 | 49 | **`bubbleRefs` Map grows unboundedly** — no cleanup on unmount | Memory |
 | 50 | **Hover state tracked in React state in `MessageBubble`** — use CSS `group-hover` instead | Performance |
 | 51 | **`channel.updated` client handler is dead code** — wired up but never fired (fixed by P1-10) | Cleanup |
+| 52 | **Theme consistency audit** — Search context menu (and potentially others) does not update on theme change. | Visual |
+| 60 | **User Card Avatar Interaction** — Clicking avatar in user card should open full profile. | UX |
+| 61 | **Copy IDs (Dev Mode)** — Add "Copy ID" to all context menus (Server, Channel, User). | Feature |
 
 ---
 

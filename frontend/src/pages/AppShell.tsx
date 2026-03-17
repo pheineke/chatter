@@ -121,17 +121,14 @@ export default function AppShell() {
                 </div>
 
                 {/* Voice + User panel */}
-                <div
-                  className="mx-2 mb-2 mt-1 rounded-sp-lg border border-sp-divider/40 overflow-hidden shrink-0 z-50 bg-sp-user"
-                  style={{ boxShadow: 'var(--m3-shadow-1)' }}
-                >
+                <div className="shrink-0 z-50 bg-sp-user border-t border-sp-divider/20">
                   {voiceSession && (
                     <>
                       <VoiceChannelBar
                         session={voiceSession}
                         onLeave={handleLeaveVoice}
                       />
-                      <div className="border-b border-sp-divider/50 mx-0" />
+                      <div className="border-b border-sp-divider/20 mx-0" />
                     </>
                   )}
                   <UserPanel />

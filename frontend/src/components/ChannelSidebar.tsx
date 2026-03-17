@@ -7,11 +7,13 @@ import { useAuth } from '../contexts/AuthContext'
 import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
 import { useServerWS } from '../hooks/useServerWS'
+import { Portal } from './Portal'
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { updateMe } from '../api/users'
+import { Fragment } from 'react'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
 import { InviteModal } from './InviteModal'
@@ -121,6 +123,12 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   }, [isAdmin]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleHeaderClick(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (contextMenu?.slideDown) {
+      setContextMenu(null)
+      return
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setContextMenu({
       x: rect.left,
@@ -268,6 +276,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   byCategory.forEach((v, k) => byCategory.set(k, [...v].sort((a, b) => a.position - b.position)))
   const flatIds: string[] = []
   const visibleFlatIds: string[] = []
+  byCategory.get(null)?.forEach(ch => {
+    flatIds.push(`ch:${ch.id}`)
+    visibleFlatIds.push(`ch:${ch.id}`)
+  })
   sortedCats.forEach(cat => {
     flatIds.push(`cat:${cat.id}`)
     visibleFlatIds.push(`cat:${cat.id}`)
@@ -275,10 +287,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       flatIds.push(`ch:${ch.id}`)
       if (!collapsedCats.has(cat.id)) visibleFlatIds.push(`ch:${ch.id}`)
     })
-  })
-  byCategory.get(null)?.forEach(ch => {
-    flatIds.push(`ch:${ch.id}`)
-    visibleFlatIds.push(`ch:${ch.id}`)
+    visibleFlatIds.push(`spacer:${cat.id}`) // Add spacer after each category for dropping to Root
   })
 
   function toggleCat(catId: string) {
@@ -298,21 +307,39 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     const activeStr = active.id as string
     const overStr = over.id as string
 
-    if (activeStr.startsWith('cat:') && overStr.startsWith('cat:')) {
-      // Reorder categories: arrayMove on sorted cat IDs
+    if (activeStr.startsWith('cat:')) {
+      // Reorder categories
+      const activeCatId = activeStr.replace('cat:', '')
       const catIds = sortedCats.map(c => c.id)
-      const oldIdx = catIds.indexOf(activeStr.replace('cat:', ''))
-      const newIdx = catIds.indexOf(overStr.replace('cat:', ''))
-      if (oldIdx === -1 || newIdx === -1) return
-      const newCatIds = arrayMove(catIds, oldIdx, newIdx)
-      const catUpdates = newCatIds.map((id, pos) => ({ id, position: pos }))
-      qc.setQueryData<typeof categories>(['categories', serverId], old =>
-        old?.map(c => ({ ...c, position: catUpdates.find(u => u.id === c.id)?.position ?? c.position }))
-          .sort((a, b) => a.position - b.position) ?? []
-      )
-      reorderCategories(serverId, catUpdates).catch(() => {
-        qc.invalidateQueries({ queryKey: ['categories', serverId] })
-      })
+      const oldIdx = catIds.indexOf(activeCatId)
+      let newIdx = -1
+
+      if (overStr.startsWith('cat:')) {
+        newIdx = catIds.indexOf(overStr.replace('cat:', ''))
+      } else if (overStr.startsWith('ch:')) {
+        const targetChId = overStr.replace('ch:', '')
+        const targetCh = channels.find(c => c.id === targetChId)
+        if (targetCh) {
+          if (targetCh.category_id) {
+            newIdx = catIds.indexOf(targetCh.category_id)
+          } else {
+            // Treat root channels as being "before" all categories
+            newIdx = 0
+          }
+        }
+      }
+
+      if (oldIdx !== -1 && newIdx !== -1) {
+        const newCatIds = arrayMove(catIds, oldIdx, newIdx)
+        const catUpdates = newCatIds.map((id, pos) => ({ id, position: pos }))
+        qc.setQueryData<typeof categories>(['categories', serverId], old =>
+          old?.map(c => ({ ...c, position: catUpdates.find(u => u.id === c.id)?.position ?? c.position }))
+            .sort((a, b) => a.position - b.position) ?? []
+        )
+        reorderCategories(serverId, catUpdates).catch(() => {
+          qc.invalidateQueries({ queryKey: ['categories', serverId] })
+        })
+      }
       return
     }
 
@@ -329,7 +356,9 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       for (const id of newFlatIds) {
         if (id.startsWith('cat:')) {
           currentCatId = id.replace('cat:', '')
-        } else {
+        } else if (id.startsWith('spacer:')) {
+          currentCatId = null
+        } else if (id.startsWith('ch:')) {
           const chId = id.replace('ch:', '')
           const pos = catChannelCount.get(currentCatId) ?? 0
           catChannelCount.set(currentCatId, pos + 1)
@@ -353,7 +382,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {/* Server name header */}
       <div
         className="px-4 font-bold border-b border-sp-divider/50 flex items-center justify-between cursor-pointer hover:bg-sp-hover/60 transition-colors select-none h-12 shrink-0"
-        onClick={handleHeaderClick}
+        onMouseDown={handleHeaderClick}
       >
         <span className="truncate">{server?.title ?? 'Server'}</span>
         <Icon name="chevron-down" size={16} className="text-sp-muted shrink-0" />
@@ -372,44 +401,6 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={visibleFlatIds} strategy={verticalListSortingStrategy}>
-              {sortedCats.map(cat => {
-                const catId = `cat:${cat.id}`
-                const collapsed = collapsedCats.has(cat.id)
-                const catChannels = byCategory.get(cat.id) ?? []
-                return (
-                  <div key={cat.id} className="mx-2 mt-2 rounded-lg border border-dashed border-sp-divider/40">
-                    <SortableCatHeader
-                      id={catId}
-                      title={cat.title}
-                      collapsed={collapsed}
-                      onToggle={() => toggleCat(cat.id)}
-                      onContextMenu={e => openCategoryContextMenu(e, cat)}
-                    />
-                    {!collapsed && catChannels.length > 0 && (
-                      <div className="pb-1">
-                        {catChannels.map(ch => (
-                          <SortableChannelItem key={`ch:${ch.id}`} id={`ch:${ch.id}`}>
-                            <ChannelRow
-                              channel={ch}
-                              active={ch.id === channelId}
-                              hasUnread={unreadChannels.has(ch.id)}
-                              serverId={serverId!}
-                              voiceSession={voiceSession}
-                              channelPresence={voicePresence[ch.id] ?? []}
-                              members={members}
-                              localUser={user ?? undefined}
-                              onJoinVoice={onJoinVoice}
-                              onLeaveVoice={onLeaveVoice}
-                              navigate={navigate}
-                              onContextMenu={e => openChannelContextMenu(e, ch)}
-                            />
-                          </SortableChannelItem>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
               {(byCategory.get(null) ?? []).map(ch => (
                 <SortableChannelItem key={`ch:${ch.id}`} id={`ch:${ch.id}`}>
                   <ChannelRow
@@ -428,6 +419,47 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   />
                 </SortableChannelItem>
               ))}
+              {sortedCats.map(cat => {
+                const catId = `cat:${cat.id}`
+                const collapsed = collapsedCats.has(cat.id)
+                const catChannels = byCategory.get(cat.id) ?? []
+                return (
+                  <Fragment key={cat.id}>
+                    <div className="mx-2 mt-2 rounded-lg border border-dashed border-sp-divider/40">
+                      <SortableCatHeader
+                        id={catId}
+                        title={cat.title}
+                        collapsed={collapsed}
+                        onToggle={() => toggleCat(cat.id)}
+                        onContextMenu={e => openCategoryContextMenu(e, cat)}
+                      />
+                      {!collapsed && catChannels.length > 0 && (
+                        <div className="pb-1">
+                          {catChannels.map(ch => (
+                            <SortableChannelItem key={`ch:${ch.id}`} id={`ch:${ch.id}`}>
+                              <ChannelRow
+                                channel={ch}
+                                active={ch.id === channelId}
+                                hasUnread={unreadChannels.has(ch.id)}
+                                serverId={serverId!}
+                                voiceSession={voiceSession}
+                                channelPresence={voicePresence[ch.id] ?? []}
+                                members={members}
+                                localUser={user ?? undefined}
+                                onJoinVoice={onJoinVoice}
+                                onLeaveVoice={onLeaveVoice}
+                                navigate={navigate}
+                                onContextMenu={e => openChannelContextMenu(e, ch)}
+                              />
+                            </SortableChannelItem>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <SortableSpacer id={`spacer:${cat.id}`} />
+                  </Fragment>
+                )
+              })}
             </SortableContext>
             <DragOverlay dropAnimation={null}>
               {dragId && (() => {
@@ -457,6 +489,23 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         ) : (
           /* Non-admin: read-only ordered list */
           <>
+            {(byCategory.get(null) ?? []).map(ch => (
+              <ChannelRow
+                key={ch.id}
+                channel={ch}
+                active={ch.id === channelId}
+                hasUnread={unreadChannels.has(ch.id)}
+                serverId={serverId!}
+                voiceSession={voiceSession}
+                channelPresence={voicePresence[ch.id] ?? []}
+                members={members}
+                localUser={user ?? undefined}
+                onJoinVoice={onJoinVoice}
+                onLeaveVoice={onLeaveVoice}
+                navigate={navigate}
+                onContextMenu={e => openChannelContextMenu(e, ch)}
+              />
+            ))}
             {sortedCats.map(cat => {
               const collapsed = collapsedCats.has(cat.id)
               const catChannels = byCategory.get(cat.id) ?? []
@@ -494,23 +543,6 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                 </div>
               )
             })}
-            {(byCategory.get(null) ?? []).map(ch => (
-              <ChannelRow
-                key={ch.id}
-                channel={ch}
-                active={ch.id === channelId}
-                hasUnread={unreadChannels.has(ch.id)}
-                serverId={serverId!}
-                voiceSession={voiceSession}
-                channelPresence={voicePresence[ch.id] ?? []}
-                members={members}
-                localUser={user ?? undefined}
-                onJoinVoice={onJoinVoice}
-                onLeaveVoice={onLeaveVoice}
-                navigate={navigate}
-                onContextMenu={e => openChannelContextMenu(e, ch)}
-              />
-            ))}
           </>
         )}
       </div>
@@ -520,7 +552,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       {/* User panel Moved to AppShell */}
       {/* Edit category modal */}
       {editCategory && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditCategory(null)}>
+        <Portal>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditCategory(null)}>
           <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Edit Category</h2>
             <label className="text-xs font-semibold uppercase text-sp-muted block mb-1">Category Name</label>
@@ -540,12 +573,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        </Portal>
       )}
 
       {/* Add category modal */}
       {showAddCategory && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAddCategory(false); setCreateError(null) }}>
+        <Portal>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAddCategory(false); setCreateError(null) }}>
           <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Create Category</h2>
             {createError && <div className="mb-2 text-sm text-red-400">{createError}</div>}
@@ -561,12 +596,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               Create Category
             </button>
           </div>
-        </div>
+          </div>
+        </Portal>
       )}
 
       {/* Add channel modal */}
       {showAddChannel && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAddChannel(false); setCreateError(null) }}>
+        <Portal>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAddChannel(false); setCreateError(null) }}>
           <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-4">Add Channel</h2>
             {createError && <div className="mb-2 text-sm text-red-400">{createError}</div>}
@@ -595,7 +632,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               Create Channel
             </button>
           </div>
-        </div>
+          </div>
+        </Portal>
       )}
 
       {/* Context menu */}
@@ -612,15 +650,18 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
       {/* Invite modal */}
       {inviteModalOpen && serverId && (
-        <InviteModal
+        <Portal>
+          <InviteModal
           serverId={serverId}
           serverName={server?.title ?? 'Server'}
           onClose={() => setInviteModalOpen(false)}
         />
+        </Portal>
       )}
       {/* Delete confirmation modal */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setConfirmDelete(null)}>
+        <Portal>
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setConfirmDelete(null)}>
           <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-96 shadow-sp-3" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-bold mb-2">
               Delete {confirmDelete.kind === 'channel' ? 'Channel' : 'Category'}
@@ -667,12 +708,14 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        </Portal>
       )}
 
       {/* Edit channel modal */}
       {editChannel && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditChannel(null)}>
+        <Portal>
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditChannel(null)}>
           <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl w-[560px] max-h-[90vh] flex flex-col overflow-hidden shadow-sp-3" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 pt-6 pb-0 shrink-0">
@@ -764,7 +807,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               </div>
             )}
           </div>
-        </div>
+          </div>
+        </Portal>
       )}
     </div>
   )
@@ -1104,6 +1148,17 @@ function SortableCatHeader({ id, title, collapsed, onToggle, onContextMenu }: { 
         <Icon name="menu" size={11} />
       </span>
     </div>
+  )
+}
+
+function SortableSpacer({ id }: { id: string }) {
+  const { setNodeRef, isOver } = useSortable({ id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`mx-2 rounded transition-all ${isOver ? 'h-8 bg-sp-mention/20 my-1' : 'h-2 -my-1 bg-transparent hover:h-4 hover:bg-sp-hover/10'}`}
+    />
   )
 }
 
