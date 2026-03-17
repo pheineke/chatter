@@ -180,9 +180,16 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
       {/* Avatar / timestamp column */}
       <div className="w-10 shrink-0 flex justify-center select-none">
         {compact ? (
-          <span className="text-[10px] text-sp-muted opacity-0 group-hover:opacity-100 mt-1 leading-tight select-none">
-            {format(new Date(msg.created_at), 'HH:mm')}
-          </span>
+          <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity select-none gap-0.5">
+            <span className="text-[10px] text-sp-muted leading-tight">
+              {format(new Date(msg.created_at), 'HH:mm')}
+            </span>
+            {msg.is_encrypted && decryptedContent && (
+              <span className="text-sp-muted" title="End-to-End Encrypted">
+                <Icon name="lock" size={10} />
+              </span>
+            )}
+          </div>
         ) : (
           <button className="cursor-pointer" onClick={handleUserClick} aria-label={`Open ${msg.author.username} profile`}>
             <UserAvatar user={msg.author} size={40} className="mt-0.5" />
@@ -225,6 +232,12 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
               {msg.author_nickname ?? msg.author.username}
             </span>
             <span className="text-xs text-sp-muted">{formatTime(msg.created_at)}</span>
+            {msg.is_encrypted && decryptedContent && (
+              <span className="text-[10px] text-sp-online/80 font-medium select-none flex items-center gap-0.5" title="End-to-End Encrypted">
+                <Icon name="lock" size={10} />
+                E2EE
+              </span>
+            )}
           </div>
         )}
 
@@ -265,12 +278,6 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
         )}
         {msg.is_edited && (
           <span className="text-[11px] text-sp-muted ml-1 select-none" title={msg.edited_at ? `Edited ${formatTime(msg.edited_at)}` : 'Edited'}>(edited)</span>
-        )}
-        {msg.is_encrypted && decryptedContent && (
-          <span className="text-[10px] text-sp-online/60 ml-1 select-none flex items-center gap-0.5 inline-flex">
-            <Icon name="lock" size={9} />
-            E2EE
-          </span>
         )}
 
         {/* URL / image embeds */}

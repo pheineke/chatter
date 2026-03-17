@@ -29,8 +29,8 @@ function DMTab({ active, hasUnread, onClick, onContextMenu }: { active: boolean;
         style={{
           width: containerWidth,
           marginLeft: 'auto',
-          borderRadius: '6px 0px 0px 6px',
-          transition: 'width 120ms ease-out',
+          borderRadius: active ? '12px 0px 0px 12px' : '8px 0px 0px 8px',
+          transition: 'width 120ms ease-out, border-radius 120ms ease-out',
         }}
       >
         <button
@@ -46,10 +46,10 @@ function DMTab({ active, hasUnread, onClick, onContextMenu }: { active: boolean;
           }}
           className={`absolute inset-0 w-full h-full flex items-center justify-center select-none
             ${active
-              ? 'bg-sp-primary/20 text-sp-mention'
+              ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
-                ? 'bg-sp-primary/15 text-sp-mention'
-                : 'bg-sp-surface-variant/80 text-sp-muted'}`}
+                ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
+                : 'bg-sp-surface-variant/80 text-sp-muted rounded-l-lg'}`}
         >
           <Icon name="message-circle" size={24} />
         </button>
@@ -88,8 +88,8 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
         style={{
           width: containerWidth,
           marginLeft: 'auto',
-          borderRadius: '6px 0px 0px 6px',
-          transition: 'width 120ms ease-out',
+          borderRadius: active ? '12px 0px 0px 12px' : '8px 0px 0px 8px',
+          transition: 'width 120ms ease-out, border-radius 120ms ease-out',
         }}
       >
         <button
@@ -108,10 +108,10 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
           }}
           className={`absolute inset-0 w-full h-full flex items-center justify-center text-sm font-bold select-none relative
             ${active
-              ? 'bg-sp-primary/20 text-sp-on-primary'
+              ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
-                ? 'bg-sp-primary/15 text-sp-primary'
-                : 'bg-sp-surface-variant/80 text-sp-on-surface'}`}
+                ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
+                : 'bg-sp-surface-variant/80 text-sp-on-surface rounded-l-lg'}`}
         >
           {server.image ? (
             <>
@@ -119,9 +119,8 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
                 src={`/api/static/${server.image}`}
                 alt={server.title}
                 className="absolute inset-0 w-full h-full object-cover"
-                style={{ opacity: active ? 0.7 : hovered ? 0.6 : 1, transition: 'opacity 150ms ease-out' }}
+                style={{ opacity: (!active && hovered) ? 0.8 : 1, transition: 'opacity 150ms ease-out' }}
               />
-              {active && <div className="absolute inset-0 bg-sp-primary/20 pointer-events-none" />}
             </>
           ) : (
             initials

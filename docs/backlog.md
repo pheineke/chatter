@@ -66,9 +66,9 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 
 | # | Issue | Area |
 |---|-------|------|
-| 42 | **Status icon cutout mask drifts at non-100% zoom** — use top-left anchor or SVG clip | Visual |
-| 43 | **Server tab active state: border instead of background tint** | Visual |
-| 44 | **E2EE tag placement** — move to timestamp area; lock icon only on follow-up messages | Visual |
+| 42 | ✅ **Status icon cutout mask drifts at non-100% zoom** — use top-left anchor or SVG clip | Visual |
+| 43 | ✅ **Server tab active state: border instead of background tint** | Visual |
+| 44 | ✅ **E2EE tag placement** — move to timestamp area; lock icon only on follow-up messages | Visual |
 | 45 | **DM list items: clicking selects text instead of just the row** — add `select-none` | UX |
 | 46 | **Escape / Close settings button is unintuitive** | UX |
 | 47 | **"Friend request sent!" never auto-clears** | UX |
