@@ -101,6 +101,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     | null
   >(null)
   const [dragId, setDragId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
@@ -303,6 +304,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setDragId(null)
+    setDragOverId(null)
     if (!over || active.id === over.id || !serverId) return
     const activeStr = active.id as string
     const overStr = over.id as string
@@ -353,11 +355,13 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       let currentCatId: string | null = null
       const catChannelCount = new Map<string | null, number>()
       const chanUpdates: { id: string; position: number; category_id: string | null }[] = []
+      // Re-scan layout
       for (const id of newFlatIds) {
         if (id.startsWith('cat:')) {
           currentCatId = id.replace('cat:', '')
         } else if (id.startsWith('spacer:')) {
-          currentCatId = null
+            // Spacer forces next items to be root until new category
+            currentCatId = null
         } else if (id.startsWith('ch:')) {
           const chId = id.replace('ch:', '')
           const pos = catChannelCount.get(currentCatId) ?? 0
@@ -398,6 +402,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragStart={e => setDragId(e.active.id as string)}
+            onDragOver={e => setDragOverId(e.over?.id as string ?? null)}
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={visibleFlatIds} strategy={verticalListSortingStrategy}>
@@ -423,9 +428,17 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                 const catId = `cat:${cat.id}`
                 const collapsed = collapsedCats.has(cat.id)
                 const catChannels = byCategory.get(cat.id) ?? []
+                
+                // Determine if we should visually expand the category container
+                let expandContainer = false
+                if (dragId && dragId.startsWith('ch:') && dragOverId) {
+                   const isOverThisCat = dragOverId === catId || catChannels.some(c => `ch:${c.id}` === dragOverId)
+                   if (isOverThisCat) expandContainer = true
+                }
+
                 return (
                   <Fragment key={cat.id}>
-                    <div className="mx-2 mt-2 rounded-lg border border-dashed border-sp-divider/40">
+                    <div className={`mx-2 mt-2 rounded-lg border border-dashed border-sp-divider/40 transition-all duration-200 ${expandContainer ? 'pb-8 border-sp-menutext/50 bg-sp-text/5' : ''}`}>
                       <SortableCatHeader
                         id={catId}
                         title={cat.title}
@@ -433,29 +446,33 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                         onToggle={() => toggleCat(cat.id)}
                         onContextMenu={e => openCategoryContextMenu(e, cat)}
                       />
-                      {!collapsed && catChannels.length > 0 && (
-                        <div className="pb-1">
+                      {(!collapsed || expandContainer) && catChannels.length > 0 && (
+                        <div className={`transition-all duration-200 ${collapsed ? 'opacity-50' : 'pb-1'}`}>
                           {catChannels.map(ch => (
                             <SortableChannelItem key={`ch:${ch.id}`} id={`ch:${ch.id}`}>
-                              <ChannelRow
-                                channel={ch}
-                                active={ch.id === channelId}
-                                hasUnread={unreadChannels.has(ch.id)}
-                                serverId={serverId!}
-                                voiceSession={voiceSession}
-                                channelPresence={voicePresence[ch.id] ?? []}
-                                members={members}
-                                localUser={user ?? undefined}
-                                onJoinVoice={onJoinVoice}
-                                onLeaveVoice={onLeaveVoice}
-                                navigate={navigate}
-                                onContextMenu={e => openChannelContextMenu(e, ch)}
-                              />
+                              {/* If collapsed but expanding for drag, hide non-targets? No, we show them so we can drop between them */}
+                              <div className={collapsed && !expandContainer ? 'hidden' : ''}>
+                                <ChannelRow
+                                  channel={ch}
+                                  active={ch.id === channelId}
+                                  hasUnread={unreadChannels.has(ch.id)}
+                                  serverId={serverId!}
+                                  voiceSession={voiceSession}
+                                  channelPresence={voicePresence[ch.id] ?? []}
+                                  members={members}
+                                  localUser={user ?? undefined}
+                                  onJoinVoice={onJoinVoice}
+                                  onLeaveVoice={onLeaveVoice}
+                                  navigate={navigate}
+                                  onContextMenu={e => openChannelContextMenu(e, ch)}
+                                />
+                              </div>
                             </SortableChannelItem>
                           ))}
                         </div>
                       )}
                     </div>
+                    {/* Add spacer only if NOT expanded to avoid double gap if dragging internally? No, always needed for root drop */}
                     <SortableSpacer id={`spacer:${cat.id}`} />
                   </Fragment>
                 )
