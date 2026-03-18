@@ -128,6 +128,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     if (!server) return
     e.preventDefault()
     e.stopPropagation()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const items: ContextMenuItem[] = []
 
     // Mark as Read
@@ -179,7 +180,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       onClick: () => navigator.clipboard.writeText(server.id).catch(console.error),
     })
 
-    setContextMenu({ x: e.clientX, y: e.clientY, items })
+    setContextMenu({ x: rect.left, y: rect.bottom, slideDown: true, width: rect.width, items })
   }
 
   function handleHeaderClick(e: React.MouseEvent) {
@@ -189,17 +190,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
       setContextMenu(null)
       return
     }
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setContextMenu({
-      x: rect.left,
-      y: rect.bottom,
-      slideDown: true,
-      width: rect.width,
-      items: [
-        { label: 'Server Settings', icon: 'settings', onClick: () => navigate(`/channels/${serverId}/settings`) },
-        { label: 'Invite to Server', icon: 'person-add', onClick: handleCreateInvite },
-      ],
-    })
+    // We reuse the full context menu logic for the click as well
+    handleHeaderContextMenu(e)
   }
 
   function handleCreateInvite() {
