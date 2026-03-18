@@ -55,6 +55,8 @@ class ServerMember(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     nickname: Mapped[str | None] = mapped_column(String(32), nullable=True)  # per-server display name
+    # Privacy Override: None = use global default; True = Allow; False = Block
+    allow_dms: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     server: Mapped["Server"] = relationship("Server", back_populates="members")
     user: Mapped["User"] = relationship("User", back_populates="server_memberships")

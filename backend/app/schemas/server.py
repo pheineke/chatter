@@ -78,6 +78,7 @@ class MemberRead(BaseModel):
     user: UserPublicRead
     joined_at: datetime
     nickname: str | None = None
+    allow_dms: bool | None = None
     roles: list[RoleRead] = []
 
 
@@ -93,6 +94,10 @@ class MemberNickUpdate(BaseModel):
         if len(cleaned) > 32:
             raise ValueError('Nickname cannot exceed 32 characters')
         return cleaned or None
+
+
+class MemberSettingsUpdate(BaseModel):
+    allow_dms: bool | None = None
 
 
 # ---- Word Filters -----------------------------------------------------------

@@ -45,7 +45,7 @@ function formatFileSize(bytes: number): string {
 
 export const MessageBubble = memo(function MessageBubble({ message: msg, channelId, partnerId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
   const { user } = useAuth()
-  const { blockedIds } = useBlocks()
+  const { blockedIds, block, unblock } = useBlocks()
   const qc = useQueryClient()
   const e2ee = useE2EE()
   const isOwn = user?.id === msg.author.id
@@ -58,6 +58,7 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
   const [cardPos, setCardPos] = useState<{ x: number; y: number } | null>(null)
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [userContextMenu, setUserContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   // E2EE: decrypt the message content if it was sent encrypted
@@ -178,7 +179,16 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
       onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY }) }}
     >
       {/* Avatar / timestamp column */}
-      <div className="w-10 shrink-0 flex justify-center select-none">
+      <div 
+        className="w-10 shrink-0 flex justify-center select-none"
+        onContextMenu={(e) => {
+           if (!compact) {
+             e.preventDefault()
+             e.stopPropagation()
+             setUserContextMenu({ x: e.clientX, y: e.clientY })
+           }
+        }}
+      >
         {compact ? (
           <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity select-none gap-0.5">
             <span className="text-[10px] text-sp-muted leading-tight">
@@ -191,7 +201,16 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
             )}
           </div>
         ) : (
-          <button className="cursor-pointer" onClick={handleUserClick} aria-label={`Open ${msg.author.username} profile`}>
+          <button 
+            className="cursor-pointer" 
+            onClick={handleUserClick}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setUserContextMenu({ x: e.clientX, y: e.clientY })
+            }}
+            aria-label={`Open ${msg.author.username} profile`}
+          >
             <UserAvatar user={msg.author} size={40} className="mt-0.5" />
           </button>
         )}
@@ -228,6 +247,11 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
             <span 
               className="font-semibold text-sp-text hover:underline cursor-pointer"
               onClick={handleUserClick}
+              onContextMenu={(e) => {
+                 e.preventDefault()
+                 e.stopPropagation()
+                 setUserContextMenu({ x: e.clientX, y: e.clientY })
+              }}
             >
               {msg.author_nickname ?? msg.author.username}
             </span>
@@ -441,6 +465,39 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
             },
           ] : []),
         ]}
+      />
+    )}
+    {userContextMenu && (
+      <ContextMenu
+        x={userContextMenu.x}
+        y={userContextMenu.y}
+        onClose={() => setUserContextMenu(null)}
+        items={[
+           {
+             label: 'Profile',
+             icon: 'user',
+             onClick: () => {
+               setCardPos({ x: userContextMenu.x, y: userContextMenu.y })
+             }
+           },
+           { separator: true },
+           {
+             label: 'Copy User ID',
+             icon: 'copy',
+             onClick: () => navigator.clipboard.writeText(msg.author.id)
+           },
+           { separator: true },
+           (!isOwn) ? {
+              label: blockedIds.has(msg.author.id) ? 'Unblock' : 'Block',
+              icon: 'slash',
+              danger: true,
+              onClick: () => {
+                if (blockedIds.has(msg.author.id)) unblock(msg.author.id)
+                else block(msg.author.id)
+                setUserContextMenu(null)
+              }
+           } : null
+        ].filter(Boolean) as any}
       />
     )}
   </>

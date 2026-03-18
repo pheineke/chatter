@@ -74,6 +74,14 @@ export async function updateMemberNick(serverId: string, userId: string, nicknam
   await client.patch(`/servers/${serverId}/members/${userId}/nick`, { nickname })
 }
 
+export async function updateMySettings(
+  serverId: string,
+  allowDms: boolean | null
+): Promise<Member> {
+  const { data } = await client.patch<Member>(`/servers/${serverId}/members/me/settings`, { allow_dms: allowDms })
+  return data
+}
+
 export async function uploadServerIcon(serverId: string, file: File): Promise<Server> {
   const form = new FormData()
   form.append('file', file)

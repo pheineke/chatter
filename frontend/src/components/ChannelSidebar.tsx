@@ -2,7 +2,7 @@ import { useNavigate, useParams, useMatch } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory, updateCategory, deleteCategory } from '../api/channels'
-import { getMembers, getServer } from '../api/servers'
+import { getMembers, getServer, updateMySettings } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
 import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
@@ -66,6 +66,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     queryFn: () => getMembers(serverId!),
     enabled: !!serverId,
   })
+
+  const me = members?.find(m => m.user.id === user?.id)
 
   // Derive admin status: owner, or member with an is_admin role
   const isAdmin =
@@ -156,10 +158,22 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     })
 
     // Privacy Settings
+    // Logic: allow_dms overrides global setting.
+    // If not set (null), falls back to global (user.dm_permission).
+    const globalAllow = user?.dm_permission !== 'friends_only'
+    const isAllowed = me?.allow_dms === true || (me?.allow_dms === null && globalAllow)
+
     items.push({
-      label: 'Privacy Settings',
-      icon: 'lock',
-      onClick: () => alert('Privacy Settings: TODO'), 
+      label: 'Allow Direct Messages',
+      icon: isAllowed ? 'checkmark-square' : 'square',
+      onClick: () => {
+        const nextState = !isAllowed
+        // If next state matches global default, set to null to inherit
+        const payload = (nextState === globalAllow) ? null : nextState
+        updateMySettings(server.id, payload).then(() => {
+          qc.invalidateQueries({ queryKey: ['members', serverId] })
+        })
+      },
     })
 
     items.push({ separator: true })

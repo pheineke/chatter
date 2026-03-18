@@ -3,12 +3,14 @@ import { useNavigate, useMatch } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import type { MouseEvent } from 'react'
 import { getConversations, markDMRead } from '../api/dms'
+import { getBlocks, blockUser, unblockUser } from '../api/blocks'
 import { updateMe } from '../api/users'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotificationSettings } from '../hooks/useNotificationSettings'
 import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
+import { ProfileCard } from './ProfileCard'
 import type { ContextMenuItem } from './ContextMenu'
 import type { DMConversation } from '../api/types'
 import { cacheConversations, getCachedConversations } from '../db/dmCache'
@@ -22,9 +24,15 @@ export function DMSidebar() {
   const match = useMatch('/channels/@me/:dmUserId')
   const activeDmUserId = match?.params.dmUserId ?? null
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [activeProfile, setActiveProfile] = useState<{ userId: string; position: { x: number; y: number } } | null>(null)
   const { channelLevel, setChannelLevel } = useNotificationSettings()
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [cachedConversations, setCachedConversations] = useState<DMConversation[]>([])
+
+  const { data: blocks = [] } = useQuery({
+    queryKey: ['blocks'],
+    queryFn: getBlocks,
+  })
 
   const markReadMut = useMutation({
     mutationFn: ({ channelId, lastReadAt }: { channelId: string; lastReadAt?: string }) =>
@@ -128,6 +136,16 @@ export function DMSidebar() {
               x: e.clientX,
               y: e.clientY,
               items: [
+                {
+                  label: 'Profile',
+                  icon: 'user',
+                  onClick: () => {
+                    setActiveProfile({
+                      userId: conv.other_user.id,
+                      position: { x: e.clientX, y: e.clientY }
+                    })
+                  }
+                },
                 ...(hasUnread ? [{
                   label: 'Mark as Read',
                   icon: 'check-circle' as const,
@@ -143,6 +161,24 @@ export function DMSidebar() {
                   icon: isMuted ? 'bell' : 'bell-off',
                   onClick: () => setChannelLevel(conv.channel_id, isMuted ? 'all' : 'mute'),
                 },
+                { separator: true },
+                {
+                  label: 'Copy ID',
+                  icon: 'copy',
+                  onClick: () => navigator.clipboard.writeText(conv.other_user.id),
+                },
+                { separator: true },
+                {
+                   label: blocks.some(b => b.id === conv.other_user.id) ? 'Unblock' : 'Block',
+                   icon: 'slash',
+                   danger: true,
+                   onClick: async () => {
+                      const isBlocked = blocks.some(b => b.id === conv.other_user.id)
+                      if (isBlocked) await unblockUser(conv.other_user.id)
+                      else await blockUser(conv.other_user.id)
+                      qc.invalidateQueries({ queryKey: ['blocks'] })
+                   }
+                }
               ],
             })
           }
@@ -186,6 +222,14 @@ export function DMSidebar() {
           y={contextMenu.y}
           items={contextMenu.items}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+      
+      {activeProfile && (
+        <ProfileCard
+          userId={activeProfile.userId}
+          position={activeProfile.position}
+          onClose={() => setActiveProfile(null)}
         />
       )}
     </div>

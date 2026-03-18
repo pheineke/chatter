@@ -51,6 +51,7 @@ export interface Member {
   server_id: string
   joined_at: string
   nickname: string | null
+  allow_dms: boolean | null
   user: User
   roles: Role[]
 }

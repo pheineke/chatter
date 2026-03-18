@@ -59,7 +59,45 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   const { blockedIds, block, unblock, isPending: blockPending } = useBlocks()
   const isBlocked = blockedIds.has(userId)
 
-  const { data: user } = useQuery({ queryKey: ['user', userId], queryFn: () => getUser(userId) })
+  const { data: user } = useQuery({ 
+    queryKey: ['user', userId], 
+    queryFn: () => getUser(userId) 
+  })
+
+  // Close the card when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+          // If a modal or menu is open on top, don't close.
+          // This is tricky.
+          onClose() 
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [onClose])
+  
+  if (!user) return null
+
+  // Adjust position to stay in viewport
+  // Simple clamping for now or just absolute positioning
+  // Ideally use floating-ui but that's a dependency. We'll simulate.
+  const style: React.CSSProperties = {
+     position: 'fixed' as const,
+     left: Math.min(window.innerWidth - 320, Math.max(10, position.x)),
+     top: Math.min(window.innerHeight - 400, Math.max(10, position.y)),
+     zIndex: 100,
+  }
+
+  async function handleMessage(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user || !msg.trim()) return
+    const { channel_id } = await getDMChannel(user.id)
+    await sendMessage(channel_id, msg.trim())
+    setMsg('')
+    onClose()
+    navigate(`/channels/@me/${user.id}`)
+  }
 
   const { data: myServers } = useQuery({
     queryKey: ['myServers'],
@@ -78,42 +116,14 @@ export function ProfileCard({ userId, onClose, position }: Props) {
     } catch { /* ignore */ }
   }
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [onClose])
-
-  // Adjust position to stay in viewport
-  // Simple clamping for now or just absolute positioning
-  // Ideally use floating-ui but that's a dependency. We'll simulate.
-  const style: React.CSSProperties = {
-     position: 'fixed',
-     left: Math.min(window.innerWidth - 320, Math.max(10, position.x)),
-     top: Math.min(window.innerHeight - 400, Math.max(10, position.y)),
-     zIndex: 100,
-  }
-
-  async function handleMessage(e: React.FormEvent) {
-    e.preventDefault()
-    if (!user || !msg.trim()) return
-    const { channel_id } = await getDMChannel(user.id)
-    await sendMessage(channel_id, msg.trim())
-    setMsg('')
-    onClose()
-    navigate(`/channels/@me/${user.id}`)
-  }
-
-  if (!user) return null
+  if (!user && !isSelf) return null // If no user loaded yet
 
   return (
-    <div ref={ref} style={{ ...style, boxShadow: 'var(--m3-shadow-4)' }} className="group/card w-80 bg-sp-popup border border-sp-divider/60 rounded-m3-lg overflow-hidden flex flex-col text-sp-text animate-fade-in-up">
+    <div ref={ref} style={{ ...style, boxShadow: 'var(--m3-shadow-4)' }} className="group/card w-80 bg-sp-popup border border-sp-divider/60 rounded-m3-lg overflow-visible flex flex-col text-sp-text animate-fade-in-up">
        {/* Banner */}
        <div 
-         className="h-24 bg-sp-mention relative"
-         style={{ backgroundColor: user.banner ? undefined : '#3F51B5', backgroundImage: user.banner ? `url(/api/static/${user.banner})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}
+         className="h-24 bg-sp-mention relative rounded-t-m3-lg"
+         style={{ backgroundColor: user?.banner ? undefined : '#3F51B5', backgroundImage: user?.banner ? `url(/api/static/${user.banner})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}
        >
          {/* More options button */}
          <div className="absolute top-2 right-2" ref={menuRef}>

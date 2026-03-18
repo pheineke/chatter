@@ -19,6 +19,7 @@ from app.schemas.server import (
     RoleRead,
     MemberRead,
     MemberNickUpdate,
+    MemberSettingsUpdate,
     WordFilterCreate,
     WordFilterRead,
     ServerBanRead,
@@ -293,6 +294,37 @@ async def update_member_nick(
         joined_at=member.joined_at,
         roles=[],
     )
+
+@router.patch("/{server_id}/members/me/settings", response_model=MemberRead)
+async def update_my_settings(
+    server_id: uuid.UUID, body: MemberSettingsUpdate, current_user: CurrentUser, db: DB
+):
+    """Update current user's settings for this server."""
+    result = await db.execute(
+        select(ServerMember)
+        .options(selectinload(ServerMember.user))
+        .where(ServerMember.server_id == server_id, ServerMember.user_id == current_user.id)
+    )
+    member = result.scalar_one_or_none()
+    
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+            
+    if body.allow_dms is not None:
+        member.allow_dms = body.allow_dms
+
+    await db.commit()
+    
+    return MemberRead(
+        user_id=member.user_id,
+        server_id=member.server_id,
+        nickname=member.nickname,
+        user=UserPublicRead.model_validate(member.user),
+        joined_at=member.joined_at,
+        allow_dms=member.allow_dms,
+        roles=[],
+    )
+
 
 # ---- Roles ------------------------------------------------------------------
 

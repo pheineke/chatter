@@ -153,6 +153,19 @@ async def mark_dm_read(
     return DMReadStateRead(**payload)
 
 
+async def _check_if_friends(db: DB, user_a_id: uuid.UUID, user_b_id: uuid.UUID) -> bool:
+    result = await db.execute(
+        select(FriendRequest).where(
+            FriendRequest.status == FriendRequestStatus.accepted,
+            or_(
+                and_(FriendRequest.sender_id == user_a_id, FriendRequest.recipient_id == user_b_id),
+                and_(FriendRequest.sender_id == user_b_id, FriendRequest.recipient_id == user_a_id),
+            ),
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
 @router.get("/{user_id}/channel")
 async def get_or_create_dm_channel(
     user_id: uuid.UUID,
@@ -183,61 +196,67 @@ async def get_or_create_dm_channel(
         raise HTTPException(status_code=403, detail="You cannot send a direct message to this user")
 
     # Enforce the target user's DM permission
-    if target_user.dm_permission != DMPermission.everyone:
+    # Rule 1: Friends are always allowed.
+    are_friends = await _check_if_friends(db, user_id, current_user.id)
+    if are_friends:
+        # Pass - friends bypass everything
+        pass
+    else:
+        # Rule 2: Check shared servers and per-server privacy overrides
+        # Get all shared servers
+        shared_query = select(ServerMember).where(
+            ServerMember.user_id == user_id,
+            ServerMember.server_id.in_(
+                select(ServerMember.server_id).where(ServerMember.user_id == current_user.id)
+            )
+        )
+        shared_memberships = (await db.execute(shared_query)).scalars().all()
+        
+        # If no shared servers, check global permission only
+        if not shared_memberships:
+             if target_user.dm_permission != DMPermission.everyone:
+                 raise HTTPException(status_code=403, detail="You do not share any servers with this user")
+        
+        # If shared servers exist, we must check if AT LEAST ONE "path" allows DMs.
+        # A path exists if:
+        # 1. The server membership has allow_dms=True
+        # 2. OR (allow_dms is None AND global_permission != blocked)
+        
+        can_dm = False
+
         if target_user.dm_permission == DMPermission.friends_only:
-            fr_result = await db.execute(
-                select(FriendRequest).where(
-                    FriendRequest.status == FriendRequestStatus.accepted,
-                    or_(
-                        and_(
-                            FriendRequest.sender_id == current_user.id,
-                            FriendRequest.recipient_id == user_id,
-                        ),
-                        and_(
-                            FriendRequest.sender_id == user_id,
-                            FriendRequest.recipient_id == current_user.id,
-                        ),
-                    ),
-                )
-            )
-            if not fr_result.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=403,
-                    detail="This user only accepts direct messages from friends",
-                )
-        elif target_user.dm_permission == DMPermission.server_members_only:
-            # Friends are always allowed regardless of shared-server restriction.
-            fr_result = await db.execute(
-                select(FriendRequest).where(
-                    FriendRequest.status == FriendRequestStatus.accepted,
-                    or_(
-                        and_(
-                            FriendRequest.sender_id == current_user.id,
-                            FriendRequest.recipient_id == user_id,
-                        ),
-                        and_(
-                            FriendRequest.sender_id == user_id,
-                            FriendRequest.recipient_id == current_user.id,
-                        ),
-                    ),
-                ).limit(1)
-            )
-            if fr_result.scalar_one_or_none():
-                pass
-            else:
-                shared_result = await db.execute(
-                    select(ServerMember).where(
-                        ServerMember.user_id == current_user.id,
-                        ServerMember.server_id.in_(
-                            select(ServerMember.server_id).where(ServerMember.user_id == user_id)
-                        ),
-                    ).limit(1)
-                )
-                if not shared_result.scalar_one_or_none():
-                    raise HTTPException(
-                        status_code=403,
-                        detail="This user only accepts direct messages from friends or people in shared servers",
-                    )
+             # If strictly friends-only and we aren't friends (checked above), blocked.
+             # Unless there is a specific server override allowing it? 
+             # Discord logic: "Allow DMs from server members" is the toggle.
+             # If global is "Friends Only", server override ON allows DMs from that server's members.
+             pass 
+        
+        # Simpler Logic: 
+        # Iterate shared servers. 
+        # If ANY shared server has allow_dms=True -> Allow
+        # If ALL shared servers have allow_dms=False -> Block
+        # If mix of None/False -> Fallback to global setting
+
+        # Logic Matrix for a single shared server:
+        # Override | Global         | Result
+        # True     | *              | Allow
+        # False    | *              | Block (for this server path)
+        # None     | Everyone       | Allow
+        # None     | Server Members | Allow
+        # None     | Friends Only   | Block (since we passed friend check)
+
+        for mem in shared_memberships:
+            if mem.allow_dms is True:
+                can_dm = True
+                break
+            if mem.allow_dms is None:
+                # Fallback to global
+                if target_user.dm_permission in [DMPermission.everyone, DMPermission.server_members_only]:
+                    can_dm = True
+                    break
+        
+        if not can_dm:
+             raise HTTPException(status_code=403, detail="This user's privacy settings prevent you from sending a message.")
 
     # Normalise pair so (a,b) and (b,a) always map to the same row
     a, b = sorted([current_user.id, user_id])
