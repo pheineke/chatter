@@ -72,6 +72,24 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
         row.channel_id: row.last_read_at for row in read_rows_result.scalars().all()
     }
 
+    # Count unread messages per channel: count(*) where created_at > last_read_at
+    unread_counts_result = await db.execute(
+        select(Message.channel_id, func.count(Message.id).label("cnt"))
+        .join(DMReadState, and_(
+            DMReadState.channel_id == Message.channel_id,
+            DMReadState.user_id == current_user.id
+        ), isouter=True)
+        .where(
+            Message.channel_id.in_(channel_ids),
+            Message.is_deleted == False,
+            Message.created_at > func.coalesce(DMReadState.last_read_at, datetime.min)
+        )
+        .group_by(Message.channel_id)
+    )
+    unread_map: dict[uuid.UUID, int] = {
+        row.channel_id: row.cnt for row in unread_counts_result.all()
+    }
+
     convs: list[DMConversationRead] = []
     for ch in channels:
         other = ch.user_b if ch.user_a_id == current_user.id else ch.user_a
@@ -81,6 +99,7 @@ async def list_dm_conversations(current_user: CurrentUser, db: DB):
             other_user=UserPublicRead.model_validate(other),
             last_message_at=last_msg.created_at if last_msg else None,
             last_read_at=read_map.get(ch.channel_id),
+            unread_count=unread_map.get(ch.channel_id, 0),
         ))
 
     convs.sort(

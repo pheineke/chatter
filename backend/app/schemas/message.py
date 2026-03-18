@@ -119,6 +119,7 @@ class DMConversationRead(BaseModel):
     other_user: UserPublicRead
     last_message_at: datetime | None = None
     last_read_at: datetime | None = None
+    unread_count: int = 0
 
 
 class DMReadStateRead(BaseModel):
