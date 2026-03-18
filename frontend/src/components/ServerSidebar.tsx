@@ -1,5 +1,5 @@
-import { markDMRead } from '../api/dms'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { markDMRead, getConversations } from '../api/dms'
+import { useNavigate, useParams, useLocation, useMatch } from 'react-router-dom'
 import { getLastChannel } from '../utils/lastChannel'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -8,12 +8,12 @@ import { joinViaInvite } from '../api/invites'
 import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
 import { InviteModal } from './InviteModal'
-import type { Server } from '../api/types'
+import type { Server, DMConversation } from '../api/types'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'
 import { useNotificationSettings } from '../hooks/useNotificationSettings'
 import { useAuth } from '../contexts/AuthContext'
 
-function DMTab({ active, hasUnread, onClick, onContextMenu }: { active: boolean; hasUnread: boolean; onClick: () => void; onContextMenu: (e: React.MouseEvent) => void }) {
+function DMTab({ active, unreadCount = 0, onClick, onContextMenu }: { active: boolean; unreadCount?: number; onClick: () => void; onContextMenu: (e: React.MouseEvent) => void }) {
   const [hovered, setHovered] = useState(false)
   const [pressing, setPressing] = useState(false)
 
@@ -55,9 +55,7 @@ function DMTab({ active, hasUnread, onClick, onContextMenu }: { active: boolean;
           <Icon name="message-circle" size={24} />
         </button>
       </div>
-      {hasUnread && !active && (
-        <span className="absolute bottom-1 right-0.5 w-2.5 h-2.5 rounded-full bg-sp-online border-2 border-sp-servers pointer-events-none" />
-      )}
+      {/* Unread badge removed as requested — individual DMs now show as separate tabs */}
     </div>
   )
 }
@@ -141,12 +139,74 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
   )
 }
 
+
+function UnreadDMItem({ conversation, onContextMenu }: { conversation: DMConversation; onContextMenu: (e: React.MouseEvent) => void }) {
+  const navigate = useNavigate()
+  const [hovered, setHovered] = useState(false)
+  const [pressing, setPressing] = useState(false)
+  
+  const user = conversation.other_user
+  const initials = user.username.slice(0, 2).toUpperCase()
+  const count = conversation.unread_count || 0
+
+  return (
+    <div
+      className="relative w-full py-0.5"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setPressing(false) }}
+    >
+      <div
+        className="h-12 overflow-hidden relative"
+        style={{
+          width: '52px',
+          marginLeft: 'auto',
+          borderRadius: '8px 0px 0px 8px',
+          transition: 'width 120ms ease-out, border-radius 120ms ease-out',
+        }}
+      >
+        <button
+          title={`${user.username} (${count} unread)`}
+          onMouseDown={() => setPressing(true)}
+          onMouseUp={() => setPressing(false)}
+          onClick={() => navigate(`/channels/@me/${user.id}`)}
+          onContextMenu={onContextMenu}
+          style={{
+            transform: pressing ? 'scale(0.92)' : 'scale(1)',
+            transformOrigin: 'right center',
+            transition: 'color 150ms ease-out, background-color 150ms ease-out, transform 80ms ease-out',
+          }}
+          className={`absolute inset-0 w-full h-full flex items-center justify-center select-none font-bold text-sm
+            ${hovered
+                ? 'bg-sp-primary/15 text-sp-primary'
+                : 'bg-sp-surface-variant/80 text-sp-on-surface'}`}
+        >
+          {user.avatar ? (
+             <img
+               src={`/api/static/${user.avatar}`}
+               alt={user.username}
+               className="absolute inset-0 w-full h-full object-cover"
+               style={{ opacity: hovered ? 0.8 : 1, transition: 'opacity 150ms ease-out' }}
+             />
+          ) : (
+            initials
+          )}
+        </button>
+      </div>
+      {count > 0 && (
+        <span className="absolute bottom-0 right-0 transform translate-x-1/4 translate-y-1/4 z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 rounded-full bg-red-500 border-2 border-sp-bg text-[10px] font-bold text-white shadow-sm pointer-events-none">
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
+    </div>
+  )
+}
+
 interface ServerSidebarProps {
-  hasUnreadDMs?: boolean
+  unreadDMsCount?: number
   activeServerId: string | null
 }
 
-export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSidebarProps) {
+export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSidebarProps) {
   const { user } = useAuth()
   const { serverId } = useParams<{ serverId: string }>()
   const effectiveServerId = activeServerId ?? serverId
@@ -163,10 +223,25 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
   const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null)
 
   const [dmContextMenu, setDmContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [unreadDMContextMenu, setUnreadDMContextMenu] = useState<{ x: number; y: number; conv: DMConversation } | null>(null)
 
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers })
   const { unreadServers, markAllServerRead } = useUnreadChannels()
-  const { serverLevel, setServerLevel } = useNotificationSettings()
+  const { serverLevel, setServerLevel, channelLevel, setChannelLevel } = useNotificationSettings()
+
+  const { data: conversations = [] } = useQuery({ queryKey: ['dmConversations'], queryFn: getConversations, staleTime: 30_000 })
+  const dmMatch = useMatch('/channels/@me/:dmUserId')
+  const activeDmUserId = dmMatch?.params.dmUserId
+
+  const unreadDMs = conversations.filter(c => {
+    // Only show unread
+    if ((c.unread_count || 0) <= 0) return false
+    // Don't show muted
+    if (channelLevel(c.channel_id) === 'mute') return false
+    // Don't show if active
+    if (activeDmUserId === c.other_user.id) return false
+    return true
+  })
 
   function handleMarkServerRead(sId: string) {
     markAllServerRead(sId)
@@ -239,10 +314,23 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
       {/* DMs — bookmark tab style */}
       <DMTab
         active={isDMActive}
-        hasUnread={hasUnreadDMs}
+        unreadCount={unreadDMsCount}
         onClick={() => navigate('/channels/@me')}
         onContextMenu={(e) => { e.preventDefault(); setDmContextMenu({ x: e.clientX, y: e.clientY }) }}
       />
+
+      {/* Unread DMs */}
+      {unreadDMs.map(c => (
+        <UnreadDMItem 
+          key={c.channel_id} 
+          conversation={c} 
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setUnreadDMContextMenu({ x: e.clientX, y: e.clientY, conv: c })
+          }}
+        />
+      ))}
 
       <div className="w-8 h-px bg-sp-divider/60" />
 
@@ -335,6 +423,40 @@ export function ServerSidebar({ hasUnreadDMs = false, activeServerId }: ServerSi
               icon: 'check-circle',
               onClick: () => { void handleMarkAllDMsRead() },
             },
+          ]}
+        />
+      )}
+
+      {/* Unread DM Context Menu */}
+      {unreadDMContextMenu && (
+        <ContextMenu
+          x={unreadDMContextMenu.x}
+          y={unreadDMContextMenu.y}
+          onClose={() => setUnreadDMContextMenu(null)}
+          items={[
+            {
+              label: 'Mark as Read',
+              icon: 'check-circle',
+              onClick: () => {
+                const { conv } = unreadDMContextMenu
+                markDMRead(conv.channel_id, conv.last_message_at ?? undefined).catch(console.error)
+              },
+            },
+            { separator: true },
+            {
+              label: channelLevel(unreadDMContextMenu.conv.channel_id) === 'mute' ? 'Unmute' : 'Mute',
+              icon: channelLevel(unreadDMContextMenu.conv.channel_id) === 'mute' ? 'bell' : 'bell-off',
+              onClick: () => setChannelLevel(
+                unreadDMContextMenu.conv.channel_id,
+                 channelLevel(unreadDMContextMenu.conv.channel_id) === 'mute' ? 'all' : 'mute'
+              ),
+            },
+            { separator: true },
+            {
+              label: 'Copy User ID',
+              icon: 'copy',
+              onClick: () => navigator.clipboard.writeText(unreadDMContextMenu.conv.other_user.id).catch(console.error),
+            }
           ]}
         />
       )}

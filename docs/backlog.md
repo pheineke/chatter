@@ -70,9 +70,9 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 | 58 | **Server Header Context Menu** — Right-click header: Mark read, Mute server, Notification settings, Hide muted, Server Settings, Privacy, Copy ID. | Feature |
 | 59 | **User Context Menu** — Right-click user: Profile, Message, Ignore, Block, Kick (Admin), Copy ID. | Feature |
 | 62 | **Server Icon Context Menu** — Right-click server icon: Leave Server, Mute, etc. | Feature |
-| 63 | **DM Notification / Active Indicators** — DM icon should show unread count; specific user DMs should appear as "tabs" or list items that can be "closed" (hidden until new msg). | UX |
-| 64 | **"Friends" Dashboard Button** — Quick access button above the DM list to open Friends view. | UX |
-| 66 | **Server header / search toggle bug** — Clicking header to close it causes a rapid close/reopen glitch. | Bug |
+| 63 | ✅ **DM Notification / Active Indicators** — DM icon should show unread count; specific user DMs should appear as "tabs" or list items that can be "closed" (hidden until new msg). | UX |
+| 64 | ✅ **"Friends" Dashboard Button** — Quick access button above the DM list to open Friends view. | UX |
+| 66 | ✅ **Server header / search toggle bug** — Clicking header to close it causes a rapid close/reopen glitch. | Bug |
 
 ### 🟢 P3 — Polish (low urgency, nice to have)
 

@@ -14,6 +14,7 @@ import { UserPanel } from '../components/UserPanel'
 import { VoiceCallProvider } from '../contexts/VoiceCallContext'
 import { SettingsPage } from './SettingsPage'
 import { ServerSettingsPage } from './ServerSettingsPage'
+import { ChannelSettingsPage } from './ChannelSettingsPage'
 import { QuickSwitcher } from '../components/QuickSwitcher'
 import { KeyboardShortcutsDialog } from '../components/KeyboardShortcutsDialog'
 import { useUnreadDMs } from '../hooks/useUnreadDMs'
@@ -34,9 +35,9 @@ export interface VoiceSession {
 export default function AppShell() {
   const { user } = useAuth()
   const [voiceSession, setVoiceSession] = useState<VoiceSession | null>(null)
-  const hasUnreadDMs = useUnreadDMs()
+  const unreadDMsCount = useUnreadDMs()
   const { unreadChannels } = useUnreadChannels()
-  useTabBadge(unreadChannels.size + (hasUnreadDMs ? 1 : 0), user?.status === 'dnd')
+  useTabBadge(unreadChannels.size + unreadDMsCount, user?.status === 'dnd')
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showLeftDrawer, setShowLeftDrawer] = useState(false)
@@ -82,6 +83,7 @@ export default function AppShell() {
       <Routes>
         <Route path="settings" element={<SettingsPage />} />
         <Route path=":serverId/settings" element={<ServerSettingsPage />} />
+        <Route path=":serverId/channels/:channelId/settings" element={<ChannelSettingsPage />} />
         <Route path="*" element={
           <VoiceCallProvider session={voiceSession} userId={user?.id ?? ''}>
             {/* Mobile backdrop — tap outside drawer to close */}
@@ -98,7 +100,7 @@ export default function AppShell() {
             <div className={`flex fixed inset-y-0 left-0 z-40 w-[312px] bg-sp-bg transition-transform duration-200 shadow-sp-3 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 md:shadow-none md:m-1.5 md:h-[calc(100vh-12px)] ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
 
               {/* Server icon tabs — outside/left of the card */}
-              <ServerSidebar hasUnreadDMs={hasUnreadDMs} activeServerId={currentServerId ?? null} />
+              <ServerSidebar unreadDMsCount={unreadDMsCount} activeServerId={currentServerId ?? null} />
 
               {/* Channel card — rounded, bordered tile */}
               <div className="flex flex-col flex-1 min-w-0 bg-sp-channels overflow-hidden md:rounded-[14px] md:border md:border-sp-divider/50">
@@ -156,6 +158,7 @@ export default function AppShell() {
                     path=":serverId/:channelId"
                     element={<MessagePane voiceSession={voiceSession} onJoinVoice={setVoiceSession} onLeaveVoice={handleLeaveVoice} onOpenNav={() => setShowLeftDrawer(true)} />}
                   />
+                  <Route path=":serverId/settings" element={<ServerSettingsPage />} />
                 </Routes>
               </div>
             </div>

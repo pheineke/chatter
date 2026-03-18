@@ -170,6 +170,7 @@ export interface DMConversation {
   other_user: User
   last_message_at: string | null
   last_read_at: string | null
+  unread_count: number
 }
 
 // ---- Friends ---------------------------------------------------------------

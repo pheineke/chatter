@@ -1,15 +1,24 @@
-import { useQuery } from '@tanstack/react-query'
-import { getMembers, getRoles } from '../api/servers'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getMembers, getRoles, getServer, kickMember, banMember } from '../api/servers'
+import { getDMChannel } from '../api/dms'
+import { getBlocks, blockUser, unblockUser } from '../api/blocks'
 import { AvatarWithStatus } from './AvatarWithStatus'
 import { ProfileCard } from './ProfileCard'
+import { ContextMenu } from './ContextMenu'
 import { useState } from 'react'
-import type { Member, Role } from '../api/types'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import type { Member, Role, Server } from '../api/types'
 
 interface Props {
   serverId: string
 }
 
 export function MemberSidebar({ serverId }: Props) {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
   const { data: members = [] } = useQuery<Member[]>({
     queryKey: ['members', serverId],
     queryFn: () => getMembers(serverId),
@@ -20,28 +29,43 @@ export function MemberSidebar({ serverId }: Props) {
     queryFn: () => getRoles(serverId),
   })
 
+  // We need server info to check ownership for permissions
+  const { data: server } = useQuery<Server>({
+    queryKey: ['server', serverId],
+    queryFn: () => getServer(serverId),
+    enabled: !!serverId
+  })
+
+  const { data: blocks = [] } = useQuery({
+    queryKey: ['blocks'],
+    queryFn: getBlocks,
+  })
+
   const [activeProfile, setActiveProfile] = useState<{ userId: string; position: { x: number; y: number } } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, member: Member } | null>(null)
 
   function handleClick(member: Member, e: React.MouseEvent) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setActiveProfile({ userId: member.user.id, position: { x: rect.left - 328, y: rect.top } })
   }
 
+  function handleContextMenu(member: Member, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.pageX, y: e.pageY, member })
+  }
+
   // Split online / offline
   const online  = members.filter(m => m.user.status !== 'offline')
   const offline = members.filter(m => m.user.status === 'offline')
 
-  // Build hoisted-role groups for online members.
-  // A role is hoisted when role.hoist === true (the dedicated flag, set by admins in Role settings).
-  // Sort roles by position descending (highest position = most prominent)
+  // Build hoisted-role groups for online members
   const hoistedRoles = [...roles]
     .filter(r => r.hoist)
     .sort((a, b) => b.position - a.position)
 
-  // Map role id → role
   const roleMap = Object.fromEntries(roles.map(r => [r.id, r]))
 
-  // For each online member, find their highest-position hoisted role (if any)
   function topHoistedRole(m: Member): Role | null {
     if (!m.roles.length) return null
     const hoisted = m.roles
@@ -78,6 +102,20 @@ export function MemberSidebar({ serverId }: Props) {
 
   const offlineSorted = [...offline].sort((a, b) => a.user.username.localeCompare(b.user.username))
 
+  // Permissions check logic
+  const myMember = members.find(m => m.user.id === user?.id)
+  const isOwner = server?.owner_id === user?.id
+  const isAdmin = myMember?.roles.some(r => r.is_admin) || isOwner
+  
+  // Helper to determine if we can manage a target member
+  function canManage(target: Member) {
+    if (!isAdmin) return false
+    if (target.user.id === server?.owner_id) return false // Can't manage owner
+    if (target.user.id === user?.id) return false // Can't kick/ban self via this menu
+    // TODO: Hierarchy check (can't ban someone with higher role)
+    return true
+  }
+
   return (
     <div className="hidden md:flex flex-col w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50">
       <div className="px-3 flex items-center h-12 shrink-0 border-b border-sp-divider/50 shadow-sm">
@@ -93,6 +131,7 @@ export function MemberSidebar({ serverId }: Props) {
           color={role?.color ?? undefined}
           members={grpMembers}
           onClickMember={handleClick}
+          onContextMenu={handleContextMenu}
         />
       ))}
 
@@ -101,6 +140,7 @@ export function MemberSidebar({ serverId }: Props) {
           label="Offline"
           members={offlineSorted}
           onClickMember={handleClick}
+          onContextMenu={handleContextMenu}
         />
       )}
 
@@ -111,15 +151,93 @@ export function MemberSidebar({ serverId }: Props) {
           onClose={() => setActiveProfile(null)}
         />
       )}
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'Profile',
+              icon: 'user',
+              onClick: () => {
+                setActiveProfile({
+                  userId: contextMenu.member.user.id,
+                  position: { x: contextMenu.x - 330, y: contextMenu.y }
+                })
+              }
+            },
+            {
+              label: 'Message',
+              icon: 'message-circle',
+              onClick: async () => {
+                try {
+                  const dm = await getDMChannel(contextMenu.member.user.id)
+                  navigate(`/channels/@me/${dm.channel_id}`)
+                } catch (err) {
+                  console.error('Failed to get DM channel', err)
+                }
+              }
+            },
+            { separator: true },
+            {
+              label: 'Copy ID',
+              icon: 'copy',
+              onClick: () => navigator.clipboard.writeText(contextMenu.member.user.id)
+            },
+            { separator: true },
+            // Block / Unblock Not server specific, always available
+            (contextMenu.member.user.id !== user?.id) ? {
+              label: blocks.some(b => b.id === contextMenu.member.user.id) ? 'Unblock' : 'Block',
+              icon: 'slash',
+              danger: true,
+              onClick: async () => {
+                 const isBlocked = blocks.some(b => b.id === contextMenu.member.user.id)
+                 if (isBlocked) await unblockUser(contextMenu.member.user.id)
+                 else await blockUser(contextMenu.member.user.id)
+                 queryClient.invalidateQueries({ queryKey: ['blocks'] })
+              }
+            } : null,
+            // Kick / Ban
+            (canManage(contextMenu.member)) ? { separator: true } : null,
+            (canManage(contextMenu.member)) ? {
+              label: 'Kick Member',
+              icon: 'user-minus',
+              danger: true,
+              onClick: async () => {
+                if (window.confirm(`Are you sure you want to kick ${contextMenu.member.user.username}?`)) {
+                  await kickMember(serverId, contextMenu.member.user.id)
+                  queryClient.invalidateQueries({ queryKey: ['members', serverId] })
+                }
+              }
+            } : null,
+            (canManage(contextMenu.member)) ? {
+              label: 'Ban Member',
+              icon: 'x-circle',
+              danger: true,
+              onClick: async () => {
+                if (window.confirm(`Are you sure you want to ban ${contextMenu.member.user.username}?`)) {
+                  await banMember(serverId, contextMenu.member.user.id)
+                  queryClient.invalidateQueries({ queryKey: ['members', serverId] })
+                   // Also bans list invalidation
+                  queryClient.invalidateQueries({ queryKey: ['bans', serverId] })
+                }
+              }
+            } : null,
+          ].filter(Boolean) as any} // Cast to any to handle conditional nulls easily
+        />
+      )}
     </div>
   )
 }
 
-function Section({ label, color, members, onClickMember }: {
+function Section({ label, color, members, onClickMember, onContextMenu }: {
   label: string
   color?: string
   members: Member[]
   onClickMember: (m: Member, e: React.MouseEvent) => void
+  onContextMenu: (m: Member, e: React.MouseEvent) => void
 }) {
   return (
     <div className="mb-2">
@@ -130,13 +248,18 @@ function Section({ label, color, members, onClickMember }: {
         {label} — {members.length}
       </div>
       {members.map(m => (
-        <MemberRow key={m.user.id} member={m} onClick={e => onClickMember(m, e)} />
+        <MemberRow
+          key={m.user.id}
+          member={m}
+          onClick={e => onClickMember(m, e)}
+          onContextMenu={e => onContextMenu(m, e)}
+        />
       ))}
     </div>
   )
 }
 
-function MemberRow({ member, onClick }: { member: Member; onClick: (e: React.MouseEvent) => void }) {
+function MemberRow({ member, onClick, onContextMenu }: { member: Member; onClick: (e: React.MouseEvent) => void; onContextMenu: (e: React.MouseEvent) => void }) {
   // Pick the highest-position role with a color to render as the name's color
   const nameColor = member.roles.reduce<string | null>((best, r) => {
     if (!r.color) return best
@@ -147,6 +270,7 @@ function MemberRow({ member, onClick }: { member: Member; onClick: (e: React.Mou
   return (
     <button
       onClick={onClick}
+      onContextMenu={onContextMenu}
       data-avatar-ring
       className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded mx-1 hover:bg-sp-input/60 transition-colors text-left group"
       style={{ width: 'calc(100% - 8px)', '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#2c2d32' } as React.CSSProperties}

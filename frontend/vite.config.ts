@@ -102,14 +102,15 @@ export default defineConfig({
             proxySocket.on('error', () => { /* suppress normal disconnect errors */ })
           })
 
-          // Browser → proxy socket: this listener runs AFTER Vite's own proxyReqWs
-          // handler (which adds the listener that logs "[vite] ws proxy socket error:"),
-          // so we can remove Vite's socket error listener and replace it with ours.
+          // Browser → proxy socket: this listener needs to remove listeners added by other handlers
+          // (like Vite's own logger). We use setImmediate/setTimeout to ensure other handlers run first.
           proxy.on('proxyReqWs', (_proxyReq, _req, socket: NodeJS.EventEmitter) => {
-            socket.removeAllListeners('error')
-            socket.on('error', (err: NodeJS.ErrnoException) => {
-              if (!suppress(err)) console.error('[ws proxy socket]', err.message)
-            })
+            setTimeout(() => {
+              socket.removeAllListeners('error')
+              socket.on('error', (err: NodeJS.ErrnoException) => {
+                if (!suppress(err)) console.error('[ws proxy socket]', err.message)
+              })
+            }, 0)
           })
         },
       },

@@ -8,6 +8,7 @@ import { useSoundManager } from './useSoundManager'
 import { activeServerIds } from './serverRegistry'
 import { useNotificationSettings } from './useNotificationSettings'
 import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
+import { useE2EE } from '../contexts/E2EEContext'
 import { getConversations } from '../api/dms'
 import type { Channel, DMConversation, Friend, Message, UserStatus } from '../api/types'
 
@@ -15,11 +16,12 @@ import type { Channel, DMConversation, Friend, Message, UserStatus } from '../ap
  * Always-on hook (call from AppShell) that:
  *  - Keeps /ws/me open regardless of active route
  *  - Patches the dmConversations cache on new messages
- *  - Returns whether any DM conversation has unread messages
+ *  - Returns the count of unread DM conversations
  */
-export function useUnreadDMs(): boolean {
+export function useUnreadDMs(): number {
   const qc = useQueryClient()
   const { user, updateUser } = useAuth()
+  const e2ee = useE2EE()
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
   const { channelLevel, serverLevel } = useNotificationSettings()
@@ -143,7 +145,7 @@ export function useUnreadDMs(): boolean {
         qc.setQueryData<DMConversation[]>(['dmConversations'], old =>
           old?.map(c =>
             c.channel_id === channel_id
-              ? { ...c, last_read_at }
+              ? { ...c, last_read_at, unread_count: 0 }
               : c
           )
         )
@@ -152,35 +154,59 @@ export function useUnreadDMs(): boolean {
 
       if (msg.type !== 'message.created') return
       const data = msg.data as Message
+      const isActiveChannel = data.channel_id === conversations.find(c => c.other_user.id === activeDmUserId)?.channel_id
 
       // Play notification sound if the user isn't currently viewing this DM conversation
-      const activeDmChannelId = conversations.find(c => c.other_user.id === activeDmUserId)?.channel_id
-      if (data.author.id !== user?.id && data.channel_id !== activeDmChannelId) {
+      if (data.author.id !== user?.id && !isActiveChannel) {
         if (channelLevel(data.channel_id) === 'mute') return
         playSound('notificationSound')
-        // Desktop notification for DMs
-        const truncated = data.content ? (data.content.length > 100 ? data.content.slice(0, 100) + '\u2026' : data.content) : 'Sent an attachment'
-        notify({
-          title: data.author.username,
-          body: truncated,
-          icon: data.author.avatar ? `/api/static/${data.author.avatar}` : undefined,
-          channelId: data.channel_id,
-          channelPath: `/channels/@me/${data.author.id}`,
-        })
+
+        // Desktop notification for DMs (async decryption if needed)
+        ;(async () => {
+          let body = data.content
+          // Attempt decryption if encrypted and we have the tools
+          if (data.is_encrypted && data.content && data.nonce && e2ee.isEnabled) {
+            try {
+              const plain = await e2ee.decryptFromUser(data.author.id, data.content, data.nonce)
+              body = plain ?? 'Encrypted Message'
+            } catch {
+              body = 'Encrypted Message'
+            }
+          }
+
+          const truncated = body
+            ? (body.length > 100 ? body.slice(0, 100) + '\u2026' : body)
+            : 'Sent an attachment'
+
+          notify({
+            title: data.author.username,
+            body: truncated,
+            icon: data.author.avatar ? `/api/static/${data.author.avatar}` : undefined,
+            channelId: data.channel_id,
+            channelPath: `/channels/@me/${data.author.id}`,
+          })
+        })()
       }
 
       qc.setQueryData<DMConversation[]>(['dmConversations'], old => {
         if (!old) return old
-        const exists = old.some(c => c.channel_id === data.channel_id)
-        if (!exists) {
+        if (!old.some(c => c.channel_id === data.channel_id)) {
+          // New conversation started by someone else
           qc.invalidateQueries({ queryKey: ['dmConversations'] })
           return old
         }
-        return old.map(c =>
-          c.channel_id === data.channel_id
-            ? { ...c, last_message_at: data.created_at }
-            : c,
-        )
+        return old.map(c => {
+          if (c.channel_id !== data.channel_id) return c
+          // Increment unread count if we are not the author and not currently viewing
+          const isMe = data.author.id === user?.id
+          const isViewing = c.other_user.id === activeDmUserId
+          const inc = (!isMe && !isViewing) ? 1 : 0
+          return {
+            ...c,
+            last_message_at: data.created_at,
+            unread_count: (c.unread_count || 0) + inc,
+          }
+        })
       })
     },
   })
@@ -191,9 +217,10 @@ export function useUnreadDMs(): boolean {
     return () => clearInterval(id)
   }, [send])
 
-  return conversations.some(conv => {
+  return conversations.reduce((acc, conv) => {
     const isActive = conv.other_user.id === activeDmUserId
     const lr = conv.last_read_at
-    return !!conv.last_message_at && (!lr || conv.last_message_at > lr) && !isActive
-  })
+    const unread = !!conv.last_message_at && (!lr || conv.last_message_at > lr) && !isActive
+    return acc + (unread ? 1 : 0)
+  }, 0)
 }

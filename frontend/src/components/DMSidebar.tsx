@@ -82,12 +82,37 @@ export function DMSidebar() {
     markReadMut.mutate({ channelId: conv.channel_id, lastReadAt: conv.last_message_at })
   }, [activeDmUserId, conversations, markReadMut])
 
+  const isFriendsActive = !activeDmUserId
+
   return (
     <div className="flex flex-col h-full">
-      <div className="px-3 py-3 text-xs font-semibold uppercase text-sp-muted tracking-wider">
-        Direct Messages
+      <div className="px-2 pt-2">
+        <button
+          onClick={() => navigate('/channels/@me')}
+          className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors mb-2
+            ${isFriendsActive
+              ? 'bg-sp-surface-variant text-sp-text'
+              : 'text-sp-muted hover:bg-sp-surface-variant/50 hover:text-sp-text'}`}
+        >
+          <div className="w-7 h-7 rounded-full bg-sp-primary/10 flex items-center justify-center">
+            <Icon name="people" size={16} className="text-sp-primary" />
+          </div>
+          <span>Friends</span>
+        </button>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+
+      <div className="flex items-center justify-between px-4 pb-1 pt-2 text-xs font-bold text-sp-muted uppercase tracking-wider group">
+        <span>Direct Messages</span>
+        <button
+          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-sp-text"
+          title="Create DM"
+          onClick={() => navigate('/channels/@me')}
+        >
+          <Icon name="plus" size={12} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-2 space-y-0.5 mt-1">
         {conversations.map(conv => {
           const isActive = conv.other_user.id === activeDmUserId
           const lr = conv.last_read_at
@@ -105,7 +130,7 @@ export function DMSidebar() {
               items: [
                 ...(hasUnread ? [{
                   label: 'Mark as Read',
-                  icon: 'check-circle',
+                  icon: 'check-circle' as const,
                   onClick: () => {
                     markReadMut.mutate({
                       channelId: conv.channel_id,
