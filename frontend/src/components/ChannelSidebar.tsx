@@ -307,7 +307,33 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     }
 
     // Common actions
-    // Mute category? Mark category read? (TODO)
+    const categoryChannels = channels.filter(c => c.category_id === cat.id)
+    const hasUnread = categoryChannels.some(c => unreadChannels.has(c.id))
+    const areAllMuted = categoryChannels.every(c => channelLevel(c.id) === 'mute')
+
+    if (hasUnread) {
+      items.push({
+        label: 'Mark as Read',
+        icon: 'check-circle',
+        onClick: () => {
+          categoryChannels.forEach(c => {
+             if (unreadChannels.has(c.id)) markRead(c.id)
+          })
+        },
+      })
+    }
+
+    items.push({
+      label: areAllMuted ? 'Unmute Category' : 'Mute Category',
+      icon: areAllMuted ? 'bell' : 'bell-off',
+      onClick: () => {
+         const newLevel = areAllMuted ? 'all' : 'mute'
+         categoryChannels.forEach(c => setChannelLevel(c.id, newLevel))
+      },
+    })
+
+    items.push({ separator: true })
+
     items.push({
       label: 'Copy ID',
       icon: 'copy',

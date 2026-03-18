@@ -112,8 +112,17 @@ export function MemberSidebar({ serverId }: Props) {
     if (!isAdmin) return false
     if (target.user.id === server?.owner_id) return false // Can't manage owner
     if (target.user.id === user?.id) return false // Can't kick/ban self via this menu
-    // TODO: Hierarchy check (can't ban someone with higher role)
-    return true
+    
+    // Server owner can manage anyone (except self)
+    if (isOwner) return true
+
+    // Compare role hierarchy
+    // Find my highest role position
+    const myHighestRole = myMember?.roles.reduce((max, r) => Math.max(max, r.position), -1) ?? -1
+    // Find target highest role position
+    const targetHighestRole = target.roles.reduce((max, r) => Math.max(max, r.position), -1) ?? -1
+    
+    return myHighestRole > targetHighestRole
   }
 
   return (
