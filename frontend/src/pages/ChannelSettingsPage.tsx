@@ -3,18 +3,24 @@ import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getChannels, updateChannel, deleteChannel, getPermissions, setPermission } from '../api/channels'
 import { getRoles } from '../api/servers'
-import { LayoutShell, NavPanel, ContentPanel } from '../components/LayoutShell'
+import { getPermState, cyclePermState, applyPermState, type PermState } from '../utils/permissions'
+import { SettingsLayout, type SettingsTab } from '../components/SettingsLayout'
 import { Icon } from '../components/Icon'
 import { useAuth } from '../contexts/AuthContext'
 import { ChannelPerm, type Channel, type ChannelPermission } from '../api/types'
 
 type Tab = 'overview' | 'permissions'
 
+const TABS: SettingsTab[] = [
+  { id: 'overview',    label: 'Overview',    icon: 'settings-2' },
+  { id: 'permissions', label: 'Permissions', icon: 'shield' },
+]
+
 export function ChannelSettingsPage() {
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<string>('overview')
 
   const { data: channels = [] } = useQuery<Channel[]>({
     queryKey: ['channels', serverId],
@@ -24,28 +30,61 @@ export function ChannelSettingsPage() {
 
   const channel = channels.find(c => c.id === channelId)
 
-  // Local state for editing
-  // We initialize lazily or via effect. Effect is safer for async loading.
-  const [title, setTitle] = useState('')
-  const [topic, setTopic] = useState('')
-  const [slowmode, setSlowmode] = useState(0)
-  const [nsfw, setNsfw] = useState(false)
-  const [userLimit, setUserLimit] = useState(0)
-  const [bitrate, setBitrate] = useState(64000)
-
-  // Load initial values
-  useEffect(() => {
-    if (channel) {
-      setTitle(channel.title)
-      setTopic(channel.description ?? '')
-      setSlowmode(channel.slowmode_delay ?? 0)
-      setNsfw(channel.nsfw ?? false)
-      setUserLimit(channel.user_limit ?? 0)
-      setBitrate(channel.bitrate ?? 64000)
-    }
-  }, [channel])
-
   if (!channel || !serverId) return null
+
+  return (
+    <SettingsLayout
+      title={channel.title}
+      tabs={TABS}
+      activeTab={tab}
+      onTabChange={setTab}
+      onClose={() => navigate(`/channels/${serverId}/${channelId}`)}
+      sidebarFooter={
+        <button
+          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+          onClick={async () => {
+              if (!confirm(`Are you sure you want to delete #${channel.title}? This cannot be undone.`)) return
+              await deleteChannel(serverId, channel.id)
+              qc.invalidateQueries({ queryKey: ['channels', serverId] })
+              navigate(`/channels/${serverId}`)
+          }}
+        >
+          <Icon name="trash-2" size={16} className="shrink-0" />
+          Delete Channel
+        </button>
+      }
+    >
+      {tab === 'overview' && (
+        <OverviewTab serverId={serverId} channel={channel} />
+      )}
+
+      {tab === 'permissions' && (
+        <PermissionsTab serverId={serverId} channel={channel} />
+      )}
+    </SettingsLayout>
+  )
+}
+
+
+function OverviewTab({ serverId, channel }: { serverId: string; channel: Channel }) {
+  const qc = useQueryClient()
+  const [title, setTitle] = useState(channel.title)
+  const [topic, setTopic] = useState(channel.description ?? '')
+  const [slowmode, setSlowmode] = useState(channel.slowmode_delay ?? 0)
+  const [nsfw, setNsfw] = useState(channel.nsfw ?? false)
+  const [userLimit, setUserLimit] = useState(channel.user_limit ?? 0)
+  const [bitrate, setBitrate] = useState(channel.bitrate ?? 64000)
+  const [saving, setSaving] = useState(false)
+  
+  // Sync when channel prop updates
+  useEffect(() => {
+    setTitle(channel.title)
+    setTopic(channel.description ?? '')
+    setSlowmode(channel.slowmode_delay ?? 0)
+    setNsfw(channel.nsfw ?? false)
+    setUserLimit(channel.user_limit ?? 0)
+    setBitrate(channel.bitrate ?? 64000)
+  }, [channel])
 
   const hasChanges = 
     title !== channel.title ||
@@ -57,203 +96,149 @@ export function ChannelSettingsPage() {
 
   async function handleSave() {
     if (!title.trim()) return
-    await updateChannel(serverId!, channel!.id, {
-      title,
-      description: topic || null,
-      slowmode_delay: slowmode,
-      nsfw,
-      user_limit: channel!.type === 'voice' ? (userLimit || null) : undefined,
-      bitrate: channel!.type === 'voice' ? (bitrate || null) : undefined,
-    })
-    qc.invalidateQueries({ queryKey: ['channels', serverId] })
+    setSaving(true)
+    try {
+      await updateChannel(serverId, channel.id, {
+        title,
+        description: topic || null,
+        slowmode_delay: slowmode,
+        nsfw,
+        user_limit: channel.type === 'voice' ? (userLimit || null) : undefined,
+        bitrate: channel.type === 'voice' ? (bitrate || null) : undefined,
+      })
+      qc.invalidateQueries({ queryKey: ['channels', serverId] })
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleReset() {
-    setTitle(channel!.title)
-    setTopic(channel!.description ?? '')
-    setSlowmode(channel!.slowmode_delay ?? 0)
-    setNsfw(channel!.nsfw ?? false)
-    setUserLimit(channel!.user_limit ?? 0)
-    setBitrate(channel!.bitrate ?? 64000)
-  }
-
-  async function handleDelete() {
-    if (!confirm(`Are you sure you want to delete #${channel!.title}? This cannot be undone.`)) return
-    await deleteChannel(serverId!, channel!.id)
-    qc.invalidateQueries({ queryKey: ['channels', serverId] })
-    navigate(`/channels/${serverId}`)
+    setTitle(channel.title)
+    setTopic(channel.description ?? '')
+    setSlowmode(channel.slowmode_delay ?? 0)
+    setNsfw(channel.nsfw ?? false)
+    setUserLimit(channel.user_limit ?? 0)
+    setBitrate(channel.bitrate ?? 64000)
   }
 
   return (
-    <LayoutShell>
-      <NavPanel className="w-[218px] px-2 py-6">
-        <div className="mb-4">
-          <div className="px-2 mb-1 text-[11px] font-bold text-sp-muted uppercase tracking-wide truncate">
-            {channel.title}
-          </div>
-          <button
-            onClick={() => setTab('overview')}
-            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium transition-colors
-              ${tab === 'overview' ? 'bg-sp-input text-sp-text' : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
-          >
-            <Icon name="settings-2" size={16} />
-            Overview
-          </button>
-          <button
-            onClick={() => setTab('permissions')}
-            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium transition-colors
-              ${tab === 'permissions' ? 'bg-sp-input text-sp-text' : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
-          >
-            <Icon name="shield" size={16} />
-            Permissions
-          </button>
+    <div className="space-y-6 flex-1 flex flex-col">
+      <div className="grid grid-cols-2 gap-6">
+        <div className="col-span-2">
+          <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">Channel Name</label>
+          <input
+            className="input w-full"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            maxLength={100}
+          />
         </div>
         
-        <div className="mt-auto pt-4 border-t border-white/5">
-          <button
-            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
-            onClick={handleDelete}
-          >
-            Delete Channel
-          </button>
+        <div className="col-span-2">
+          <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">Channel Topic</label>
+          <textarea
+            className="input w-full h-24 resize-none py-2"
+            value={topic}
+            onChange={e => setTopic(e.target.value)}
+            placeholder="Let everyone know how to use this channel!"
+            maxLength={1024}
+          />
         </div>
-      </NavPanel>
 
-      <ContentPanel>
-        <div className="max-w-[740px] min-h-full flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-xl font-bold">{tab === 'overview' ? 'Channel Overview' : 'Permissions'}</h1>
-            <button
-              onClick={() => navigate(`/channels/${serverId}/${channelId}`)}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-sp-muted hover:text-sp-text transition-colors"
-            >
-              <Icon name="close" size={24} />
-            </button>
+        {channel.type === 'text' && (
+          <div className="col-span-2">
+            <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">Slowmode</label>
+            <div className="flex items-center gap-4">
+               <input
+                 type="range"
+                 min="0"
+                 max="21600"
+                 step="5"
+                 value={slowmode}
+                 onChange={e => setSlowmode(Number(e.target.value))}
+                 className="flex-1"
+               />
+               <span className="w-20 text-right text-sm font-mono text-sp-text">
+                 {slowmode === 0 ? 'Off' : `${slowmode}s`}
+               </span>
+            </div>
+            <p className="text-xs text-sp-muted mt-1">
+              Members will be restricted to sending one message per this interval, unless they have Manage Channel or Manage Messages permissions.
+            </p>
           </div>
+        )}
 
-          {tab === 'overview' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="col-span-2">
-                  <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">Channel Name</label>
-                  <input
-                    className="input w-full"
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                    maxLength={100}
-                  />
-                </div>
-                
-                <div className="col-span-2">
-                  <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">Channel Topic</label>
-                  <textarea
-                    className="input w-full h-24 resize-none py-2"
-                    value={topic}
-                    onChange={e => setTopic(e.target.value)}
-                    placeholder="Let everyone know how to use this channel!"
-                    maxLength={1024}
-                  />
-                </div>
-
-                {channel.type === 'text' && (
-                  <div className="col-span-2">
-                    <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">Slowmode</label>
-                    <div className="flex items-center gap-4">
-                       <input
-                         type="range"
-                         min="0"
-                         max="21600"
-                         step="5"
-                         value={slowmode}
-                         onChange={e => setSlowmode(Number(e.target.value))}
-                         className="flex-1"
-                       />
-                       <span className="w-20 text-right text-sm font-mono text-sp-text">
-                         {slowmode === 0 ? 'Off' : `${slowmode}s`}
-                       </span>
-                    </div>
-                    <p className="text-xs text-sp-muted mt-1">
-                      Members will be restricted to sending one message per this interval, unless they have Manage Channel or Manage Messages permissions.
-                    </p>
-                  </div>
-                )}
-
-                {channel.type === 'voice' && (
-                  <>
-                    <div className="col-span-2">
-                      <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">Bitrate</label>
-                      <div className="flex items-center gap-4">
-                         <input
-                           type="range"
-                           min="8000"
-                           max="96000"
-                           step="1000"
-                           value={bitrate}
-                           onChange={e => setBitrate(Number(e.target.value))}
-                           className="flex-1"
-                         />
-                         <span className="w-20 text-right text-sm font-mono text-sp-text">
-                           {Math.round(bitrate / 1000)}kbps
-                         </span>
-                      </div>
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">User Limit</label>
-                      <div className="flex items-center gap-4">
-                         <input
-                           type="range"
-                           min="0"
-                           max="99"
-                           step="1"
-                           value={userLimit}
-                           onChange={e => setUserLimit(Number(e.target.value))}
-                           className="flex-1"
-                         />
-                         <span className="w-20 text-right text-sm font-mono text-sp-text">
-                           {userLimit === 0 ? 'No Limit' : `${userLimit} users`}
-                         </span>
-                      </div>
-                      <p className="text-xs text-sp-muted mt-1">
-                        Limit the number of users that can connect to this voice channel. Users with the Move Members permission ignore this limit.
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                <div className="col-span-2 flex items-center justify-between p-4 bg-sp-surface rounded border border-sp-divider/40">
-                   <div>
-                     <div className="font-medium text-sp-text">NSFW Channel</div>
-                     <div className="text-xs text-sp-muted">Users will need to confirm they contain 18+ content to view this channel.</div>
-                   </div>
-                   <input
-                     type="checkbox"
-                     className="toggle"
-                     checked={nsfw}
-                     onChange={e => setNsfw(e.target.checked)}
-                   />
-                </div>
+        {channel.type === 'voice' && (
+          <>
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">Bitrate</label>
+              <div className="flex items-center gap-4">
+                 <input
+                   type="range"
+                   min="8000"
+                   max="96000"
+                   step="1000"
+                   value={bitrate}
+                   onChange={e => setBitrate(Number(e.target.value))}
+                   className="flex-1"
+                 />
+                 <span className="w-20 text-right text-sm font-mono text-sp-text">
+                   {Math.round(bitrate / 1000)}kbps
+                 </span>
               </div>
             </div>
-          )}
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-sp-muted uppercase mb-2 block">User Limit</label>
+              <div className="flex items-center gap-4">
+                 <input
+                   type="range"
+                   min="0"
+                   max="99"
+                   step="1"
+                   value={userLimit}
+                   onChange={e => setUserLimit(Number(e.target.value))}
+                   className="flex-1"
+                 />
+                 <span className="w-20 text-right text-sm font-mono text-sp-text">
+                   {userLimit === 0 ? 'No Limit' : `${userLimit} users`}
+                 </span>
+              </div>
+              <p className="text-xs text-sp-muted mt-1">
+                Limit the number of users that can connect to this voice channel. Users with the Move Members permission ignore this limit.
+              </p>
+            </div>
+          </>
+        )}
 
-          {tab === 'permissions' && (
-            <PermissionsEditor serverId={serverId!} channelId={channelId!} />
-          )}
-
-          {/* Save Bar */}
-          {hasChanges && (
-             <div className="sticky bottom-6 mt-auto bg-sp-surface-variant p-3 rounded flex items-center justify-between shadow-lg border border-sp-divider/20 animate-in fade-in slide-in-from-bottom-4">
-               <span className="text-sm font-medium px-2">Careful — you have unsaved changes!</span>
-               <div className="flex items-center gap-3">
-                 <button onClick={handleReset} className="text-sm font-medium hover:underline px-2">Reset</button>
-                 <button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white px-5 py-1.5 rounded text-sm font-medium transition-colors">Save Changes</button>
-               </div>
-             </div>
-          )}
+        <div className="col-span-2 flex items-center justify-between p-4 bg-sp-surface rounded border border-sp-divider/40">
+           <div>
+             <div className="font-medium text-sp-text">NSFW Channel</div>
+             <div className="text-xs text-sp-muted">Users will need to confirm they contain 18+ content to view this channel.</div>
+           </div>
+           <input
+             type="checkbox"
+             className="toggle"
+             checked={nsfw}
+             onChange={e => setNsfw(e.target.checked)}
+           />
         </div>
-      </ContentPanel>
-    </LayoutShell>
+      </div>
+
+      {/* Floating Save Bar */}
+      {hasChanges && (
+         <div className="sticky bottom-0 mt-auto pt-6 pb-2 bg-gradient-to-t from-sp-bg via-sp-bg to-transparent">
+           <div className="bg-sp-surface-variant p-3 rounded flex items-center justify-between shadow-lg border border-sp-divider/20 animate-in fade-in slide-in-from-bottom-2">
+             <span className="text-sm font-medium px-2">Careful — you have unsaved changes!</span>
+             <div className="flex items-center gap-3">
+               <button onClick={handleReset} className="text-sm font-medium hover:underline px-2">Reset</button>
+               <button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white px-5 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50">
+                 {saving ? 'Saving...' : 'Save Changes'}
+               </button>
+             </div>
+           </div>
+         </div>
+      )}
+    </div>
   )
 }
 
@@ -270,29 +255,7 @@ const PERM_COLUMNS: { key: keyof typeof ChannelPerm; label: string }[] = [
   { key: 'MENTION_EVERYONE', label: 'All / Here' },
 ]
 
-type PermState = 'inherit' | 'allow' | 'deny'
-
-function getPermState(allow: number, deny: number, bit: number): PermState {
-  if (deny & bit) return 'deny'
-  if (allow & bit) return 'allow'
-  return 'inherit'
-}
-
-function cyclePermState(current: PermState): PermState {
-  if (current === 'inherit') return 'allow'
-  if (current === 'allow') return 'deny'
-  return 'inherit'
-}
-
-function applyPermState(allow: number, deny: number, bit: number, next: PermState) {
-  let a = allow, d = deny
-  a &= ~bit; d &= ~bit
-  if (next === 'allow') a |= bit
-  if (next === 'deny')  d |= bit
-  return { allow_bits: a, deny_bits: d }
-}
-
-function PermissionsEditor({ serverId, channelId }: { serverId: string; channelId: string }) {
+function PermissionsTab({ serverId, channel }: { serverId: string; channel: Channel }) {
   const qc = useQueryClient()
   const [draft, setDraft] = useState<Record<string, { allow_bits: number; deny_bits: number }> | null>(null)
   const [saving, setSaving] = useState(false)
@@ -305,8 +268,8 @@ function PermissionsEditor({ serverId, channelId }: { serverId: string; channelI
 
   // We need to fetch channel-specific overrides
   const { data: existingPerms = [], isSuccess: permsLoaded } = useQuery<ChannelPermission[]>({
-    queryKey: ['channelPerms', channelId],
-    queryFn: () => getPermissions(serverId, channelId),
+    queryKey: ['channelPerms', channel.id],
+    queryFn: () => getPermissions(serverId, channel.id),
   })
 
   // Initialize draft
@@ -321,7 +284,7 @@ function PermissionsEditor({ serverId, channelId }: { serverId: string; channelI
     })
     setDraft(init)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permsLoaded, channelId, roles.length]) 
+  }, [permsLoaded, channel.id, roles.length]) 
 
   function toggle(roleId: string, bit: number) {
     setDraft(prev => {
@@ -342,10 +305,10 @@ function PermissionsEditor({ serverId, channelId }: { serverId: string; channelI
     try {
       await Promise.all(
         Object.entries(draft).map(([roleId, bits]) =>
-          setPermission(serverId, channelId, roleId, bits)
+          setPermission(serverId, channel.id, roleId, bits)
         )
       )
-      qc.invalidateQueries({ queryKey: ['channelPerms', channelId] })
+      qc.invalidateQueries({ queryKey: ['channelPerms', channel.id] })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } finally {
@@ -420,6 +383,7 @@ function PermissionsEditor({ serverId, channelId }: { serverId: string; channelI
         </table>
       </div>
 
+      {(saved || draft) && (
       <div className="mt-6 flex justify-end gap-3 sticky bottom-6 bg-sp-surface p-4 border border-sp-divider/20 rounded shadow-2xl z-20">
          {saved && <span className="flex items-center text-green-400 text-sm font-medium mr-auto animate-in fade-in slide-in-from-left-2 transition-opacity duration-1000"><Icon name="checkmark" size={16} className="mr-1.5"/> Permissions Saved!</span>}
          <button
@@ -430,6 +394,7 @@ function PermissionsEditor({ serverId, channelId }: { serverId: string; channelI
            {saving ? 'Saving...' : 'Save Permissions'}
          </button>
       </div>
+      )}
       <div className="h-10"/> {/* Spacer */}
     </div>
   )

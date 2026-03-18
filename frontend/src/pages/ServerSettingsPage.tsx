@@ -16,19 +16,17 @@ import { InviteModal } from '../components/InviteModal'
 import { useAuth } from '../contexts/AuthContext'
 import type { Member, Role } from '../api/types'
 import type { ServerInvite } from '../api/invites'
-import { LayoutShell, NavPanel, ContentPanel } from '../components/LayoutShell'
-
-type Tab = 'overview' | 'members' | 'roles' | 'invites' | 'word-filters' | 'bans'
+import { SettingsLayout, type SettingsTab } from '../components/SettingsLayout'
 
 // ─── Nav sidebar ─────────────────────────────────────────────────────────────
 
-const NAV: { tab: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
-  { tab: 'overview',      label: 'Overview',      icon: 'settings-2' },
-  { tab: 'members',       label: 'Members',       icon: 'people',      adminOnly: true },
-  { tab: 'roles',         label: 'Roles',         icon: 'shield',      adminOnly: true },
-  { tab: 'invites',       label: 'Invites',       icon: 'link-2',      adminOnly: true },
-  { tab: 'word-filters',  label: 'Word Filters',  icon: 'funnel',      adminOnly: true },
-  { tab: 'bans',          label: 'Bans',          icon: 'slash',       adminOnly: true },
+const TABS: (SettingsTab & { adminOnly?: boolean })[] = [
+  { id: 'overview',      label: 'Overview',      icon: 'settings-2' },
+  { id: 'members',       label: 'Members',       icon: 'people',      adminOnly: true },
+  { id: 'roles',         label: 'Roles',         icon: 'shield',      adminOnly: true },
+  { id: 'invites',       label: 'Invites',       icon: 'link-2',      adminOnly: true },
+  { id: 'word-filters',  label: 'Word Filters',  icon: 'funnel',      adminOnly: true },
+  { id: 'bans',          label: 'Bans',          icon: 'slash',       adminOnly: true },
 ]
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -38,7 +36,7 @@ export function ServerSettingsPage() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
   const qc = useQueryClient()
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<string>('overview')
 
   const { data: server } = useQuery({
     queryKey: ['server', serverId],
@@ -56,41 +54,19 @@ export function ServerSettingsPage() {
   const isAdmin = isOwner ||
     members.some(m => m.user.id === currentUser?.id && m.roles.some(r => r.is_admin))
 
-  function close() {
-    navigate(`/channels/${serverId}`)
-  }
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [serverId])
-
   if (!server || !serverId) return null
 
-  const visibleTabs = NAV.filter(n => !n.adminOnly || isAdmin)
+  const visibleTabs = TABS.filter(n => !n.adminOnly || isAdmin)
 
   return (
-    <LayoutShell>
-      {/* Left nav */}
-      <NavPanel className="w-[218px] px-2 py-6">
-        <div className="mb-4">
-          <div className="px-2 mb-1 text-[11px] font-bold text-sp-muted uppercase tracking-wide truncate">
-            {server.title}
-          </div>
-          {visibleTabs.map(n => (
-            <button
-              key={n.tab}
-              onClick={() => setTab(n.tab)}
-              className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium transition-colors
-                ${tab === n.tab ? 'bg-sp-input text-sp-text' : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
-            >
-              <Icon name={n.icon} size={16} className="shrink-0" />
-              {n.label}
-            </button>
-          ))}
-        </div>
-        <div className="mt-auto pt-4 border-t border-white/5">
+    <SettingsLayout
+      title={server.title}
+      tabs={visibleTabs}
+      activeTab={tab}
+      onTabChange={setTab}
+      onClose={() => navigate(`/channels/${serverId}`)}
+      sidebarFooter={
+        <>
           {isOwner && (
             <button
               className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
@@ -120,37 +96,19 @@ export function ServerSettingsPage() {
               Leave Server
             </button>
           )}
-        </div>
-      </NavPanel>
-
-      {/* Content */}
-      <ContentPanel>
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-2xl mx-auto">
-            {tab === 'overview'      && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
-            {tab === 'members'       && <MembersTab  serverId={serverId} members={members} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
-            {tab === 'roles'         && <RolesTab    serverId={serverId} />}
-            {tab === 'invites'       && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
-            {tab === 'word-filters'  && <WordFiltersTab serverId={serverId} />}
-            {tab === 'bans'          && <BansTab serverId={serverId} />}
-          </div>
-        </div>
-
-        {/* Close button */}
-        <div className="p-4 shrink-0 flex flex-col items-center gap-1 relative z-10">
-          <button
-            onClick={close}
-            className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-muted/30 flex items-center justify-center transition-colors group"
-            title="Close (Esc)"
-          >
-            <Icon name="close" size={20} className="text-sp-muted group-hover:text-sp-text" />
-          </button>
-          <span className="text-[10px] text-sp-muted">ESC</span>
-        </div>
-      </ContentPanel>
-    </LayoutShell>
+        </>
+      }
+    >
+      {tab === 'overview'      && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
+      {tab === 'members'       && <MembersTab  serverId={serverId} members={members} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
+      {tab === 'roles'         && <RolesTab    serverId={serverId} />}
+      {tab === 'invites'       && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
+      {tab === 'word-filters'  && <WordFiltersTab serverId={serverId} />}
+      {tab === 'bans'          && <BansTab serverId={serverId} />}
+    </SettingsLayout>
   )
 }
+
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 

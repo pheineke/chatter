@@ -17,15 +17,16 @@ import { getMyDecorations, redeemDecorationCode } from '../api/decorations'
 import { useE2EE } from '../contexts/E2EEContext'
 import { QRScanner } from '../components/QRScanner'
 import { clearDMCache } from '../db/dmCache'
-import { LayoutShell, NavPanel, ContentPanel } from '../components/LayoutShell'
+import { SettingsLayout, type SettingsGroup } from '../components/SettingsLayout'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications' | 'tokens'
 
 // ─── Sidebar nav ─────────────────────────────────────────────────────────────
 
-const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[] = [
+const SETTINGS_GROUPS: SettingsGroup[] = [
   {
-    group: 'User Settings',
+    id: 'user',
+    label: 'User Settings',
     items: [
       { id: 'account', label: 'My Account', icon: 'person' },
       { id: 'privacy', label: 'Privacy & Safety', icon: 'lock-closed' },
@@ -33,7 +34,8 @@ const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[
     ],
   },
   {
-    group: 'App Settings',
+    id: 'app',
+    label: 'App Settings',
     items: [
       { id: 'appearance', label: 'Appearance', icon: 'color-palette' },
       { id: 'voice', label: 'Voice & Video', icon: 'mic' },
@@ -41,6 +43,42 @@ const NAV: { group: string; items: { id: Tab; label: string; icon: string }[] }[
     ],
   },
 ]
+
+export function SettingsPage() {
+  const navigate = useNavigate()
+  const [tab, setTab] = useState('account')
+  const { logout } = useAuth()
+
+  return (
+    <SettingsLayout
+      groups={SETTINGS_GROUPS}
+      activeTab={tab}
+      onTabChange={setTab}
+      onClose={() => navigate(-1)}
+      sidebarFooter={(
+        <button
+          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+          onClick={() => {
+            if (confirm('Are you sure you want to log out?')) {
+              logout()
+              navigate('/login')
+            }
+          }}
+        >
+          <Icon name="log-out" size={16} className="shrink-0" />
+          Log Out
+        </button>
+      )}
+    >
+      {tab === 'account' && <AccountTab />}
+      {tab === 'privacy' && <PrivacyTab />}
+      {tab === 'tokens' && <TokensTab />}
+      {tab === 'appearance' && <AppearanceTab />}
+      {tab === 'voice' && <VoiceTab />}
+      {tab === 'notifications' && <NotificationsTab />}
+    </SettingsLayout>
+  )
+}
 
 // ─── My Account tab ───────────────────────────────────────────────────────────
 
@@ -1435,66 +1473,6 @@ function TokensTab() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function SettingsPage() {
-  const { logout } = useAuth()
-  const navigate = useNavigate()
-  const [tab, setTab] = useState<Tab>('account')
+// Old SettingsPage implementation removed
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') navigate(-1) }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [navigate])
-
-  return (
-    <LayoutShell>
-
-      {/* Nav sidebar */}
-      <NavPanel className="w-[218px] px-2 py-6">
-        {NAV.map(group => (
-          <div key={group.group} className="mb-4">
-            <div className="px-2 mb-1 text-[11px] font-bold text-sp-muted uppercase tracking-wide">{group.group}</div>
-            {group.items.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setTab(item.id)}
-                className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium transition-colors
-                  ${tab === item.id ? 'bg-sp-input text-sp-text' : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
-              >
-                <Icon name={item.icon} size={16} className="shrink-0" />
-                {item.label}
-              </button>
-            ))}
-          </div>
-        ))}
-        <div className="mt-auto pt-4 border-t border-white/5">
-          <button onClick={logout} className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors">
-            <Icon name="log-out" size={16} className="shrink-0" />
-            Log Out
-          </button>
-        </div>
-      </NavPanel>
-
-      {/* Content */}
-      <ContentPanel>
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-2xl mx-auto">
-          {tab === 'account'       && <AccountTab />}
-          {tab === 'privacy'       && <PrivacyTab />}
-          {tab === 'appearance'    && <AppearanceTab />}
-          {tab === 'voice'         && <VoiceTab />}
-          {tab === 'notifications' && <NotificationsTab />}
-          {tab === 'tokens'        && <TokensTab />}
-        </div>
-      </div>
-      {/* Close button */}
-      <div className="p-4 shrink-0 flex flex-col items-center gap-1 relative z-10">
-        <button onClick={() => navigate(-1)} title="Close (Esc)" className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-muted/30 flex items-center justify-center transition-colors group">
-          <Icon name="close" size={20} className="text-sp-muted group-hover:text-sp-text" />
-        </button>
-        <span className="text-[10px] text-sp-muted">ESC</span>
-      </div>
-      </ContentPanel>
-    </LayoutShell>
-  )
-}
+// End of file
