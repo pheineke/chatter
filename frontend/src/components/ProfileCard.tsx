@@ -59,10 +59,13 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   const { blockedIds, block, unblock, isPending: blockPending } = useBlocks()
   const isBlocked = blockedIds.has(userId)
 
-  const { data: user } = useQuery({ 
+  const { data: fetchedUser } = useQuery({ 
     queryKey: ['user', userId], 
     queryFn: () => getUser(userId) 
   })
+
+  // Fallback to currentUser if strictly self (avoids wait)
+  const user = fetchedUser ?? (isSelf ? currentUser : null)
 
   // Close the card when clicking outside
   useEffect(() => {
@@ -77,7 +80,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose])
   
-  if (!user) return null
+  // Removed early return here that caused hook mismatch
 
   // Adjust position to stay in viewport
   // Simple clamping for now or just absolute positioning
@@ -116,7 +119,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
     } catch { /* ignore */ }
   }
 
-  if (!user && !isSelf) return null // If no user loaded yet
+  if (!user) return null // If no user loaded yet
 
   return (
     <div ref={ref} style={{ ...style, boxShadow: 'var(--m3-shadow-4)' }} className="group/card w-80 bg-sp-popup border border-sp-divider/60 rounded-m3-lg overflow-visible flex flex-col text-sp-text animate-fade-in-up">
@@ -212,8 +215,11 @@ export function ProfileCard({ userId, onClose, position }: Props) {
 
        <div className="px-4 pb-4 relative">
           {/* Avatar */}
-          <div className="absolute -top-10 left-4 rounded-full p-1.5 bg-sp-sidebar">
+          <div className="absolute -top-10 left-4 rounded-full p-1.5 bg-sp-sidebar group hover:bg-sp-sidebar/80 transition-colors cursor-pointer" onClick={() => setShowFullProfile(true)}>
              <AvatarWithStatus user={user} size={80} ringColor="#121214" />
+             <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <span className="text-white text-xs font-bold uppercase tracking-wider">View</span>
+             </div>
           </div>
           
           <div className="mt-12">
