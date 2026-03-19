@@ -190,7 +190,7 @@ export function DMSidebar() {
               onContextMenu={openConvContextMenu}
               data-avatar-ring
               style={{ '--avatar-ring': isActive ? 'transparent' : 'transparent', '--avatar-ring-hover': 'transparent' } as React.CSSProperties}
-              className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-full text-sm transition-all
+              className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-full text-sm transition-all select-none
                 ${isActive
                   ? 'bg-sp-mention/15 text-sp-mention font-semibold'
                   : 'text-sp-muted hover:bg-sp-channel-hover hover:text-sp-text'}`}

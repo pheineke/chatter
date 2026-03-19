@@ -26,6 +26,15 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(0)
 
+  // Clear "Add Friend" form state when switching tabs
+  useEffect(() => {
+    if (tab !== 'add') {
+      setAddUsername('')
+      setAddSuccess('')
+      setAddError('')
+    }
+  }, [tab])
+
   const { data: friends = [], isError: friendsError } = useQuery({ queryKey: ['friends'], queryFn: getFriends })
   const { data: requests = [], isError: requestsError } = useQuery({ queryKey: ['friendRequests'], queryFn: getFriendRequests })
 
@@ -58,7 +67,12 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
       }
       return sendFriendRequest(recipientId)
     },
-    onSuccess: () => { setAddSuccess(`Friend request sent!`); setAddUsername(''); setAddError('') },
+    onSuccess: () => { 
+      setAddSuccess(`Friend request sent!`)
+      setAddUsername('')
+      setAddError('')
+      setTimeout(() => setAddSuccess(''), 3000)
+    },
     onError: (err: any) => {
       if (err?.isSelf) { setAddError("You can't add yourself."); setAddSuccess(''); return }
       const detail = err?.response?.data?.detail

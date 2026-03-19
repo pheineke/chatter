@@ -81,14 +81,14 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 | 42 | ✅ **Status icon cutout mask drifts at non-100% zoom** — use top-left anchor or SVG clip | Visual |
 | 43 | ✅ **Server tab active state: border instead of background tint** | Visual |
 | 44 | ✅ **E2EE tag placement** — move to timestamp area; lock icon only on follow-up messages | Visual |
-| 45 | **DM list items: clicking selects text instead of just the row** — add `select-none` | UX |
-| 46 | **Escape / Close settings button is unintuitive** | UX |
-| 47 | **"Friend request sent!" never auto-clears** | UX |
-| 48 | **"Add friend" form state persists when switching tabs** | UX |
-| 49 | **`bubbleRefs` Map grows unboundedly** — no cleanup on unmount | Memory |
-| 50 | **Hover state tracked in React state in `MessageBubble`** — use CSS `group-hover` instead | Performance |
-| 51 | **`channel.updated` client handler is dead code** — wired up but never fired (fixed by P1-10) | Cleanup |
-| 52 | **Theme consistency audit** — Search context menu (and potentially others) does not update on theme change. | Visual |
+| 45 | ✅ **DM list items: clicking selects text instead of just the row** — add `select-none` | UX |
+| 46 | ✅ **Escape / Close settings button is unintuitive** | UX |
+| 47 | ✅ **"Friend request sent!" never auto-clears** | UX |
+| 48 | ✅ **"Add friend" form state persists when switching tabs** | UX |
+| 49 | ✅ **`bubbleRefs` Map grows unboundedly** — no cleanup on unmount | Memory |
+| 50 | ✅ **Hover state tracked in React state in `MessageBubble`** — use CSS `group-hover` instead | Performance |
+| 51 | ✅ **`channel.updated` client handler is dead code** — wired up but never fired (fixed by P1-10) | Cleanup |
+| 52 | ✅ **Theme consistency audit** — Search context menu (and potentially others) does not update on theme change. | Visual |
 | 60 | ✅ **User Card Avatar Interaction** — Clicking avatar in user card should open full profile. | UX |
 | 61 | ✅ **Copy IDs (Dev Mode)** — Add "Copy ID" to all context menus (Server, Channel, User). | Feature |
 

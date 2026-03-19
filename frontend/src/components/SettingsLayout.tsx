@@ -127,17 +127,17 @@ export function SettingsLayout({
             </h2>
             {children}
             
-            {/* Floating Close Button, sticky to top-right - Positioned relative to content container */}
-            <div className="absolute top-0 -right-12 xl:-right-20 flex flex-col items-center gap-1">
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-sp-input hover:bg-sp-muted/30 flex items-center justify-center transition-colors group"
-              title="Close (Esc)"
-            >
-              <Icon name="close" size={20} className="text-sp-muted group-hover:text-sp-text" />
-            </button>
-            <span className="text-[10px] text-sp-muted">ESC</span>
-          </div>
+            {/* Floating Close Button, fixed to top-right of viewport */}
+            <div className="fixed top-8 right-8 z-50 flex flex-col items-center gap-1 animate-fade-in">
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full border-2 border-sp-muted/40 hover:border-sp-text/60 bg-sp-bg/80 backdrop-blur hover:bg-sp-surface-variant flex items-center justify-center transition-all group shadow-lg"
+                title="Close (Esc)"
+              >
+                <Icon name="close" size={20} className="text-sp-muted group-hover:text-sp-text" />
+              </button>
+              <span className="text-[10px] font-bold text-sp-muted tracking-wide mt-0.5">ESC</span>
+            </div>
         </div>
         </div>
       </ContentPanel>

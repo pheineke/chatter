@@ -65,7 +65,7 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
   return (
     <div className="w-72 flex flex-col bg-sp-sidebar border-l border-sp-divider/50 h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 h-12 border-b border-white/[0.07] shrink-0">
+      <div className="flex items-center gap-2 px-3 h-12 border-b border-sp-divider/20 shrink-0">
         <span className="text-sp-muted text-xs font-semibold uppercase tracking-wide">
           {results.length > 0 ? `${results.length} result${results.length !== 1 ? 's' : ''}` : 'Search Results'}
         </span>
