@@ -47,7 +47,7 @@ function AuditLogItem({ entry }: { entry: AuditLogEntry }) {
     <div className="flex gap-3 p-3 bg-gray-700/30 rounded border border-gray-700 hover:border-gray-600 transition-colors">
       <div className="flex-shrink-0">
         {actor ? (
-           <UserAvatar user={actor} size="md" />
+           <UserAvatar user={actor} size={40} />
         ) : (
           <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
             <Icon name="person" className="w-5 h-5 text-gray-400" />

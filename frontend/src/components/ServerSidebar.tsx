@@ -1,3 +1,4 @@
+import { PortalModal } from './PortalModal'
 import { markDMRead, getConversations } from '../api/dms'
 import { useNavigate, useParams, useLocation, useMatch } from 'react-router-dom'
 import { getLastChannel } from '../utils/lastChannel'
@@ -472,7 +473,7 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSide
 
       {/* Confirm Leave Modal */}
       {confirmLeaveId && (
-        <Modal title="Leave Server" onClose={() => setConfirmLeaveId(null)}>
+        <PortalModal title="Leave Server" onClose={() => setConfirmLeaveId(null)}>
           <p className="mb-4 text-sp-text/80">
             Are you sure you want to leave <span className="font-bold text-sp-text">{servers.find(s => s.id === confirmLeaveId)?.title ?? 'this server'}</span>?
             You won't be able to rejoin unless you are invited again.
@@ -485,12 +486,12 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSide
               Leave Server
             </button>
           </div>
-        </Modal>
+        </PortalModal>
       )}
 
       {/* Create server modal */}
       {showCreate && (
-        <Modal title="Create Server" onClose={() => setShowCreate(false)}>
+        <PortalModal title="Create Server" onClose={() => setShowCreate(false)}>
           <input
             autoFocus
             className="input w-full mb-3"
@@ -508,12 +509,12 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSide
               Join Instead
             </button>
           </div>
-        </Modal>
+        </PortalModal>
       )}
 
       {/* Join server modal */}
       {showJoin && (
-        <Modal title="Join Server" onClose={() => setShowJoin(false)}>
+        <PortalModal title="Join Server" onClose={() => setShowJoin(false)}>
           <p className="text-sm text-sp-muted mb-3">Paste an invite link or code below.</p>
           <input
             autoFocus
@@ -527,13 +528,13 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSide
           <button className="btn w-full" onClick={() => joinMut.mutate()} disabled={!inviteCode.trim() || joinMut.isPending}>
             {joinMut.isPending ? 'Joining…' : 'Join Server'}
           </button>
-        </Modal>
+        </PortalModal>
       )}
     </div>
   )
 }
 
-function Modal({ title, onClose, children, className = 'w-80' }: { title: string; onClose: () => void; children: React.ReactNode; className?: string }) {
+function Modal__old({ title, onClose, children, className = 'w-80' }: { title: string; onClose: () => void; children: React.ReactNode; className?: string }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
       <div className={`bg-sp-popup border border-sp-divider/60 rounded-sp-xl p-6 ${className}`} style={{ boxShadow: 'var(--sp-shadow-3)' }} onClick={(e) => e.stopPropagation()}>
