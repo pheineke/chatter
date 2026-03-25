@@ -59,17 +59,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (user?.theme_colors) {
+    if (!user) return
+
+    if (user.theme_preset) {
+      localStorage.setItem('appPreset', user.theme_preset)
+    }
+
+    if (user.theme_colors) {
       try {
         const parsed = JSON.parse(user.theme_colors)
         applyColorOverrides(parsed)
         localStorage.setItem('colorOverrides', user.theme_colors)
-        if (user.theme_preset) {
-           localStorage.setItem('appPreset', user.theme_preset)
-        }
       } catch { /* ignore */ }
+    } else {
+      applyColorOverrides({})
+      localStorage.removeItem('colorOverrides')
     }
-  }, [user?.theme_colors, user?.theme_preset])
+  }, [user?.theme_colors, user?.theme_preset, user])
 
   const login = async (username: string, password: string) => {
     const data = await apiLogin(username, password)
