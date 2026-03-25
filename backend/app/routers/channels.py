@@ -7,6 +7,8 @@ from sqlalchemy import select
 from app.dependencies import CurrentUser, DB
 from app.routers.servers import _get_server_or_404, _require_member, _require_admin
 from app.ws_manager import manager
+from app.services.audit_log_service import create_audit_log
+from models.audit_log import AuditLogAction
 from app.schemas.channel import (
     CategoryCreate,
     CategoryUpdate,
@@ -43,6 +45,15 @@ async def create_category(
     server = await _get_server_or_404(server_id, db)
     await _require_admin(server, current_user.id, db)
     category = Category(server_id=server_id, title=body.title, position=body.position)
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id, # Using passed user object context
+        action=AuditLogAction.CHANNEL_CREATE,
+        changes={"title": body.title, "type": "category"}
+    )
+    
     db.add(category)
     await db.commit()
     await db.refresh(category)
@@ -100,6 +111,16 @@ async def update_category(
         cat.title = body.title
     if body.position is not None:
         cat.position = body.position
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.CHANNEL_UPDATE,
+        target_id=category_id,
+        changes=body.model_dump(exclude_unset=True) | {"type": "category"},
+    )
+
     await db.commit()
     await db.refresh(cat)
     await manager.broadcast_server(
@@ -121,6 +142,16 @@ async def delete_category(
     cat = result.scalar_one_or_none()
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.CHANNEL_DELETE,
+        target_id=category_id,
+        changes={"title": cat.title, "type": "category"},
+    )
+
     await db.delete(cat)
     await db.commit()
     await manager.broadcast_server(
@@ -157,6 +188,15 @@ async def create_channel(
         user_limit=body.user_limit,
         bitrate=body.bitrate,
     )
+
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.CHANNEL_CREATE,
+        changes={"title": body.title, "type": body.type, "description": body.description},
+    )
+
     db.add(channel)
     await db.commit()
     await db.refresh(channel)
@@ -217,6 +257,16 @@ async def update_channel(
         channel.description = body.description
     if body.position is not None:
         channel.position = body.position
+
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.CHANNEL_UPDATE,
+        target_id=channel_id,
+        changes=body.model_dump(exclude_unset=True),
+    )
+
     if body.category_id is not None:
         channel.category_id = body.category_id
     if body.slowmode_delay is not None:
@@ -228,6 +278,16 @@ async def update_channel(
     if body.bitrate is not None:
         channel.bitrate = max(8000, body.bitrate)  # floor at 8 kbps
     await db.commit()
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.CHANNEL_DELETE,
+        target_id=channel_id,
+        changes={"title": channel.title, "type": channel.type},
+    )
+
     await db.refresh(channel)
     await manager.broadcast_server(
         server_id,

@@ -40,6 +40,9 @@ class Server(Base):
     bans: Mapped[list["ServerBan"]] = relationship(
         "ServerBan", back_populates="server", cascade="all, delete-orphan"
     )
+    audit_logs: Mapped[list["AuditLog"]] = relationship(
+        "AuditLog", back_populates="server", cascade="all, delete-orphan"
+    )
 
 
 class ServerMember(Base):

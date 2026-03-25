@@ -10,6 +10,8 @@ from sqlalchemy.orm import selectinload
 from app.dependencies import CurrentUser, DB
 from app.routers.servers import _get_server_or_404, _require_member, _require_admin, _check_not_banned
 from app.ws_manager import manager
+from app.services.audit_log_service import create_audit_log
+from models.audit_log import AuditLogAction
 from models.invite import ServerInvite
 from models.server import Server, ServerMember
 
@@ -88,6 +90,15 @@ async def create_invite(
         expires_at=expires_at,
         max_uses=body.max_uses,
     )
+
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.INVITE_CREATE,
+        changes={"max_uses": body.max_uses, "expires_hours": body.expires_hours},
+    )
+
     db.add(invite)
     await db.commit()
 
@@ -195,6 +206,15 @@ async def revoke_invite(code: str, current_user: CurrentUser, db: DB):
     await _require_admin(server, current_user.id, db)
     server_id = invite.server_id
     code = invite.code
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.INVITE_DELETE,
+        changes={"code": code},
+    )
+
     await db.delete(invite)
     await db.commit()
     await manager.broadcast_server(

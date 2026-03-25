@@ -1,13 +1,14 @@
-import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, useLayoutEffect, type KeyboardEvent } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 import { sendMessage, uploadAttachment } from '../api/messages'
 import { getMembers } from '../api/servers'
+import { getCommands, createInteraction } from '../api/interactions'
 import { Icon } from './Icon'
 import { EmojiPicker } from './EmojiPicker'
 import { UserAvatar } from './UserAvatar'
 import { useE2EE } from '../contexts/E2EEContext'
-import type { Message, Member } from '../api/types'
+import type { Message, Member, ApplicationCommandRead } from '../api/types'
 
 const TYPING_THROTTLE_MS = 8_000  // retransmit at most every 8s while typing (Discord-style)
 
@@ -60,11 +61,12 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
   const [uploadError, setUploadError] = useState<string | null>(null)
   const messageSentRef = useRef(false)
 
-  const resetComposerHeight = useCallback(() => {
-    const ta = textareaRef.current
-    if (!ta) return
-    ta.style.height = 'auto'
-  }, [])
+  // Auto-shrink textarea when message is cleared
+  useLayoutEffect(() => {
+    if (text === '' && textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+    }
+  }, [text])
 
   // Tick the countdown every second
   useEffect(() => {
@@ -93,12 +95,26 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
   const [mentionIndex, setMentionIndex] = useState(0)
   const mentionListRef = useRef<HTMLDivElement>(null)
 
+  // Command autocomplete state
+  const [commandQuery, setCommandQuery] = useState<string | null>(null)
+  const [commandIndex, setCommandIndex] = useState(0)
+  const commandListRef = useRef<HTMLDivElement>(null)
+
   // Load server members (uses cached data if already fetched by MemberSidebar)
   const { data: members = [] } = useQuery<Member[]>({
     queryKey: ['members', serverId],
-    queryFn: () => getMembers(serverId!),
+    queryFn: () => getMembers(serverId || ''),
     enabled: !!serverId,
-    staleTime: 60_000,
+    staleTime: Infinity,
+  })
+
+  // Load commands
+  const { data: commands = [] } = useQuery<ApplicationCommandRead[]>({
+    queryKey: ['commands', serverId],
+    queryFn: () => getCommands(serverId),
+    // Stale time effectively infinite for production usually, but we want to see new commands during dev
+    staleTime: 10_000, 
+    refetchOnWindowFocus: true
   })
 
   // Filter members by current mention query
@@ -107,6 +123,18 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
         .filter((m) => m.user.username.toLowerCase().startsWith(mentionQuery))
         .slice(0, 8)
     : []
+
+  // Filter commands by query
+  const commandCandidates = commandQuery !== null
+    ? commands
+        .filter((c) => c.name.toLowerCase().startsWith(commandQuery))
+        .slice(0, 8)
+    : []
+  
+  // Reset selected index when candidates change
+  useEffect(() => {
+    if (commandCandidates.length > 0) setCommandIndex(0)
+  }, [commandQuery])
 
   // Throttled typing emit
   const emitTyping = useCallback(() => {
@@ -136,7 +164,6 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     },
     onSuccess: (_data, _variables) => {
       setText('')
-      resetComposerHeight()
       qc.invalidateQueries({ queryKey: ['messages', channelId] })
       onCancelReply?.()
       // Start client-side cooldown so the user sees the countdown immediately
@@ -174,7 +201,6 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['messages', channelId] })
       setText('')
-      resetComposerHeight()
       onCancelReply?.()
       setUploadError(null)
       if (slowmodeDelay > 0) {
@@ -197,6 +223,74 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     },
   })
 
+  // Execute a slash command interaction
+  const executeCommand = async (commandName: string, args: string) => {
+    // Basic argument parsing: split by space for now
+    // In a real implementation this would parse options based on schema
+    const options: Record<string, any> = {}
+    const cmd = commands.find(c => c.name === commandName)
+    if (cmd && args) {
+       // "Smart" parsing: if multiple options, parsing is hard. 
+       // For 'echo', we assume 'message' is the rest.
+       if (cmd.name === 'echo') options['message'] = args.trim()
+       else if (cmd.options && cmd.options.length > 0) {
+         options[cmd.options[0].name] = args.trim()
+       }
+    }
+
+    try {
+        if (!cmd) throw new Error('Command not found')
+        const response = await createInteraction(cmd.id, cmd.name, options, serverId, channelId)
+        
+        if (response?.data?.flags === 64 && response.data.content) {
+          // Ephemeral message injection
+          const ephemeralMsg: Message = {
+            id: `ephemeral-${Date.now()}`,
+            channel_id: channelId,
+            content: response.data.content,
+            author: { 
+              id: 'system', 
+              username: 'System', 
+              status: 'online', 
+              preferred_status: 'online', 
+              hide_status: false, 
+              created_at: new Date().toISOString(), 
+              avatar: null, 
+              banner: null, 
+              avatar_decoration: null, 
+              description: null, 
+              pronouns: null, 
+              dm_permission: 'everyone' 
+            },
+            author_nickname: null,
+            reply_to_id: null,
+            reply_to: null,
+            is_deleted: false,
+            is_edited: false,
+            edited_at: null,
+            created_at: new Date().toISOString(),
+            attachments: [],
+            reactions: [],
+            mentions: [],
+            is_encrypted: false,
+            nonce: null,
+            is_ephemeral: true
+          }
+
+          qc.setQueryData(['messages', channelId], (old: any) => {
+            if (!old) return old
+            const [first, ...rest] = old.pages
+            return { ...old, pages: [[...(first ?? []), ephemeralMsg], ...rest] }
+          })
+        }
+    } catch (err) {
+        setUploadError(`Command failed: ${err}`)
+    }
+    
+    setText('')
+    setCommandQuery(null)
+  }
+
   function handleSend() {
     if (inCooldown) return
     const trimmed = text.trim()
@@ -205,10 +299,21 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       setUploadError(`Message is too long (${trimmed.length}/${MAX_MESSAGE_LEN}).`)
       return
     }
+
+    // Check for slash command
+    if (trimmed.startsWith('/')) {
+        const parts = trimmed.slice(1).split(' ')
+        const cmdName = parts[0]
+        const args = parts.slice(1).join(' ')
+        if (commands.some(c => c.name === cmdName)) {
+            executeCommand(cmdName, args)
+            return
+        }
+    }
+
     if (isOffline && onOfflineSubmit) {
       onOfflineSubmit(trimmed)
       setText('')
-      resetComposerHeight()
       setMentionQuery(null)
       return
     }
@@ -231,6 +336,13 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       const pos = before.length + inserted.length
       ta?.setSelectionRange(pos, pos)
     })
+  }
+
+  function selectCommand(cmd: ApplicationCommandRead) {
+    // Replace current query with command
+    setText(`/${cmd.name} `)
+    setCommandQuery(null)
+    textareaRef.current?.focus()
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -258,12 +370,71 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       }
     }
 
+    // Command navigation
+    if (commandQuery !== null && commandCandidates.length > 0) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setCommandIndex(i => (i - 1 + commandCandidates.length) % commandCandidates.length)
+        return
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setCommandIndex(i => (i + 1) % commandCandidates.length)
+        return
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault()
+        selectCommand(commandCandidates[commandIndex])
+        return
+      }
+      if (e.key === 'Escape') {
+        setCommandQuery(null)
+        return
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
     if (e.key === 'Escape' && replyTo) {
       onCancelReply?.()
+    }
+  }
+
+  function handleInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const newVal = e.target.value
+    setText(newVal)
+    e.target.style.height = 'auto'
+    e.target.style.height = `${e.target.scrollHeight}px`
+    emitTyping()
+
+    const selStart = e.target.selectionStart ?? newVal.length
+
+    // Detect /commands (must be at start)
+    if (newVal.startsWith('/')) {
+        const cmdPart = newVal.slice(1).split(' ')[0]
+        // only show menu while typing the command name
+        if (!newVal.includes(' ') || (selStart <= cmdPart.length + 1)) {
+             setCommandQuery(cmdPart.toLowerCase())
+             setCommandIndex(0)
+             setMentionQuery(null) 
+             return
+        } else {
+             setCommandQuery(null)
+        }
+    } else {
+        setCommandQuery(null)
+    }
+
+    // Detect @mentions
+    const match = findMentionTrigger(newVal, selStart)
+    if (match && serverId) {
+      setMentionQuery(match.query)
+      setMentionTriggerStart(match.triggerStart)
+      setMentionIndex(0)
+    } else {
+      setMentionQuery(null)
     }
   }
 
@@ -335,6 +506,36 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
         </div>
       )}
 
+      {/* /command autocomplete dropdown */}
+      {commandQuery !== null && commandCandidates.length > 0 && (
+        <div
+          className="absolute bottom-full mb-1 left-4 right-4 bg-sp-popup border border-sp-divider/50 rounded-sp-lg shadow-sp-3 overflow-hidden z-50 flex flex-col"
+        >
+          <div className="px-3 py-1.5 text-[10px] font-bold uppercase text-sp-muted tracking-wider border-b border-sp-divider/50 bg-sp-bg/50">
+             Commands — {commandQuery ? `matching "/${commandQuery}"` : 'all'}
+          </div>
+          <div className="max-h-[220px] overflow-y-auto custom-scrollbar p-1 space-y-0.5">
+           {commandCandidates.map((cmd, idx) => (
+            <button
+              key={cmd.id}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-md transition-colors text-left
+                ${idx === commandIndex ? 'bg-sp-mention/15 text-sp-mention' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'}`}
+              onMouseEnter={() => setCommandIndex(idx)}
+              onMouseDown={(e) => { e.preventDefault(); selectCommand(cmd) }}
+            >
+              <div className="w-6 h-6 rounded-full bg-sp-button text-sp-text flex items-center justify-center shrink-0">
+                  <span className="font-bold text-xs">/</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                  <span className="font-bold truncate">{cmd.name}</span>
+                  <span className="text-[10px] opacity-70 truncate">{cmd.description}</span>
+              </div>
+            </button>
+          ))}
+          </div>
+        </div>
+      )}
+
       {/* Slowmode banner */}
       {inCooldown && (
         <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300/60 rounded-sp-sm px-3 py-1.5 mb-1.5 text-xs text-yellow-700">
@@ -403,24 +604,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
           maxLength={MAX_MESSAGE_LEN}
           placeholder={inCooldown ? `Slowmode — wait ${cooldownSecs}s…` : placeholder}
           disabled={inCooldown}
-          onChange={(e) => {
-            const newText = e.target.value
-            setText(newText)
-            e.target.style.height = 'auto'
-            e.target.style.height = `${e.target.scrollHeight}px`
-            emitTyping()
-
-            // @mention detection
-            const cursor = e.target.selectionStart ?? newText.length
-            const trigger = findMentionTrigger(newText, cursor)
-            if (trigger && serverId) {
-              setMentionQuery(trigger.query)
-              setMentionTriggerStart(trigger.triggerStart)
-              setMentionIndex(0)
-            } else {
-              setMentionQuery(null)
-            }
-          }}
+          onChange={handleInput}
           onKeyDown={handleKeyDown}
         />
 

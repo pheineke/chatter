@@ -7,7 +7,7 @@ import { useSoundManager } from './useSoundManager'
 import { activeServerIds } from './serverRegistry'
 import { useNotificationSettings } from './useNotificationSettings'
 import { useAuth } from '../contexts/AuthContext'
-import type { Channel, Category, Member, VoiceParticipant } from '../api/types'
+import type { Channel, Category, Member, VoiceParticipant, User } from '../api/types'
 
 /** Voice presence query key for a given server. */
 const vpKey = (serverId: string | null) => ['voicePresence', serverId] as const
@@ -148,6 +148,17 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           qc.setQueryData<Channel[]>(['channels', serverId], () => updated)
           break
         }
+        case 'user.updated': {
+          const user = msg.data as User
+          // Update member list
+          qc.setQueryData<Member[]>(['members', serverId], (old) => {
+            if (!old) return old
+            return old.map((m) => (m.user.id === user.id ? { ...m, user: { ...m.user, ...user } } : m))
+          })
+          // Update cached user profile if exists
+          qc.setQueryData<User>(['user', user.id], (old) => old ? { ...old, ...user } : old)
+          break
+        }
         case 'categories.reordered': {
           const updated = msg.data as Category[]
           qc.setQueryData<Category[]>(['categories', serverId], () => updated)
@@ -158,15 +169,6 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           qc.setQueryData<Member[]>(['members', serverId], (old = []) =>
             old.map(m =>
               m.user.id === user_id ? { ...m, user: { ...m.user, status: status as Member['user']['status'] } } : m
-            )
-          )
-          break
-        }
-        case 'user.updated': {
-          const updatedUser = msg.data as Member['user']
-          qc.setQueryData<Member[]>(['members', serverId], (old = []) =>
-            old.map(m =>
-              m.user.id === updatedUser.id ? { ...m, user: { ...m.user, ...updatedUser } } : m
             )
           )
           break

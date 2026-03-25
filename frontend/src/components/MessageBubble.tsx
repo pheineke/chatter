@@ -172,6 +172,26 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
     )
   }
 
+  if (msg.is_ephemeral) {
+    return (
+      <div className={`relative group py-2 pr-4 pl-4 ${compact ? 'mt-0' : 'mt-3'} flex gap-3 border-l-2 bg-[#2b2d31] hover:bg-[#2b2d31]/80 border-emerald-500`}>
+        <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+          <Icon name="Wrench" className="w-5 h-5 text-emerald-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="font-semibold text-sp-text">System</span>
+            <span className="text-xs text-sp-muted font-semibold bg-emerald-500/10 text-emerald-400 px-1 rounded">APP</span>
+            <span className="text-xs text-sp-muted">Only you can see this</span>
+          </div>
+          <div className="text-sp-text leading-relaxed break-words whitespace-pre-wrap mt-0.5">
+            {msg.content}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
     <div
@@ -268,19 +288,27 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
         {editing ? (
           <div>
             <textarea
-              className="input w-full resize-none text-sm"
+              className="input w-full resize-none text-sm p-2 rounded-md bg-sp-input border border-sp-divider/30 text-sp-text focus:border-sp-primary focus:ring-1 focus:ring-sp-primary/20 outline-none"
               rows={2}
               value={editText}
               maxLength={2000}
-              onChange={(e) => setEditText(e.target.value)}
+              onChange={(e) => {
+                setEditText(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = `${e.target.scrollHeight}px`
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); editMut.mutate() }
                 if (e.key === 'Escape') setEditing(false)
               }}
+              ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' } }}
               autoFocus
             />
-            <div className="text-xs text-sp-muted mt-1">
-              Enter to save · Esc to cancel
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs text-sp-muted">escape to cancel • enter to save</span>
+              <span className={`text-[10px] ${editText.length > 1800 ? 'text-red-400' : 'text-sp-muted'}`}>
+                {editText.length}/2000
+              </span>
             </div>
           </div>
         ) : (

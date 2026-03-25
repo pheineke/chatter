@@ -103,6 +103,75 @@ export interface Category {
   position: number
 }
 
+// ---- Audit Logs ------------------------------------------------------------
+
+export enum AuditLogAction {
+    SERVER_UPDATE = "SERVER_UPDATE",
+    CHANNEL_CREATE = "CHANNEL_CREATE",
+    CHANNEL_UPDATE = "CHANNEL_UPDATE",
+    CHANNEL_DELETE = "CHANNEL_DELETE",
+    MEMBER_KICK = "MEMBER_KICK",
+    MEMBER_BAN = "MEMBER_BAN",
+    MEMBER_UNBAN = "MEMBER_UNBAN",
+    MEMBER_ROLE_UPDATE = "MEMBER_ROLE_UPDATE",
+    ROLE_CREATE = "ROLE_CREATE",
+    ROLE_UPDATE = "ROLE_UPDATE",
+    ROLE_DELETE = "ROLE_DELETE",
+    INVITE_CREATE = "INVITE_CREATE",
+    INVITE_DELETE = "INVITE_DELETE",
+    WEBHOOK_CREATE = "WEBHOOK_CREATE",
+    WEBHOOK_UPDATE = "WEBHOOK_UPDATE",
+    WEBHOOK_DELETE = "WEBHOOK_DELETE",
+    EMOJI_CREATE = "EMOJI_CREATE",
+    EMOJI_UPDATE = "EMOJI_UPDATE",
+    EMOJI_DELETE = "EMOJI_DELETE",
+    MESSAGE_DELETE = "MESSAGE_DELETE",
+    MESSAGE_BULK_DELETE = "MESSAGE_BULK_DELETE",
+    MESSAGE_PIN = "MESSAGE_PIN",
+    MESSAGE_UNPIN = "MESSAGE_UNPIN",
+    INTEGRATION_CREATE = "INTEGRATION_CREATE",
+    INTEGRATION_UPDATE = "INTEGRATION_UPDATE",
+    INTEGRATION_DELETE = "INTEGRATION_DELETE",
+}
+
+export interface AuditLogEntry {
+    id: string
+    server_id: string
+    user_id: string | null
+    action_type: AuditLogAction
+    target_id: string | null
+    changes: Record<string, any> | null
+    reason: string | null
+    created_at: string
+}
+
+// ---- Interactions ----------------------------------------------------------
+
+export interface ApplicationCommandOption {
+    type: number
+    name: string
+    description: string
+    required: boolean
+    choices?: { name: string; value: string | number }[]
+}
+
+export interface ApplicationCommandRead {
+    id: string
+    application_id: string
+    name: string
+    description: string
+    options?: ApplicationCommandOption[]
+}
+
+export interface InteractionResponse {
+    type: number
+    data?: {
+        content?: string
+        flags?: number
+    }
+}
+
+
 // ---- Messages --------------------------------------------------------------
 
 export interface Attachment {
@@ -155,6 +224,8 @@ export interface Message {
   is_encrypted: boolean
   /** AES-GCM nonce (base64); required when is_encrypted is true */
   nonce: string | null
+  /** Optional flag for messages only visible to the local user (Slash command responses) */
+  is_ephemeral?: boolean
 }
 
 export interface PinnedMessage {

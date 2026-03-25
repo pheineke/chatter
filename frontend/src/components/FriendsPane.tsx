@@ -175,7 +175,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
               <>
                 <p className="text-xs uppercase font-semibold text-sp-muted mb-2">Incoming — {incoming.length}</p>
                 {incoming.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group">
+                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group select-none">
                     <UserAvatar user={r.sender} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{r.sender.username}</p>
@@ -193,7 +193,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
               <>
                 <p className="text-xs uppercase font-semibold text-sp-muted mt-4 mb-2">Outgoing — {outgoing.length}</p>
                 {outgoing.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group">
+                  <div key={r.id} className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group select-none">
                     <UserAvatar user={r.recipient} size={40} />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{r.recipient.username}</p>
@@ -220,7 +220,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
             </p>
             <div style={{ paddingTop: padTop, paddingBottom: padBottom }}>
             {visibleFriends.map((f) => (
-              <div key={f.user.id} data-avatar-ring className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group cursor-pointer"
+              <div key={f.user.id} data-avatar-ring className="flex items-center gap-3 p-2 rounded hover:bg-sp-input/40 group cursor-pointer select-none"
                 style={{ '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#26272c' } as React.CSSProperties}
                 onClick={() => navigate(`/channels/@me/${f.user.id}`)}>
                 <AvatarWithStatus user={f.user} size={40} ringColor="#1a1a1e" />

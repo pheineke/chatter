@@ -20,9 +20,14 @@ from models.notification import (
 from models.word_filter import WordFilter, ServerBan, WordFilterAction
 from models.decoration_code import DecorationCode
 from models.e2ee import QRSession, QRSessionStatus, UserE2EEKey
+from models.audit_log import AuditLog, AuditLogAction
+from models.interaction import ApplicationCommand, ApplicationCommandType, InteractionType, InteractionCallbackType
 
 __all__ = [
     "Base",
+    "ApplicationCommand",
+    "AuditLog",
+    "AuditLogAction",
     "User",
     "UserStatus",
     "Server",

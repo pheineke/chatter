@@ -281,7 +281,7 @@ function MemberRow({ member, onClick, onContextMenu }: { member: Member; onClick
       onClick={onClick}
       onContextMenu={onContextMenu}
       data-avatar-ring
-      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded mx-1 hover:bg-sp-input/60 transition-colors text-left group"
+      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded mx-1 hover:bg-sp-input/60 transition-colors text-left group select-none"
       style={{ width: 'calc(100% - 8px)', '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#2c2d32' } as React.CSSProperties}
     >
       <AvatarWithStatus user={member.user} size={32} />

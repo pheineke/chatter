@@ -26,6 +26,8 @@ from app.schemas.server import (
 )
 from app.schemas.user import UserRead, UserPublicRead
 from app.ws_manager import manager
+from app.services.audit_log_service import create_audit_log
+from models.audit_log import AuditLogAction
 from models.server import Server, ServerMember, Role, UserRole
 from models.user import User, UserStatus
 from models.word_filter import WordFilter, ServerBan
@@ -110,6 +112,15 @@ async def update_server(server_id: uuid.UUID, body: ServerUpdate, current_user: 
         server.title = body.title
     if body.description is not None:
         server.description = body.description
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.SERVER_UPDATE,
+        changes=body.model_dump(exclude_unset=True),
+    )
+
     await db.commit()
     await db.refresh(server)
     await manager.broadcast_server(
@@ -254,6 +265,17 @@ async def remove_member(
     member = result.scalar_one_or_none()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
+    
+    # If admin kicked someone else, log it
+    if current_user.id != user_id:
+        await create_audit_log(
+            session=db,
+            server_id=server_id,
+            user_id=current_user.id,
+            action=AuditLogAction.MEMBER_KICK,
+            target_id=user_id,
+        )
+
     await db.delete(member)
     await db.commit()
     event_type = "server.member_left" if current_user.id == user_id else "server.member_kicked"
@@ -348,6 +370,15 @@ async def create_role(server_id: uuid.UUID, body: RoleCreate, current_user: Curr
         mentionable=body.mentionable,
         position=body.position,
     )
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.ROLE_CREATE,
+        changes={"name": body.name, "is_admin": body.is_admin, "color": body.color},
+    )
+
     db.add(role)
     await db.commit()
     await db.refresh(role)
@@ -380,6 +411,16 @@ async def update_role(
         role.mentionable = body.mentionable
     if body.position is not None:
         role.position = body.position
+
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.ROLE_UPDATE,
+        target_id=role_id,
+        changes=body.model_dump(exclude_unset=True),
+    )
+
     await db.commit()
     await db.refresh(role)
     await manager.broadcast_server(
@@ -399,6 +440,16 @@ async def delete_role(
     role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.ROLE_DELETE,
+        target_id=role_id,
+        changes={"name": role.name},
+    )
+    
     await db.delete(role)
     await db.commit()
     await manager.broadcast_server(
@@ -422,6 +473,16 @@ async def assign_role(
     )
     if not existing.scalar_one_or_none():
         db.add(UserRole(user_id=user_id, role_id=role_id))
+        
+        await create_audit_log(
+            session=db,
+            server_id=server_id,
+            user_id=current_user.id,
+            action=AuditLogAction.MEMBER_ROLE_UPDATE,
+            target_id=user_id,
+            changes={"added_role_id": str(role_id)},
+        )
+        
         await db.commit()
         await manager.broadcast_server(
             server_id,
@@ -443,6 +504,17 @@ async def remove_role(
     user_role = result.scalar_one_or_none()
     if user_role:
         await db.delete(user_role)
+        # Audit Log
+        from app.routers.audit_logs import create_audit_log, AuditLogAction
+        await create_audit_log(
+            session=db,
+            server_id=server_id,
+            user_id=current_user.id,
+            action=AuditLogAction.MEMBER_ROLE_UPDATE,
+            target_id=user_id,
+            changes={"removed_role_id": str(role_id)},
+        )
+        
         await db.commit()
         await manager.broadcast_server(
             server_id,
@@ -510,6 +582,15 @@ async def ban_member(server_id: uuid.UUID, user_id: uuid.UUID, current_user: Cur
     )
     if not existing.scalar_one_or_none():
         db.add(ServerBan(server_id=server_id, user_id=user_id))
+    
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.MEMBER_BAN,
+        target_id=user_id,
+    )
+
     # Kick if still a member
     member_row = await db.execute(
         select(ServerMember).where(ServerMember.server_id == server_id, ServerMember.user_id == user_id)
@@ -534,6 +615,15 @@ async def unban_member(server_id: uuid.UUID, user_id: uuid.UUID, current_user: C
     ban = result.scalar_one_or_none()
     if not ban:
         raise HTTPException(status_code=404, detail="Ban not found")
+        
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.MEMBER_UNBAN,
+        target_id=user_id,
+    )
+
     await db.delete(ban)
     await db.commit()
 

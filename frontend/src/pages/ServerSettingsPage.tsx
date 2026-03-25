@@ -13,6 +13,7 @@ import { listInvites, revokeInvite } from '../api/invites'
 import { UserAvatar } from '../components/UserAvatar'
 import { Icon } from '../components/Icon'
 import { InviteModal } from '../components/InviteModal'
+import { ServerAuditLog } from '../components/ServerAuditLog'
 import { useAuth } from '../contexts/AuthContext'
 import type { Member, Role } from '../api/types'
 import type { ServerInvite } from '../api/invites'
@@ -27,7 +28,9 @@ const TABS: (SettingsTab & { adminOnly?: boolean })[] = [
   { id: 'invites',       label: 'Invites',       icon: 'link-2',      adminOnly: true },
   { id: 'word-filters',  label: 'Word Filters',  icon: 'funnel',      adminOnly: true },
   { id: 'bans',          label: 'Bans',          icon: 'slash',       adminOnly: true },
+  { id: 'audit-logs',    label: 'Audit Log',     icon: 'activity',    adminOnly: true },
 ]
+
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -105,6 +108,7 @@ export function ServerSettingsPage() {
       {tab === 'invites'       && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
       {tab === 'word-filters'  && <WordFiltersTab serverId={serverId} />}
       {tab === 'bans'          && <BansTab serverId={serverId} />}
+      {tab === 'audit-logs'    && <ServerAuditLog serverId={serverId} />}
     </SettingsLayout>
   )
 }

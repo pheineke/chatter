@@ -54,7 +54,7 @@ export default function AppShell() {
   const { data: channels = [] } = useQuery({
     queryKey: ['channels', currentServerId],
     queryFn: () => getChannels(currentServerId!),
-    enabled: !!currentServerId,
+    enabled: !!currentServerId && currentServerId !== '@me',
     staleTime: 60_000,
   })
   const channelPaths = channels

@@ -18,8 +18,8 @@ export function UserPanel() {
   return (
     <>
     <div className="px-2 py-1.5 flex items-center gap-1 shrink-0 h-14 bg-sp-user select-none">
-      <div
-        className="flex items-center gap-2 flex-1 min-w-0 hover:bg-white/5 rounded-md px-2 py-1.5 cursor-pointer transition-colors group"
+      <button
+        className="flex items-center gap-2 flex-1 min-w-0 hover:bg-white/5 rounded-md px-2 py-1.5 cursor-pointer transition-colors group text-left"
         onClick={(e) => {
           setStatusError(null)
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -56,7 +56,7 @@ export function UserPanel() {
             {user.status === 'dnd' ? 'Do Not Disturb' : user.status}
           </div>
         </div>
-      </div>
+      </button>
       
       <div className="flex items-center">
         <button

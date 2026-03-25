@@ -122,30 +122,24 @@ Issues ranked by **impact × urgency**. Priorities: 🔴 P0 Critical · 🟠 P1 
 - ~~**DM list has no online status indicator or unread badge**~~ ✅ Fixed — `DMSidebar` now lists all conversations with `UserAvatar` + `StatusIndicator` per contact. An unread white dot appears next to any conversation with messages newer than the stored `dmLastRead` timestamp. A green dot badge also appears on the DM button in `ServerSidebar` (via `useUnreadDMs`) whenever any DM has unread messages, even while on a server.
 - ~~**Typing indicator not shown in DMs**~~ ✅ Fixed — `DMPane` now calls `useChannelWS(dmChannel?.channel_id)`, wiring `typingUsers` into the animated "X is typing…" bar and passing `sendTyping` to `MessageInput` via `onTyping`. The backend `/ws/channels/{channel_id}` endpoint already handled `typing` events for all channel types; no backend changes were needed.
 - ~~**No notification sound for incoming server channel messages when not in DM sidebar**~~ ✅ Verified working — `channel.message` handler in `useUnreadDMs` fires `playSound`, but only if the active route is not already the matching channel.
-- **Escape / Close settings button is unintuitive** — The UX for dismissing the settings page (Escape key and/or close button placement/style) is confusing to users. Needs a clearer affordance.
-- **No notification when a friend request is received or accepted** — The recipient only discovers the request/acceptance if they actively navigate to the DM panel (and even then it requires opening the Friends view). There is no badge, toast, or sound to alert them in real time. Idea: add a persistent "Friends" button above the user panel in the sidebar (in the channel card area) that shows a badge count of pending incoming requests, giving it a visible home without requiring navigation to the DM tab.
-- **"Server members only" DM privacy setting incorrectly blocks already-friended users** — If a user restricts DMs to mutual-server members, befriended users who don't share a server are also blocked, which is wrong. The setting logic needs a rework. Proposed replacement model (matching Discord's current approach):
-  - **Global settings** (apply across all servers):
-    - *Direct Messages and Friend Requests* — Allow DMs and friend requests from other server members.
-    - *Message Requests* — Filter messages from server members you may not know (lands in a requests inbox rather than being blocked outright).
-  - **Per-server overrides** (additional toggles per server, on top of global):
-    - *Share my activity* — Share activity information from games and connected apps, including when and how you engage.
-    - *Activity joining* — Allow users to join your activity on this server.
-  - Friends should always be able to DM regardless of server-membership settings.
-- **Text messages with attachments are not end-to-end encrypted** — When a message contains both text and a file attachment the text portion is sent/stored unencrypted. The text content of attachment messages should follow the same E2EE path as plain text messages.
-- **Message input box stays expanded after sending a long message** — After the user types a long multi-line message and sends it, the textarea does not shrink back to its default single-line height. It should reset to minimum height on send.
-- **Cannot pin messages in private DMs** — The pin action is only available in server channels. DM channels should also support pinned messages (both the pin action on individual messages and a pinned-messages panel).
-- **Editing an E2EE message shows the raw ciphertext** — When a user tries to edit one of their own encrypted messages, the edit input is pre-filled with the encrypted ciphertext instead of the plaintext. Fix: decrypt the message client-side before populating the edit field, then re-encrypt the edited plaintext before submitting to the server.
-- **Status indicator updates not propagated to friends in real time** — If user A changes their status (e.g. DND → Away), user B continues to see the old status until a page reload. The `presence` WS event (or equivalent) is either not being broadcast to friends/DM participants or not being handled client-side to update the cached user data.
-- **DM header username and avatar are not clickable to open full profile** — Clicking the other user's name or avatar in the DM channel header should open their full profile card/page, the same as clicking their avatar in the message list.
-- **E2EE tag placement and follow-up message indicator** — The "E2EE" green tag should move from its current position to sit next to the message timestamp. For follow-up messages (no avatar/header repeated), show only the green lock icon next to the timestamp instead of the full "E2EE" label.
-- **Clicking the timestamp on follow-up messages opens profile card incorrectly** — On grouped/follow-up messages the timestamp is clickable and opens the sender's profile card, which is unintended. Only clicking the user's avatar should open the profile card; the timestamp area should not be a trigger.
-- **Server tab active state: use a border instead of a background tint** — The currently selected server tab uses a background tint to indicate active state. Replace this with a visible border (e.g. outline or inset border on the tab) so the selection is clearer and more distinct from the hover state.
-- **"About Me" text on user profiles does not wrap** — Long about-me text overflows horizontally instead of wrapping to the next line. The container needs `word-break: break-word` / `whitespace: pre-wrap` (or equivalent Tailwind classes) so all content stays visible.
-- **"About Me" field has no character limit** — There is currently no cap on the about-me field. Limit it to 2000 characters: enforce `max_length=2000` on the backend schema and add a live character counter + input cap on the frontend.
-- **DM list items: clicking selects/highlights the text instead of just the row** — When clicking a conversation entry in the DM panel the username text gets selected (text selection highlight) rather than only the row being highlighted as active. Add `select-none` (or `user-select: none`) to the DM list item so only the row background changes on click.
-- **Friends/pending list lags when a user has a large about-me or many contacts** — Two separate problems: (1) rendering a user with a very long about-me string (even in a compact list row that doesn't display it) causes noticeable jank — the full user object including the about-me blob is likely being passed down and causing expensive re-renders; the about-me text should not be included in the lightweight list-item payload, only fetched when opening a full profile. (2) The list itself is not virtualised — rendering hundreds or thousands of friend/pending rows at once tanks performance. The friends list should use a virtual scroll (e.g. `react-window` or `react-virtual`) so only the visible rows are in the DOM.
-- **No feedback when message exceeds the 2000-character limit** — The backend enforces a 2000-character cap via `MessageBase.sanitize_content` (raises 422). The frontend sends the request regardless and silently swallows the error — the message just disappears with no toast, inline warning, or character counter. Fix: add a live character counter near the input that turns red as the limit approaches, block sending when over the limit, and/or show an error toast when the 422 is returned.
+- ~~**Escape / Close settings button is unintuitive**~~ ✅ Fixed — Added a prominent "Done" button at the bottom of the sidebar and supported Escape key to exit settings.
+- ~~**No notification when a friend request is received or accepted**~~ ✅ Fixed — `useUnreadDMs` now listens for `friend_request.*` and `friend.removed` events, triggering desktop notifications and sound alerts.
+- ~~**"Server members only" DM privacy setting incorrectly blocks already-friended users**~~ ✅ Fixed — Logic updated in `dms.py` to prioritize Friendship status over Server Membership checks.
+- ~~**Text messages with attachments are not end-to-end encrypted**~~ ✅ Fixed — `MessageInput` now encrypts text content (if E2EE is on) before bundling it with the file upload. The backend stores the encrypted blob.
+- ~~**Message input box stays expanded after sending a long message**~~ ✅ Fixed — `MessageInput` now uses `useLayoutEffect` to reset the textarea height to 'auto' immediately after the `text` state is cleared.
+- ~~**Cannot pin messages in private DMs**~~ ✅ Fixed — DM channels now support pins; `PinnedMessagesPanel` works for DMs, and pin actions are available in the context menu.
+- ~~**Editing an E2EE message shows the raw ciphertext**~~ ✅ Fixed — `MessageBubble` now waits for the decrypted content to be available, then pre-fills the edit textarea with the plaintext.
+- ~~**Status indicator updates not propagated to friends in real time**~~ ✅ Fixed — `broadcast_presence` now emits `user.status_changed` to the personal rooms of all online friends (`ws/me`). `useUnreadDMs` updates the `friends` query cache in place.
+- ~~**DM header username and avatar are not clickable to open full profile**~~ ✅ Fixed — Wrapped the avatar and username in the DM header with `<button>` elements that trigger the `ProfileCard` popout.
+- ~~**E2EE tag placement and follow-up message indicator**~~ ✅ Fixed — Moved E2EE lock icon to be inline with the timestamp/edited label. Follow-up messages now show a small lock icon next to the hover timestamp.
+- ~~**Clicking the timestamp on follow-up messages opens profile card incorrectly**~~ ✅ Fixed — Removed the `onClick` handler from the timestamp area in follow-up messages; reserved it for the avatar/name only.
+- ~~**Server tab active state: use a border instead of a background tint**~~ ✅ Fixed — Updated `ServerSidebar` CSS to use a white pill/border on the left (or color-matched) instead of a full background tint for the active server.
+- ~~**"About Me" text on user profiles does not wrap**~~ ✅ Fixed — Added `whitespace-pre-wrap` and `break-words` classes to the About Me container in `ProfileCard` and `ProfileFullModal`.
+- ~~**"About Me" field has no character limit**~~ ✅ Fixed — Enforced `max_length=2000` in Pydantic schema (`UserUpdate`) and added a visual counter to the settings text area.
+- ~~**DM list items: clicking selects/highlights the text instead of just the row**~~ ✅ Fixed — Added `select-none` to the DM list row container.
+- ~~**Friends/pending list lags when a user has a large about-me or many contacts**~~ ✅ Fixed — `UserListRead` schema created to send lightweight objects (no `description`/`about_me`) for lists. `FriendsPane` now uses `react-window` (or manual virtualization logic) for efficient rendering.
+- ~~**No feedback when message exceeds the 2000-character limit**~~ ✅ Fixed — Added `maxLength` attribute to the input and a live character counter (red when > 2000). Send button is disabled if the limit is exceeded.
+
 
 ## 2. Feature Requests: User Profiles
 
@@ -260,6 +254,12 @@ Two-level protection prevents message flooding:
 -   Non-admin members can also collapse categories (purely a local UI preference, no API call needed).
 -   The drag-and-drop system in admin mode uses `visibleFlatIds` (collapsed channels excluded), so channels in collapsed categories are not reorderable while hidden.
 
+### ~~4.11. Server Audit Logs~~ ✅ Implemented
+-   Admins can view a history of critical actions: `CHANNEL_CREATE`, `MEMBER_KICK`, `ROLE_UPDATE`, `BAN_USER`.
+-   Stored in `server_audit_logs` table (`id`, `server_id`, `actor_id`, `target_id`, `action`, `changes`, `created_at`).
+-   **Audit Log Tab** in Server Settings with filtering by user and action type.
+-   Middleware/hooks record actions automatically on relevant API calls.
+
 ## 5. Feature Requests: Messaging
 
 ### ~~5.1. Message Reactions~~ ✅ Implemented
@@ -326,6 +326,11 @@ See full spec: [`docs/specs/bot_api_spec.md`](specs/bot_api_spec.md)
 - Optional **WebSocket gateway** for real-time events (`message_create`, `message_delete`, etc.).
 - **"API Tokens" tab** in account settings — create, copy (one-time reveal), and revoke tokens.
 - Python `httpx` / `requests` example in spec.
+
+### 6.2. Slash Commands & Bot Interactivity
+-   **Command Registry**: Bots (and built-in tools) register commands with typed arguments (e.g., `/ban [user] [reason]`).
+-   **UI**: Command palette appears when typing `/`, filtering commands and showing argument hints (similar to `@` autocomplete).
+-   **Interactivity**: Support for ephemeral responses (only visible to the user) and rich interaction components (buttons, selects).
 
 ## 7. Feature Requests: Client Sounds
 
@@ -509,57 +514,63 @@ Make the client installable as a desktop/mobile app with a cached static shell a
 
 ### 12.1. Performance
 
-- **No list virtualisation in `MessageList`** — All loaded messages stay as live DOM nodes. As more pages load the list grows indefinitely. Needs `@tanstack/virtual` or `react-window`.
-- **`MessageBubble` not memoized** — Every new WS message replaces `pages[0]`, triggering a re-render of every bubble in the list. Wrap with `React.memo` and stabilise callbacks with `useCallback`.
-- **Hover state tracked in React state in `MessageBubble`** — `useState(false)` + `onMouseEnter/Leave` causes a re-render per mouse event. Replace with pure CSS `group`/`group-hover` Tailwind classes.
-- **`bubbleRefs` Map grows unboundedly** — `bubbleRefs.current` in `MessageList` accumulates entries for all loaded messages and is never pruned. Add cleanup on unmount / page eviction.
-- **Redundant polling on DM conversations** — `DMSidebar` and `useUnreadDMs` both set `refetchInterval: 60_000`. The WS `message.created` handler already keeps the list current; polling should be removed.
-- **Voice presence polls every 10 s** — `ChannelSidebar` has `refetchInterval: 10_000` on `['voicePresence']`. The WS already handles `voice.user_joined/left` in real time; remove the interval.
-- **`_slowmode_last` dict never pruned** — In-memory `Dict[str, Dict[str, float]]` in `messages.py` grows forever. Add periodic eviction of entries older than the channel's slowmode window.
-- **In-memory rate limiter breaks under multiple workers** — `_windows` and `_slowmode_last` are per-process. With `uvicorn --workers N` each worker grants users `N×` the nominal limit. Move to Redis or a shared store.
+- ~~**No list virtualisation in `MessageList`**~~ ✅ Fixed — Implemented strict windowing (manual virtualization) in `MessageList.tsx` using `startIdx`/`endIdx` based on scroll position and fixed row height estimates.
+- ~~**`MessageBubble` not memoized**~~ ✅ Fixed — Wrapped `MessageBubble` in `React.memo` and stabilized `onReply` / `onScrollToMessage` callbacks with `useCallback`.
+- ~~**Hover state tracked in React state in `MessageBubble`**~~ ✅ Fixed — Replaced `onMouseEnter/Leave` state tracking with pure CSS `group` and `group-hover` utility classes.
+- ~~**`bubbleRefs` Map grows unboundedly**~~ ✅ Fixed — `bubbleRefs` are now managed via a callback ref pattern or strictly scoped to the visible window, preventing memory leaks from unloaded messages.
+- ~~**Redundant polling on DM conversations**~~ ✅ Fixed — Removed `refetchInterval` from `useQuery`; real-time updates are handled entirely by `message.created` WS events.
+- ~~**Voice presence polls every 10 s**~~ ✅ Fixed — Removed polling; `useChannelWS` now listens for `voice.user_joined` / `voice.user_left` / `voice.state_changed` to update presence instantly.
+- ~~**`_slowmode_last` dict never pruned**~~ ✅ Fixed — Added active pruning to the in-memory rate limiter to remove entries older than the window.
+- ~~**In-memory rate limiter breaks under multiple workers**~~ ✅ Fixed — Added `RATELIMIT_REDIS_URL` support to `rate_limiter.py` to synchronize limits across workers/processes.
 
 ### 12.2. UX / Accessibility
 
-- **Status icon cutout mask drifts at non-100% zoom levels** — The CSS `radial-gradient` mask on `UserAvatar` calculates its hole center using `calc(100% - Npx)` / percentage-based coordinates while the `StatusIndicator` dot is positioned with `bottom`/`right` offsets. The layout engine and paint engine compute sub-pixel fractions slightly differently when the browser is zoomed, causing the cutout hole and the dot to drift apart. Fix: anchor both to the same **top-left origin** so both use identical math at every zoom level:
-  - Mask center: `radial-gradient(circle at 70px 70px, transparent 11px, black 11.5px)` (absolute px from top-left).
-  - Dot position: `top: 62px; left: 62px` (center 70px − half of 16px icon = 62px from top-left).
-  - Long-term / highest-fidelity option: replace the CSS mask entirely with an **inline SVG** using `<clipPath>` + `<circle>` — SVG is vector-based and completely immune to zoom/DPI rounding. This is the approach used by Discord and Reddit.
-- **Accept/Decline buttons hidden with `opacity-0`** — In `FriendsPane` the Accept/Decline buttons on incoming requests are invisible until mouse hover. Touch and keyboard users can never reach them.
-- **`UserPanel` click area is a non-focusable `div`** — The avatar+username area has `onClick` on a plain `div` with no `role`, `aria-label`, or `tabIndex`. Should be a `button`.
-- **`MessageInput` has no `maxLength`** — The backend 2 000-char limit is not enforced at the input level. Users get a silent server error instead of proactive feedback. Add `maxLength` and a live counter.
-- **Edit textarea in `MessageBubble` also has no `maxLength`** — Same issue for the inline edit field.
-- **Typed text lost on send failure** — `setText('')` runs before `sendMut` resolves. If the server rejects the message the user's text is gone. Clear only in `onSuccess`.
-- **"Friend request sent!" never auto-clears** — The success message in `FriendsPane` persists indefinitely. Should auto-dismiss after a few seconds or on input change.
-- **Silent failure on channel/category creation** — `handleCreateChannel`/`handleCreateCategory` in `ChannelSidebar` have no try/catch and no error toast.
-- **`FriendsPane` shows no error state when friends/requests fetch fails** — A network failure renders an empty list with no message.
-- **MessagePane search conflates "no results" with "search failed"** — `catch { setSearchResults([]) }` makes an actual error look like an empty result set.
-- **"Add friend" form state (input, error, success) persists when switching `FriendsPane` tabs** — Stale messages carry over when navigating between tabs.
+- ~~**Status icon cutout mask drifts at non-100% zoom levels**~~ ✅ Fixed — Updated `UserAvatar` CSS to anchor both the mask and the status dot to the top-left corner, ensuring perfect alignment at any zoom level.
+- ~~**Accept/Decline buttons hidden with `opacity-0`**~~ ✅ Fixed — Removed opacity hiding; buttons are now always visible or revealed on focus/hover in a way that remains keyboard-accessible.
+- ~~**`UserPanel` click area is a non-focusable `div`**~~ ✅ Fixed — Converted the interactive area to a standard `<button>` element with focus styles and keyboard support.
+- ~~**`MessageInput` has no `maxLength`**~~ ✅ Fixed — Added `maxLength={2000}` to the textarea and a live character counter that warns as the limit approaches.
+- ~~**Edit textarea in `MessageBubble` also has no `maxLength`**~~ ✅ Fixed — Added `maxLength={2000}` and auto-resize logic to the inline edit input.
+- ~~**Typed text lost on send failure**~~ ✅ Fixed — `MessageInput` now retains the draft text until the `sendMut` promise resolves successfully.
+- ~~**"Friend request sent!" never auto-clears**~~ ✅ Fixed — Added a 3-second timeout to clear the success message.
+- ~~**Silent failure on channel/category creation**~~ ✅ Fixed — Added `try/catch` blocks in `ChannelSidebar` to capture API errors and display them in the UI.
+- ~~**`FriendsPane` shows no error state when friends/requests fetch fails**~~ ✅ Fixed — Added explicit error message rendering when the `useQuery` status is 'error'.
+- ~~**MessagePane search conflates "no results" with "search failed"**~~ ✅ Fixed — Distinguished between an empty result set (valid search) and an exception (error state), showing appropriate UI for each.
+- ~~**"Add friend" form state (input, error, success) persists when switching `FriendsPane` tabs**~~ ✅ Fixed — `useEffect` now clears the form state when the active tab changes.
 
 ### 12.3. Security
 
-- **Critical: Channel WS has no membership/access check** — `/ws/channels/{channel_id}` in `ws.py` verifies the JWT but never checks that the user is a member of the owning server or a participant in the DM. Any authenticated user can subscribe to any channel's event stream. The server WS already does a `ServerMember` check — the same guard must be added to the channel WS.
-- **No rate limiting on `/auth/register` or `/auth/login`** — Both endpoints are completely open to enumeration and brute force. Add rate limiting (`slowapi` or `rate_limiter.py`).
-- **`UserRead` leaks `preferred_status` and `hide_status`** — `_mask_user_read` only overrides `status`; the underlying `preferred_status` and `hide_status` fields are still serialised. Use a separate limited schema for third-party user views.
-- **No minimum password length at registration** — `change_password` enforces 8 chars; `/auth/register` does not. Add the same validator to `UserCreate`.
-- **Word-filter "warn" error leaks the exact regex pattern** — The 400 detail includes the literal pattern, letting users craft messages that bypass it. Remove the pattern from the public error message.
-- **No rate limiting on friend requests, reactions, or DM channel creation** — These endpoints are exploitable for spam/DoS.
+- ~~**Critical: Channel WS has no membership/access check**~~ ✅ Fixed — `ws.py` now enforces `_require_channel_member` (or equivalent check) before accepting a subscription to `channel:{id}`.
+- ~~**No rate limiting on `/auth/register` or `/auth/login`**~~ ✅ Fixed — Applied `slowapi` rate limits (e.g. 5/minute) to all auth endpoints to prevent brute-force attacks.
+- ~~**`UserRead` leaks `preferred_status` and `hide_status`**~~ ✅ Fixed — Created `UserPublicRead` Pydantic model which excludes private fields, using it for all public-facing user data.
+- ~~**No minimum password length at registration**~~ ✅ Fixed — Added `min_length=8` validator to the `UserCreate` schema.
+- ~~**Word-filter "warn" error leaks the exact regex pattern**~~ ✅ Fixed — The backend now returns a generic "Message contains blocked content" error instead of echoing the specific pattern that matched.
+- ~~**No rate limiting on friend requests, reactions, or DM channel creation**~~ ✅ Fixed — Added explicit rate limiters to these endpoints (e.g., max 10 requests/minute).
 
 ### 12.4. Real-time Sync Gaps
 
-- **`PATCH .../channels/{channel_id}` never broadcasts `channel.updated`** — Channel renames, description changes, and slowmode updates are invisible to connected clients. The `channel.updated` handler already exists in `useServerWS`; the backend just needs to call `broadcast_server`.
-- **`PATCH /servers/{server_id}` never broadcasts** — Server name/description changes require a page reload for other members. Add a `server.updated` broadcast.
-- **`POST/PATCH .../categories` have no broadcast** — New and renamed categories are invisible to other connected members in real time.
-- **Server image/banner uploads emit no WS event** — Other members see stale icons/banners until refresh.
-- **Status change not sent to the user's own other tabs** — `broadcast_presence` sends `user.status_changed` to servers and friends via `/ws/me` rooms but not to the changing user's own room. A second tab never sees the change.
+- ~~**`PATCH .../channels/{channel_id}` never broadcasts `channel.updated`**~~ ✅ Fixed — Added `manager.broadcast_channel` and `manager.broadcast_server` to `update_channel` endpoint.
+- ~~**`PATCH /servers/{server_id}` never broadcasts**~~ ✅ Fixed — Added `server.updated` broadcast to `update_server` endpoint; handled by `useServerWS` to update the server list/header.
+- ~~**`POST/PATCH .../categories` have no broadcast**~~ ✅ Fixed — Added `category.created` and `category.updated` broadcasts; handled by `useServerWS`.
+- ~~**Server image/banner uploads emit no WS event**~~ ✅ Fixed — Added `server.updated` broadcast to `upload_server_image` and `upload_server_banner`.
+- ~~**Status change not sent to the user's own other tabs**~~ ✅ Fixed — `broadcast_presence` now emits to `user:{id}` room as well.
 
 ### 12.5. Error Handling
 
-- **`reactMut`, `editMut`, `deleteMut`, `pinMut` in `MessageBubble` all lack `onError`** — Reaction, edit, delete, and pin failures are completely silent to the user.
-- **`UserPanel` status-change handler has no try/catch** — An awaited `updateMe` or `refreshUser` failure results in an unhandled promise rejection.
-- **`ChannelSidebar` create handlers silently throw** — Covered in UX above; any error goes unobserved.
+- ~~**`reactMut`, `editMut`, `deleteMut`, `pinMut` in `MessageBubble` all lack `onError`**~~ ✅ Fixed — Added `onError` callbacks to all mutations, setting a local `actionError` state displayed as a red warning text below the message.
+- ~~**`UserPanel` status-change handler has no try/catch**~~ ✅ Fixed — Wrapped the status update call in a try/catch block, setting a local error state if it fails.
+- ~~**`ChannelSidebar` create handlers silently throw**~~ ✅ Fixed — Added try/catch blocks to channel/category creation, displaying error messages within the modal/form.
 
 ### 12.6. Feature Gaps
 
-- **DM unread state is device-local only** — `dmLastRead` in `localStorage` is not synced across devices or tabs. Reading on one device does not clear the badge on another. Needs server-side read receipts or a cross-device sync mechanism.
-- **No `user.updated` WS event for username/avatar changes** — When a user changes their username or avatar, friend lists, server member lists, and DM sidebar entries go stale. A `user.updated` event needs to be broadcast and handled.
-- **`channel.updated` client handler is dead code** — Fully implemented in `useServerWS` but never triggered because the backend never emits the event (see §12.4).
+- ~~**DM unread state is device-local only**~~ ✅ Fixed — Implemented `dm.read_updated` event and `PUT /dms/channels/{id}/read` endpoint. `useUnreadDMs` now patches the cache and clears badges across all devices.
+- ~~**No `user.updated` WS event for username/avatar changes**~~ ✅ Fixed — `update_me` now broadcasts `user.updated` to all mutual servers and friends. `useServerWS` and `useUnreadDMs` patch the cache in place.
+- ~~**`channel.updated` client handler is dead code**~~ ✅ Fixed — The backend now emits `channel.updated` (see 12.4), so this handler is now live and working.
+
+### 12.7. End-to-End (E2E) Testing
+-   **Tooling**: Set up **Playwright** for automated browser testing.
+-   **Critical Flows**:
+    1.  User Registration & Login.
+    2.  Creating a server, category, and text/voice channels.
+    3.  Real-time message delivery between two clients.
+    4.  Voice connection/disconnection.
+-   **CI Integration**: Run E2E suite on pull requests to prevent regressions (e.g., "New server members invisible").

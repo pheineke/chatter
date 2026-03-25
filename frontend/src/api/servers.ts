@@ -1,5 +1,6 @@
+import { useNavigate, useParams } from 'react-router-dom'
 import client from './client'
-import type { Server, Member, Role } from './types'
+import type { Server, Member, Role, AuditLogEntry } from './types'
 
 export async function getMyServers(): Promise<Server[]> {
   const { data } = await client.get<Server[]>('/servers/')
@@ -79,6 +80,22 @@ export async function updateMySettings(
   allowDms: boolean | null
 ): Promise<Member> {
   const { data } = await client.patch<Member>(`/servers/${serverId}/members/me/settings`, { allow_dms: allowDms })
+  return data
+}
+
+export async function getAuditLogs(
+  serverId: string,
+  limit: number = 50,
+  offset: number = 0,
+  userId?: string,
+  actionType?: string
+): Promise<AuditLogEntry[]> {
+  const params: Record<string, string | number> = { limit, offset }
+  if (userId) params.user_id = userId
+  if (actionType) params.action_type = actionType
+  const { data } = await client.get<AuditLogEntry[]>(`/servers/${serverId}/audit-logs`, {
+    params
+  })
   return data
 }
 

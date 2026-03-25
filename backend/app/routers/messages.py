@@ -119,7 +119,7 @@ async def _apply_word_filters(
         # Unknown action — fall through silently
         break
 
-async def _enrich_message_read(msg: Message, server_id: 'uuid.UUID | None', db) -> MessageRead:
+async def enrich_message_read(msg: Message, server_id: 'uuid.UUID | None', db) -> MessageRead:
     """Return a MessageRead with author_nickname populated when msg is in a server channel."""
     read = MessageRead.model_validate(msg)
     if server_id:
@@ -354,7 +354,7 @@ async def send_message(
     )
     await db.commit()
     sent = result.scalar_one()
-    msg_read = await _enrich_message_read(sent, channel.server_id, db)
+    msg_read = await enrich_message_read(sent, channel.server_id, db)
 
     # --- fire-and-forget all WS notifications --------------------------------
     # Captured before the task to avoid holding a reference to the DB session.
@@ -427,7 +427,7 @@ async def edit_message(
     await db.commit()
     db.expire_all()
     updated = await _get_message_or_404(message_id, db)
-    msg_read = await _enrich_message_read(updated, server_id, db)
+    msg_read = await enrich_message_read(updated, server_id, db)
     await manager.broadcast_channel(
         channel_id,
         {"type": "message.updated", "data": msg_read.model_dump(mode="json")},
@@ -529,7 +529,7 @@ async def upload_attachment(
     db.expire_all()
 
     updated = await _get_message_or_404(message_id, db)
-    upload_read = await _enrich_message_read(updated, server_id, db)
+    upload_read = await enrich_message_read(updated, server_id, db)
     await manager.broadcast_channel(
         channel_id,
         {"type": "message.updated", "data": upload_read.model_dump(mode="json")},
