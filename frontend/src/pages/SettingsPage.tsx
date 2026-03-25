@@ -530,6 +530,9 @@ const PRESETS: { id: string; label: string; accent: string; bg: string; sidebar:
 
 
 function AppearanceTab() {
+  const { user, refreshUser } = useAuth()
+  const qc = useQueryClient()
+
   const initSaved   = loadColorOverrides
   const initPreset  = () => localStorage.getItem('appPreset') ?? 'softpop'
 
@@ -542,6 +545,14 @@ function AppearanceTab() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const isDirty = JSON.stringify(pending) !== JSON.stringify(saved) || pendingPreset !== savedPreset
+
+  const updateMut = useMutation({
+    mutationFn: (patch: any) => updateMe(patch),
+    onSuccess: async () => {
+      await refreshUser()
+      qc.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
 
   useEffect(() => {
     applyColorOverrides(loadColorOverrides())
@@ -565,6 +576,7 @@ function AppearanceTab() {
     localStorage.setItem('colorOverrides', JSON.stringify(pending))
     localStorage.setItem('appPreset', pendingPreset)
     applyColorOverrides(pending)
+    updateMut.mutate({ theme_preset: pendingPreset, theme_colors: JSON.stringify(pending) })
   }
 
   function handleDiscard() {
@@ -580,6 +592,7 @@ function AppearanceTab() {
     localStorage.removeItem('colorOverrides')
     localStorage.setItem('appPreset', 'softpop')
     applyColorOverrides({})
+    updateMut.mutate({ theme_preset: 'softpop', theme_colors: null })
   }
 
   function applyStyleTag(css: string) {

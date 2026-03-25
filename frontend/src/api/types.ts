@@ -15,6 +15,8 @@ export interface User {
   preferred_status: UserStatus
   dm_permission: DMPermission
   hide_status: boolean
+  theme_preset?: string | null
+  theme_colors?: string | null
   created_at: string
 }
 

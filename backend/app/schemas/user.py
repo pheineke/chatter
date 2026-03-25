@@ -44,6 +44,8 @@ class UserUpdate(BaseModel):
     dm_permission: DMPermission | None = None
     hide_status: bool | None = None
     avatar_decoration: str | None = None
+    theme_preset: str | None = None
+    theme_colors: str | None = None
 
     @field_validator('description', 'pronouns', mode='before')
     @classmethod
@@ -85,6 +87,8 @@ class UserRead(UserPublicRead):
     """Full profile view — only returned for the authenticated user themselves."""
     preferred_status: UserStatus = UserStatus.online
     hide_status: bool = False
+    theme_preset: str | None = None
+    theme_colors: str | None = None
 
 
 class Token(BaseModel):

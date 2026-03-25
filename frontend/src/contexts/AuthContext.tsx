@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import type { User } from '../api/types'
 import { getMe, login as apiLogin, register as apiRegister, logout as apiLogout } from '../api/users'
 
+import { applyColorOverrides } from '../utils/colorOverrides'
+
 interface AuthContextValue {
   user: User | null
   loading: boolean
@@ -55,6 +57,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Validate in background — update or clear user silently
     refreshUser()
   }, [])
+
+  useEffect(() => {
+    if (user?.theme_colors) {
+      try {
+        const parsed = JSON.parse(user.theme_colors)
+        applyColorOverrides(parsed)
+        localStorage.setItem('colorOverrides', user.theme_colors)
+        if (user.theme_preset) {
+           localStorage.setItem('appPreset', user.theme_preset)
+        }
+      } catch { /* ignore */ }
+    }
+  }, [user?.theme_colors, user?.theme_preset])
 
   const login = async (username: string, password: string) => {
     const data = await apiLogin(username, password)

@@ -104,6 +104,12 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
             if not owned.scalar_one_or_none():
                 raise HTTPException(status_code=403, detail="You do not own this decoration")
         current_user.avatar_decoration = body.avatar_decoration or None
+    if body.theme_preset is not None:
+        current_user.theme_preset = body.theme_preset
+    if body.theme_colors is not None:
+        # If null string was passed from front-end it still matches but as a string "null" maybe we should check
+        current_user.theme_colors = body.theme_colors if body.theme_colors != "null" else None
+        
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)

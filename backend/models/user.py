@@ -49,6 +49,8 @@ class User(Base):
     hide_status: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     avatar_decoration: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    theme_preset: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    theme_colors: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
