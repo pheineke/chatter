@@ -50,11 +50,12 @@ export default function AppShell() {
   const channelMatch = useMatch('/channels/:serverId/:channelId')
   const serverOnlyMatch = useMatch('/channels/:serverId')
   const currentServerId = channelMatch?.params.serverId ?? serverOnlyMatch?.params.serverId
+  
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers, staleTime: 60_000 })
   const { data: channels = [] } = useQuery({
     queryKey: ['channels', currentServerId],
     queryFn: () => getChannels(currentServerId!),
-    enabled: !!currentServerId && currentServerId !== '@me',
+    enabled: !!currentServerId && currentServerId !== '@me' && currentServerId !== 'settings',
     staleTime: 60_000,
   })
   const channelPaths = channels
