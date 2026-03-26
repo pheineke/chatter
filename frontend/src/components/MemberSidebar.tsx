@@ -5,6 +5,7 @@ import { getBlocks, blockUser, unblockUser } from '../api/blocks'
 import { AvatarWithStatus } from './AvatarWithStatus'
 import { ProfileCard } from './ProfileCard'
 import { ContextMenu } from './ContextMenu'
+import { Icon } from './Icon'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -133,8 +134,18 @@ export function MemberSidebar({ serverId, onClose }: Props) {
         className="md:hidden fixed inset-0 z-40 bg-black/60" 
         onClick={onClose} 
       />
-      <div className="fixed inset-y-0 right-0 z-40 md:static flex flex-col w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50 shadow-sp-3 md:shadow-none transition-transform">
-        <div className="px-3 flex items-center h-12 shrink-0 border-b border-sp-divider/50 shadow-sm">
+<div className="fixed inset-y-0 right-0 z-40 md:static flex flex-col w-full md:w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50 shadow-sp-3 md:shadow-none transition-transform">
+        <div className="px-3 flex items-center gap-2 h-12 shrink-0 border-b border-sp-divider/50 shadow-sm">
+          {/* Mobile close button */}
+          {onClose && (
+            <button
+              className="md:hidden p-1 -ml-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1"
+              onClick={onClose}
+              aria-label="Close members list"
+            >
+              <Icon name="arrow-ios-back" size={24} />
+            </button>
+          )}
         <span className="text-xs font-bold uppercase text-sp-muted tracking-wider">
           Members — {members.length}
         </span>

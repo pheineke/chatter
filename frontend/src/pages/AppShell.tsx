@@ -44,12 +44,15 @@ export default function AppShell() {
   const [showLeftDrawer, setShowLeftDrawer] = useState(false)
   const location = useLocation()
 
-  // Auto-close the mobile left-panel drawer whenever the user navigates
-  useEffect(() => { setShowLeftDrawer(false) }, [location.pathname])
-
   // Build channel path list for Alt+↑/↓ navigation
   const channelMatch = useMatch('/channels/:serverId/:channelId')
   const serverOnlyMatch = useMatch('/channels/:serverId')
+  const dmMatch = useMatch('/channels/@me/:dmId')
+
+  // Auto-close the mobile left-panel drawer when navigating to a specific channel or DM
+  useEffect(() => { 
+    if (channelMatch || dmMatch) setShowLeftDrawer(false)
+  }, [location.pathname])
   const currentServerId = channelMatch?.params.serverId ?? serverOnlyMatch?.params.serverId
   
   const { data: servers = [] } = useQuery({ queryKey: ['servers'], queryFn: getMyServers, staleTime: 60_000 })
@@ -99,7 +102,7 @@ export default function AppShell() {
             {/* ── Left panel: server tabs (outside) + channel card (bordered tile) ──
                 Mobile (<md): fixed off-screen, slides in from left.
                 Desktop (md+): flex row — tabs sit outside the rounded card.   */}
-            <div className={`flex fixed inset-y-0 left-0 z-40 w-[312px] bg-sp-bg transition-transform duration-200 shadow-sp-3 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 md:shadow-none md:m-1.5 md:h-[calc(100vh-12px)] ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className={`flex fixed inset-y-0 left-0 z-40 w-full md:w-[312px] bg-sp-bg transition-transform duration-200 shadow-sp-3 md:static md:inset-auto md:z-auto md:transition-none md:translate-x-0 md:shadow-none md:m-1.5 md:h-[calc(100vh-12px)] ${showLeftDrawer ? 'translate-x-0' : '-translate-x-full'}`}>
 
               {/* Server icon tabs — outside/left of the card */}
               <ServerSidebar unreadDMsCount={unreadDMsCount} activeServerId={currentServerId ?? null} />
