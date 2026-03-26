@@ -27,7 +27,7 @@ interface Props {
 export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav }: Props) {
   const { serverId, channelId } = useParams<{ serverId: string; channelId: string }>()
   const navigate = useNavigate()
-  const [showMembers, setShowMembers] = useState(true)
+  const [showMembers, setShowMembers] = useState(() => window.innerWidth >= 768)
   const [showPins, setShowPins] = useState(false)
   const [showNotifMenu, setShowNotifMenu] = useState(false)
   const notifBtnRef = useRef<HTMLButtonElement>(null)
@@ -221,12 +221,12 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
           </button>
         )}
         <Icon name="hash" size={16} className="text-sp-muted shrink-0" />
-        <span className="font-bold shrink-0 select-none leading-none">{channel?.title ?? channelId}</span>
+        <span className="font-bold truncate select-none leading-none">{channel?.title ?? channelId}</span>
         {channel?.description && (
           <>
-            <div className="w-px h-5 bg-sp-divider/80 shrink-0 mx-1" />
+            <div className="w-px h-5 bg-sp-divider/80 shrink-0 mx-1 hidden md:block" />
             <span
-              className="text-sm text-sp-muted truncate"
+              className="text-sm text-sp-muted truncate hidden md:block"
               title={channel.description}
             >
               <Linkified text={channel.description} noMentions />
@@ -287,11 +287,11 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
             <span className="ml-0.5 text-xs text-sp-muted">{pinnedIds.size}</span>
           )}
         </button>
-        {/* Members toggle — hidden on mobile (member list has no space) */}
+        {/* Members toggle — accessible on mobile through right drawer */}
         <button
           onClick={() => setShowMembers(v => !v)}
           title="Toggle member list"
-          className={`hidden md:block p-1.5 rounded transition-colors shrink-0 ${showMembers ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
+          className={`p-1.5 rounded transition-colors shrink-0 ${showMembers ? 'text-sp-text bg-sp-input/60' : 'text-sp-muted hover:text-sp-text hover:bg-sp-input/40'}`}
         >
           <Icon name="people" size={20} />
         </button>
@@ -433,7 +433,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
           />
         )}
 
-        {showMembers && serverId && <MemberSidebar serverId={serverId} />}
+        {showMembers && serverId && <MemberSidebar serverId={serverId} onClose={() => setShowMembers(false)} />}
       </div>
     </div>
   )

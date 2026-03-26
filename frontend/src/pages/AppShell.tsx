@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useMatch } from 'react-router-dom'
+import { Icon } from '../components/Icon'
 import { useAuth } from '../contexts/AuthContext'
 import { ServerSidebar } from '../components/ServerSidebar'
 import { ChannelSidebar } from '../components/ChannelSidebar'
@@ -147,12 +148,21 @@ export default function AppShell() {
                   <Route path="@me" element={<FriendsPane onOpenNav={() => setShowLeftDrawer(true)} />} />
                   <Route path="@me/:dmUserId" element={<DMPane onOpenNav={() => setShowLeftDrawer(true)} />} />
                   <Route path=":serverId" element={
-                    <div className="h-full flex flex-col items-center justify-center text-sp-muted p-8 text-center">
-                      <div className="w-24 h-24 rounded-3xl bg-sp-surface-variant flex items-center justify-center mb-6 shadow-sm">
-                        <span className="text-4xl">👋</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-sp-text mb-2">Welcome specifically to {servers.find(s => s.id === currentServerId)?.title || 'this server'}!</h3>
-                      <p className="max-w-md">Select a channel from the sidebar to start chatting, or check out the server settings.</p>
+                      <div className="flex flex-col h-full bg-sp-bg">
+                        {/* Mobile Header for empty state */}
+                        <div className="md:hidden flex items-center px-4 py-3 border-b border-black/20 shadow-sm shrink-0">
+                           <button onClick={() => setShowLeftDrawer(true)} className="p-1 -ml-1 text-sp-muted hover:text-sp-text shrink-0" aria-label="Open navigation">
+                             <Icon name="menu" size={22} />
+                           </button>
+                           <span className="font-bold ml-3 text-sp-text truncate">{servers.find(s => s.id === currentServerId)?.title || 'Server'}</span>
+                        </div>
+                        <div className="flex-1 flex flex-col items-center justify-center text-sp-muted p-8 text-center overflow-y-auto">
+                          <div className="w-24 h-24 rounded-3xl bg-sp-surface-variant flex items-center justify-center mb-6 shadow-sm">
+                            <span className="text-4xl">👋</span>
+                          </div>
+                          <h3 className="text-xl font-bold text-sp-text mb-2">Welcome specifically to {servers.find(s => s.id === currentServerId)?.title || 'this server'}!</h3>
+                          <p className="max-w-md">Select a channel from the sidebar to start chatting, or check out the server settings.</p>
+                        </div>
                     </div>
                   } />
                   <Route

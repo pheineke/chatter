@@ -12,9 +12,10 @@ import type { Member, Role, Server } from '../api/types'
 
 interface Props {
   serverId: string
+  onClose?: () => void
 }
 
-export function MemberSidebar({ serverId }: Props) {
+export function MemberSidebar({ serverId, onClose }: Props) {
   const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -126,8 +127,14 @@ export function MemberSidebar({ serverId }: Props) {
   }
 
   return (
-    <div className="hidden md:flex flex-col w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50">
-      <div className="px-3 flex items-center h-12 shrink-0 border-b border-sp-divider/50 shadow-sm">
+    <>
+      {/* Mobile backdrop */}
+      <div 
+        className="md:hidden fixed inset-0 z-40 bg-black/60" 
+        onClick={onClose} 
+      />
+      <div className="fixed inset-y-0 right-0 z-40 md:static flex flex-col w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50 shadow-sp-3 md:shadow-none transition-transform">
+        <div className="px-3 flex items-center h-12 shrink-0 border-b border-sp-divider/50 shadow-sm">
         <span className="text-xs font-bold uppercase text-sp-muted tracking-wider">
           Members — {members.length}
         </span>
@@ -237,7 +244,8 @@ export function MemberSidebar({ serverId }: Props) {
           ].filter(Boolean) as any} // Cast to any to handle conditional nulls easily
         />
       )}
-    </div>
+      </div>
+    </>
   )
 }
 
