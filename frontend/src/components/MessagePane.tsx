@@ -213,7 +213,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
         {/* Mobile: open left-panel drawer */}
         {onOpenNav && (
           <button
-            className="md:hidden p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0"
+            className="md:hidden p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5"
             onClick={onOpenNav}
             aria-label="Open navigation"
           >
@@ -221,7 +221,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
           </button>
         )}
         <Icon name="hash" size={16} className="text-sp-muted shrink-0" />
-        <span className="font-bold truncate select-none leading-none">{channel?.title ?? channelId}</span>
+        <span className="font-bold truncate select-none">{channel?.title ?? channelId}</span>
         {channel?.description && (
           <>
             <div className="w-px h-5 bg-sp-divider/80 shrink-0 mx-1 hidden md:block" />
@@ -235,12 +235,12 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
         )}
         <div className="flex-1" />
         {/* Notification settings */}
-        <div className="relative shrink-0">
+        <div className="relative shrink-0 flex items-center">
           <button
             ref={notifBtnRef}
             onClick={() => setShowNotifMenu(v => !v)}
             title="Notification settings"
-            className={`p-1.5 rounded transition-colors shrink-0 ${showNotifMenu ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
+            className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center ${showNotifMenu ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
           >
             <Icon name={notifLevel === 'nothing' ? 'bell-off' : 'bell'} size={20} />
           </button>
@@ -280,18 +280,18 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
         <button
           onClick={() => setShowPins(v => !v)}
           title={showPins ? 'Close pins' : 'Pinned messages'}
-          className={`p-1.5 rounded transition-colors shrink-0 ${showPins ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
+          className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center gap-1 ${showPins ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
         >
           <Icon name="pin" size={20} />
           {pinnedIds.size > 0 && (
-            <span className="ml-0.5 text-xs text-sp-muted">{pinnedIds.size}</span>
+            <span className="text-xs text-sp-muted">{pinnedIds.size}</span>
           )}
         </button>
         {/* Members toggle — accessible on mobile through right drawer */}
         <button
           onClick={() => setShowMembers(v => !v)}
           title="Toggle member list"
-          className={`p-1.5 rounded transition-colors shrink-0 ${showMembers ? 'text-sp-text bg-sp-input/60' : 'text-sp-muted hover:text-sp-text hover:bg-sp-input/40'}`}
+          className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center ${showMembers ? 'text-sp-text bg-sp-input/60' : 'text-sp-muted hover:text-sp-text hover:bg-sp-input/40'}`}
         >
           <Icon name="people" size={20} />
         </button>
@@ -317,7 +317,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
           <button
             onClick={() => { if (searchFocused) { closeSearch() } else { setSearchFocused(true) } }}
             title={searchFocused ? 'Close search (Esc)' : 'Search messages'}
-            className={`p-1.5 rounded transition-colors shrink-0 ${searchFocused ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
+            className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center ${searchFocused ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
           >
             <Icon name="search" size={20} />
           </button>

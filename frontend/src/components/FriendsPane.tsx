@@ -116,7 +116,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
       <div className="flex items-center gap-0 px-4 py-3 border-b border-black/20 shadow-sm shrink-0 space-x-1">
         {onOpenNav && (
           <button
-            className="md:hidden p-1 -ml-1 mr-3 text-sp-muted hover:text-sp-text shrink-0"
+            className="md:hidden p-1 -ml-1 mr-2 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5"
             onClick={onOpenNav}
             aria-label="Open navigation"
           >

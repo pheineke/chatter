@@ -151,7 +151,7 @@ export default function AppShell() {
                       <div className="flex flex-col h-full bg-sp-bg">
                         {/* Mobile Header for empty state */}
                         <div className="md:hidden flex items-center px-4 py-3 border-b border-black/20 shadow-sm shrink-0">
-                           <button onClick={() => setShowLeftDrawer(true)} className="p-1 -ml-1 text-sp-muted hover:text-sp-text shrink-0" aria-label="Open navigation">
+                           <button onClick={() => setShowLeftDrawer(true)} className="p-1 -ml-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5" aria-label="Open navigation">
                              <Icon name="menu" size={22} />
                            </button>
                            <span className="font-bold ml-3 text-sp-text truncate">{servers.find(s => s.id === currentServerId)?.title || 'Server'}</span>
