@@ -106,7 +106,7 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
             transformOrigin: 'right center',
             transition: 'color 150ms ease-out, background-color 150ms ease-out, transform 80ms ease-out',
           }}
-          className={`absolute inset-0 w-full h-full flex items-center justify-center text-sm font-bold select-none relative
+          className={`absolute inset-0 w-full h-full flex items-center justify-center text-sm font-bold select-none relative overflow-hidden
             ${active
               ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
