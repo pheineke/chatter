@@ -40,6 +40,8 @@ _HEARTBEAT_TIMEOUT = 90
 router = APIRouter(tags=["websocket"])
 
 
+from models.refresh_token import RefreshToken
+
 # ---------------------------------------------------------------------------
 # Auth helper
 # ---------------------------------------------------------------------------
@@ -51,9 +53,23 @@ async def _authenticate_ws(ws: WebSocket, token: str) -> uuid.UUID:
     Returns the user_id UUID or closes the websocket with 4001 if invalid.
     """
     # Try JWT first
-    user_id = decode_access_token(token)
-    if user_id is not None:
-        return user_id
+    payload = decode_access_token(token)
+    if payload is not None:
+        try:
+            user_id = uuid.UUID(payload["sub"])
+            sid = payload.get("sid")
+            if sid:
+                session_id = uuid.UUID(sid)
+                async with AsyncSessionLocal() as db:
+                    rt = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
+                    rt_row = rt.scalar_one_or_none()
+                    if rt_row and not rt_row.revoked:
+                        return user_id
+            else:
+                # If no session tracked, allow historically
+                return user_id
+        except ValueError:
+            pass
 
     # Fall back to personal API token (contains a dot separator)
     if "." in token:

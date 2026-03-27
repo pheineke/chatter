@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import decode_access_token, hash_api_token
 from app.database import get_db
 from models.api_token import ApiToken
+from models.refresh_token import RefreshToken
 from models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
@@ -67,9 +68,26 @@ async def get_current_user(
     if token is None:
         raise credentials_exception
 
-    user_id = decode_access_token(token)
-    if user_id is None:
+    payload = decode_access_token(token)
+    if not payload:
         raise credentials_exception
+
+    try:
+        user_id = uuid.UUID(payload["sub"])
+    except ValueError:
+        raise credentials_exception
+
+    # Check if this token belongs to a specific session and if it was revoked
+    sid = payload.get("sid")
+    if sid:
+        try:
+            session_id = uuid.UUID(sid)
+            rt_result = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
+            rt_row = rt_result.scalar_one_or_none()
+            if not rt_row or rt_row.revoked:
+                raise credentials_exception
+        except ValueError:
+            raise credentials_exception
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

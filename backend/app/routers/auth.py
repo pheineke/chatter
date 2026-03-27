@@ -33,11 +33,14 @@ def _ua(request: Request) -> str | None:
 
 async def _issue_token_pair(user_id, db, *, user_agent: str | None = None) -> Token:
     """Create a fresh access + refresh token pair, persist the refresh token hash."""
-    access = create_access_token(user_id)
+    import uuid
+    session_id = uuid.uuid4()
+    access = create_access_token(user_id, session_id=session_id)
     raw_rt, rt_hash = generate_refresh_token()
     expires = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
     now = datetime.now(timezone.utc)
     db.add(RefreshToken(
+        id=session_id,
         token_hash=rt_hash,
         user_id=user_id,
         expires_at=expires,

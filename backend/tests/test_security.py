@@ -70,7 +70,8 @@ class TestJWT:
         uid = uuid.uuid4()
         token = create_access_token(uid)
         decoded = decode_access_token(token)
-        assert decoded == uid
+        assert decoded is not None
+        assert decoded["sub"] == str(uid)
 
     def test_tampered_signature_rejected(self):
         token = create_access_token(uuid.uuid4())

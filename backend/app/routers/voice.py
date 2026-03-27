@@ -36,12 +36,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.auth import decode_access_token
-from app.database import get_db
+from app.database import get_db, AsyncSessionLocal
 from app.schemas.voice import VoiceParticipantRead
 from app.voice_manager import voice_manager
 from app.ws_manager import manager as ws_manager
 from models.channel import Channel, ChannelType
 from models.server import ServerMember
+from models.refresh_token import RefreshToken
 
 logger = logging.getLogger(__name__)
 
@@ -80,11 +81,25 @@ async def _broadcast_state_change(
 # ---------------------------------------------------------------------------
 
 async def _authenticate_ws(ws: WebSocket, token: str) -> uuid.UUID | None:
-    user_id = decode_access_token(token)
-    if user_id is None:
-        await ws.close(code=4001, reason="Invalid or expired token")
-        return None
-    return user_id
+    payload = decode_access_token(token)
+    if payload is not None:
+        try:
+            user_id = uuid.UUID(payload["sub"])
+            sid = payload.get("sid")
+            if sid:
+                session_id = uuid.UUID(sid)
+                async with AsyncSessionLocal() as db:
+                    rt = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
+                    rt_row = rt.scalar_one_or_none()
+                    if rt_row and not rt_row.revoked:
+                        return user_id
+            else:
+                return user_id
+        except ValueError:
+            pass
+            
+    await ws.close(code=4001, reason="Invalid or expired token")
+    return None
 
 
 # ---------------------------------------------------------------------------
