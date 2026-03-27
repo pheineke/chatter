@@ -58,16 +58,16 @@ async def _authenticate_ws(ws: WebSocket, token: str) -> uuid.UUID:
         try:
             user_id = uuid.UUID(payload["sub"])
             sid = payload.get("sid")
-            if sid:
-                session_id = uuid.UUID(sid)
-                async with AsyncSessionLocal() as db:
-                    rt = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
-                    rt_row = rt.scalar_one_or_none()
-                    if rt_row and not rt_row.revoked:
-                        return user_id
-            else:
-                # If no session tracked, allow historically
-                return user_id
+            if not sid:
+                # Force refresh of legacy tokens
+                raise ValueError("Missing session ID")
+
+            session_id = uuid.UUID(sid)
+            async with AsyncSessionLocal() as db:
+                rt = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
+                rt_row = rt.scalar_one_or_none()
+                if rt_row and not rt_row.revoked:
+                    return user_id
         except ValueError:
             pass
 

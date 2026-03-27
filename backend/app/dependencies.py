@@ -79,15 +79,18 @@ async def get_current_user(
 
     # Check if this token belongs to a specific session and if it was revoked
     sid = payload.get("sid")
-    if sid:
-        try:
-            session_id = uuid.UUID(sid)
-            rt_result = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
-            rt_row = rt_result.scalar_one_or_none()
-            if not rt_row or rt_row.revoked:
-                raise credentials_exception
-        except ValueError:
+    if not sid:
+        # Legacy tokens without sid cannot be revoked securely; reject them to force a re-login or refresh
+        raise credentials_exception
+
+    try:
+        session_id = uuid.UUID(sid)
+        rt_result = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
+        rt_row = rt_result.scalar_one_or_none()
+        if not rt_row or rt_row.revoked:
             raise credentials_exception
+    except ValueError:
+        raise credentials_exception
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

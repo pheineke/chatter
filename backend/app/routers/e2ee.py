@@ -85,10 +85,12 @@ class E2EEPublicKeyWrite(BaseModel):
 
 async def _issue_token_pair_for_user(user_id: uuid.UUID, db, *, ua: str | None = None) -> tuple[str, str]:
     """Mint a new access + refresh token pair, persist the refresh token, return (access, raw_refresh)."""
-    access = create_access_token(user_id)
+    session_id = uuid.uuid4()
+    access = create_access_token(user_id, session_id=session_id)
     raw_rt, rt_hash = generate_refresh_token()
     expires = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
     db.add(RefreshToken(
+        id=session_id,
         token_hash=rt_hash,
         user_id=user_id,
         expires_at=expires,
