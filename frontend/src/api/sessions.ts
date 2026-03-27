@@ -6,6 +6,7 @@ export interface Session {
   last_used_at: string | null
   user_agent: string | null
   expires_at: string
+  is_current: boolean
 }
 
 export async function getSessions(): Promise<Session[]> {

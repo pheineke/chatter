@@ -89,6 +89,8 @@ async def get_current_user(
         rt_row = rt_result.scalar_one_or_none()
         if not rt_row or rt_row.revoked:
             raise credentials_exception
+        
+        request.state.session_id = str(session_id)
     except ValueError:
         raise credentials_exception
 

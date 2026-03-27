@@ -146,13 +146,15 @@ class SessionRead(BaseModel):
     last_used_at: datetime | None
     user_agent: str | None
     expires_at: datetime
+    is_current: bool = False
 
     model_config = {"from_attributes": True}
 
 
 @router.get("/sessions", response_model=list[SessionRead])
-async def list_sessions(current_user: CurrentUser, db: DB):
+async def list_sessions(request: Request, current_user: CurrentUser, db: DB):
     """Return all active (non-revoked, non-expired) sessions for the current user."""
+    current_session_id = getattr(request.state, "session_id", None)
     now = datetime.now(timezone.utc)
     result = await db.execute(
         select(RefreshToken).where(
@@ -168,6 +170,7 @@ async def list_sessions(current_user: CurrentUser, db: DB):
         last_used_at=r.last_used_at,
         user_agent=r.user_agent,
         expires_at=r.expires_at,
+        is_current=str(r.id) == current_session_id,
     ) for r in rows]
 
 

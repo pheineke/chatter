@@ -478,8 +478,8 @@ function SessionsSection() {
         <p className="text-sm text-sp-muted">No active sessions found.</p>
       ) : (
         <div className="space-y-2">
-          {sessions.map((s: Session, i: number) => {
-            const isCurrent = i === 0
+          {sessions.map((s: Session) => {
+            const isCurrent = s.is_current
             return (
               <div
                 key={s.id}
