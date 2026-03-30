@@ -415,11 +415,16 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   }
 
   function reattachTile(tileId: string) {
+    const mode = detachedTiles[tileId]
+
     setDetachedTiles(prev => {
       const next = { ...prev }
       delete next[tileId]
       return next
     })
+
+    if (focused === tileId) clearFocused()
+
     const win = detachedWindowsRef.current[tileId]
     if (win && !win.closed) win.close()
     detachedWindowsRef.current[tileId] = null
@@ -428,6 +433,18 @@ export function VoiceGridPane({ session, onLeave }: Props) {
       delete next[tileId]
       return next
     })
+
+    // If this was the last shared stream, close the shared popout too.
+    if (mode === 'shared') {
+      const hasAnotherShared = Object.entries(detachedTiles).some(([id, m]) => id !== tileId && m === 'shared')
+      if (!hasAnotherShared) {
+        if (sharedWindowRef.current && !sharedWindowRef.current.closed) {
+          sharedWindowRef.current.close()
+        }
+        sharedWindowRef.current = null
+        setSharedContainer(null)
+      }
+    }
   }
 
   // Exit fullscreen when theater mode ends
@@ -533,15 +550,16 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   }
 
   // Theater mode helpers ─────────────────────────────────────────────────────
+  const visibleTiles = tiles.filter((t) => !(t.kind === 'video' && detachedTiles[t.id]))
 
-  const focusedTile = focused != null ? tiles.find(t => t.id === focused) : null
+  const focusedTile = focused != null ? visibleTiles.find(t => t.id === focused) : null
   // Only video tiles can be theaters
   const theaterTile = focusedTile?.kind === 'video' ? focusedTile : null
-  const filmstripTiles = theaterTile ? tiles.filter(t => t.id !== theaterTile.id) : []
+  const filmstripTiles = theaterTile ? visibleTiles.filter(t => t.id !== theaterTile.id) : []
 
   // Validate focus — if the focused tile no longer exists (stream ended), clear
   useEffect(() => {
-    if (focused && !tiles.find(t => t.id === focused)) clearFocused()
+    if (focused && !visibleTiles.find(t => t.id === focused)) clearFocused()
   })
 
   // When a stream disappears (share stopped), remove it from activeTiles so that
@@ -654,8 +672,8 @@ export function VoiceGridPane({ session, onLeave }: Props) {
           </div>
         ) : (
           // ── Standard grid ────────────────────────────────────────────────
-          <div className={`h-full grid ${gridCols(tiles.length)} gap-4 auto-rows-fr content-start`}>
-            {tiles.map(t =>
+          <div className={`h-full grid ${gridCols(visibleTiles.length)} gap-4 auto-rows-fr content-start`}>
+            {visibleTiles.map(t =>
               t.kind === 'video' ? (
                 <VideoCard
                   key={t.id}
