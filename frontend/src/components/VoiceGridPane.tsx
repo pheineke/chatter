@@ -29,7 +29,7 @@ interface VideoTile {
   kind: 'video'
   id: string
   label: string
-  stream: MediaStream
+  stream: MediaStream | null
   /** Optional audio stream to play alongside the video (e.g. screen-share system audio). */
   audioStream?: MediaStream
   tileType: 'screen' | 'webcam'
@@ -43,10 +43,11 @@ type Tile = ParticipantTile | VideoTile
 
 // ─── Video element ──────────────────────────────────────────────────────────
 
-function VideoEl({ stream }: { stream: MediaStream }) {
+function VideoEl({ stream }: { stream: MediaStream | null }) {
   const ref = useRef<HTMLVideoElement>(null)
   useEffect(() => {
-    if (ref.current) ref.current.srcObject = stream
+    if (!ref.current) return
+    ref.current.srcObject = stream
   }, [stream])
   return <video ref={ref} autoPlay muted playsInline className="w-full h-full object-contain" />
 }
@@ -204,9 +205,18 @@ function VideoCard({
         ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}
       onClick={onClick}
     >
-      <VideoEl stream={tile.stream} />
-      {/* Play screen-share system audio alongside the video when present */}
-      {tile.audioStream && <AudioEl stream={tile.audioStream} />}
+      {tile.stream ? (
+        <>
+          <VideoEl stream={tile.stream} />
+          {/* Play screen-share system audio alongside the video when present */}
+          {tile.audioStream && <AudioEl stream={tile.audioStream} />}
+        </>
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70">
+          <Icon name="loader" size={26} className="animate-spin" />
+          <span className="text-xs font-semibold">Waiting for stream…</span>
+        </div>
+      )}
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
       {/* Theater Mode hint — center overlay */}
       {!focused && !compact && (
@@ -277,8 +287,17 @@ function DetachedStreamCard({
         </button>
       </div>
       <div className="flex-1 min-h-0 flex items-center justify-center">
-        <VideoEl stream={tile.stream} />
-        {tile.audioStream && <AudioEl stream={tile.audioStream} />}
+        {tile.stream ? (
+          <>
+            <VideoEl stream={tile.stream} />
+            {tile.audioStream && <AudioEl stream={tile.audioStream} />}
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-2 text-white/70">
+            <Icon name="loader" size={26} className="animate-spin" />
+            <span className="text-xs font-semibold">Waiting for stream…</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -485,12 +504,12 @@ export function VoiceGridPane({ session, onLeave }: Props) {
         ? remoteWebcamStreams[p.user_id] : undefined,
     })
     // Remote screen share tile — audioStream carries system audio if the user shared it
-    if (p.is_sharing_screen && remoteScreenStreams[p.user_id]) {
+    if (p.is_sharing_screen) {
       tiles.push({
         kind: 'video',
         id: `screen-${p.user_id}`,
         label: `${user.username}'s Screen`,
-        stream: remoteScreenStreams[p.user_id],
+        stream: remoteScreenStreams[p.user_id] ?? null,
         audioStream: remoteScreenAudioStreams[p.user_id],
         tileType: 'screen',
         isLocal: false,
@@ -674,7 +693,14 @@ export function VoiceGridPane({ session, onLeave }: Props) {
 
           {/* Video */}
           <div className="flex-1 min-h-0 flex items-center justify-center">
-            <VideoEl stream={theaterTile.stream} />
+            {theaterTile.stream ? (
+              <VideoEl stream={theaterTile.stream} />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2 text-white/70">
+                <Icon name="loader" size={30} className="animate-spin" />
+                <span className="text-sm font-semibold">Waiting for stream…</span>
+              </div>
+            )}
           </div>
 
           {/* Bottom bar */}
