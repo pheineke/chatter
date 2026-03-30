@@ -509,7 +509,9 @@ export function VoiceGridPane({ session, onLeave }: Props) {
         kind: 'video',
         id: `screen-${p.user_id}`,
         label: `${user.username}'s Screen`,
-        stream: remoteScreenStreams[p.user_id] ?? null,
+        // Firefox and some WebRTC paths may not set `contentHint=detail`,
+        // so the incoming screen video can land in the webcam stream map.
+        stream: remoteScreenStreams[p.user_id] ?? remoteWebcamStreams[p.user_id] ?? null,
         audioStream: remoteScreenAudioStreams[p.user_id],
         tileType: 'screen',
         isLocal: false,
