@@ -37,6 +37,8 @@ interface VideoTile {
   isLocal: boolean
 }
 
+type DetachMode = 'separate' | 'shared'
+
 type Tile = ParticipantTile | VideoTile
 
 // ─── Video element ──────────────────────────────────────────────────────────
@@ -157,10 +159,11 @@ function ParticipantCard({
 // ─── Video tile card ─────────────────────────────────────────────────────────
 
 function VideoCard({
-  tile, compact = false, focused = false, active = false, onActivate, onDeactivate, onClick,
+  tile, compact = false, focused = false, active = false, onActivate, onDeactivate, onClick, onDetach,
 }: {
   tile: VideoTile; compact?: boolean; focused?: boolean
   active?: boolean; onActivate?: () => void; onDeactivate?: () => void; onClick?: () => void
+  onDetach?: (mode: DetachMode) => void
 }) {
   // Inactive placeholder — shown for remote tiles until the user clicks to watch.
   if (!active) {
@@ -217,6 +220,24 @@ function VideoCard({
         {tile.label}
       </div>
       <div className="absolute top-2 right-2 flex items-center gap-1.5">
+        {onDetach && (
+          <>
+            <button
+              title="Detach into new window"
+              className="opacity-0 group-hover:opacity-100 transition text-[10px] font-bold text-white bg-black/65 hover:bg-black/90 px-1.5 py-0.5 rounded flex items-center gap-1"
+              onClick={e => { e.stopPropagation(); onDetach('separate') }}
+            >
+              <Icon name="external-link" size={10} />{!compact && 'Popout'}
+            </button>
+            <button
+              title="Detach into shared window"
+              className="opacity-0 group-hover:opacity-100 transition text-[10px] font-bold text-white bg-black/65 hover:bg-black/90 px-1.5 py-0.5 rounded flex items-center gap-1"
+              onClick={e => { e.stopPropagation(); onDetach('shared') }}
+            >
+              <Icon name="monitor" size={10} />{!compact && 'Shared'}
+            </button>
+          </>
+        )}
         {onDeactivate && (
           <button
             title="Stop watching"
@@ -229,6 +250,35 @@ function VideoCard({
         <span className="text-[10px] uppercase font-bold text-white bg-sp-mention/80 px-1.5 py-0.5 rounded">
           {tile.tileType === 'screen' ? 'Screen' : 'Cam'}
         </span>
+      </div>
+    </div>
+  )
+}
+
+function DetachedStreamCard({
+  tile,
+  onReturn,
+}: {
+  tile: VideoTile
+  onReturn: () => void
+}) {
+  return (
+    <div className="w-full h-full bg-black text-white flex flex-col">
+      <div className="h-11 shrink-0 px-3 flex items-center gap-2 border-b border-white/15 bg-black/70">
+        <span className="text-sm font-semibold truncate">{tile.label}</span>
+        <span className="text-[10px] uppercase font-bold text-white/80 bg-white/15 px-1.5 py-0.5 rounded">
+          {tile.tileType === 'screen' ? 'Screen' : 'Cam'}
+        </span>
+        <button
+          onClick={onReturn}
+          className="ml-auto text-xs rounded bg-white/10 hover:bg-white/20 px-2.5 py-1 flex items-center gap-1.5"
+        >
+          <Icon name="arrow-back" size={12} /> Return to grid
+        </button>
+      </div>
+      <div className="flex-1 min-h-0 flex items-center justify-center">
+        <VideoEl stream={tile.stream} />
+        {tile.audioStream && <AudioEl stream={tile.audioStream} />}
       </div>
     </div>
   )
@@ -260,10 +310,105 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   const [activeTiles, setActiveTiles] = useState<Set<string>>(
     () => new Set(['screen-local'])
   )
+  const [detachedTiles, setDetachedTiles] = useState<Record<string, DetachMode>>({})
+  const [detachedContainers, setDetachedContainers] = useState<Record<string, HTMLElement>>({})
+  const [sharedContainer, setSharedContainer] = useState<HTMLElement | null>(null)
+  const detachedWindowsRef = useRef<Record<string, Window | null>>({})
+  const sharedWindowRef = useRef<Window | null>(null)
+
   const activateTile   = (id: string) => setActiveTiles(prev => new Set([...prev, id]))
   const deactivateTile = (id: string) => {
     if (focused === id) setFocused(null)
     setActiveTiles(prev => { const n = new Set(prev); n.delete(id); return n })
+  }
+
+  function cloneStylesToWindow(targetDoc: Document) {
+    targetDoc.head.innerHTML = ''
+    document.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
+      targetDoc.head.appendChild(node.cloneNode(true))
+    })
+  }
+
+  function createWindowContainer(win: Window, title: string): HTMLElement {
+    const doc = win.document
+    doc.title = title
+    cloneStylesToWindow(doc)
+    doc.body.className = 'm-0 p-0 bg-sp-bg'
+    doc.body.innerHTML = ''
+    const container = doc.createElement('div')
+    container.style.width = '100%'
+    container.style.height = '100vh'
+    doc.body.appendChild(container)
+    return container
+  }
+
+  function detachTile(tileId: string, mode: DetachMode) {
+    activateTile(tileId)
+
+    if (mode === 'shared') {
+      let win = sharedWindowRef.current
+      if (!win || win.closed) {
+        win = window.open('', 'chatter-shared-streams', 'width=1280,height=760')
+        if (!win) return
+        const container = createWindowContainer(win, 'Chatter Streams')
+        sharedWindowRef.current = win
+        setSharedContainer(container)
+        win.addEventListener('beforeunload', () => {
+          sharedWindowRef.current = null
+          setSharedContainer(null)
+          setDetachedTiles(prev => {
+            const next: Record<string, DetachMode> = {}
+            Object.entries(prev).forEach(([k, v]) => {
+              if (v !== 'shared') next[k] = v
+            })
+            return next
+          })
+        })
+      }
+      setDetachedTiles(prev => ({ ...prev, [tileId]: 'shared' }))
+      win.focus()
+      return
+    }
+
+    let win = detachedWindowsRef.current[tileId]
+    if (!win || win.closed) {
+      win = window.open('', `chatter-stream-${tileId}`, 'width=1100,height=700')
+      if (!win) return
+      const container = createWindowContainer(win, 'Chatter Stream')
+      detachedWindowsRef.current[tileId] = win
+      setDetachedContainers(prev => ({ ...prev, [tileId]: container }))
+      win.addEventListener('beforeunload', () => {
+        detachedWindowsRef.current[tileId] = null
+        setDetachedContainers(prev => {
+          const next = { ...prev }
+          delete next[tileId]
+          return next
+        })
+        setDetachedTiles(prev => {
+          const next = { ...prev }
+          delete next[tileId]
+          return next
+        })
+      })
+    }
+    setDetachedTiles(prev => ({ ...prev, [tileId]: 'separate' }))
+    win.focus()
+  }
+
+  function reattachTile(tileId: string) {
+    setDetachedTiles(prev => {
+      const next = { ...prev }
+      delete next[tileId]
+      return next
+    })
+    const win = detachedWindowsRef.current[tileId]
+    if (win && !win.closed) win.close()
+    detachedWindowsRef.current[tileId] = null
+    setDetachedContainers(prev => {
+      const next = { ...prev }
+      delete next[tileId]
+      return next
+    })
   }
 
   // Exit fullscreen when theater mode ends
@@ -388,6 +533,28 @@ export function VoiceGridPane({ session, onLeave }: Props) {
     })
   })
 
+  // Cleanup detached windows for streams that ended.
+  useEffect(() => {
+    const alive = new Set(tiles.filter((t): t is VideoTile => t.kind === 'video').map(t => t.id))
+    Object.keys(detachedTiles).forEach((tileId) => {
+      if (!alive.has(tileId)) {
+        reattachTile(tileId)
+      }
+    })
+  }, [tiles, detachedTiles])
+
+  // Close child windows when leaving voice pane.
+  useEffect(() => {
+    return () => {
+      Object.values(detachedWindowsRef.current).forEach((win) => {
+        if (win && !win.closed) win.close()
+      })
+      if (sharedWindowRef.current && !sharedWindowRef.current.closed) {
+        sharedWindowRef.current.close()
+      }
+    }
+  }, [])
+
   // Participant count label ──────────────────────────────────────────────────
   const participantCount = state.participants.length + 1
 
@@ -421,6 +588,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                 tile={theaterTile} focused active
                 onDeactivate={theaterTile.isLocal ? undefined : () => deactivateTile(theaterTile.id)}
                 onClick={clearFocused}
+                onDetach={!theaterTile.isLocal ? (mode) => detachTile(theaterTile.id, mode) : undefined}
               />
               {/* Fullscreen button — bottom right */}
               <button
@@ -444,6 +612,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                       onActivate={() => activateTile(t.id)}
                       onDeactivate={t.isLocal ? undefined : () => deactivateTile(t.id)}
                       onClick={() => setFocused(t.id)}
+                      onDetach={!t.isLocal ? (mode) => detachTile(t.id, mode) : undefined}
                     />
                   ) : (
                     <ParticipantCard
@@ -470,6 +639,7 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                   onActivate={() => activateTile(t.id)}
                   onDeactivate={t.isLocal ? undefined : () => deactivateTile(t.id)}
                   onClick={() => setFocused(t.id)}
+                  onDetach={!t.isLocal ? (mode) => detachTile(t.id, mode) : undefined}
                 />
               ) : (
                 <ParticipantCard
@@ -518,6 +688,42 @@ export function VoiceGridPane({ session, onLeave }: Props) {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Detached windows: per-stream */}
+      {Object.entries(detachedTiles).map(([tileId, mode]) => {
+        if (mode !== 'separate') return null
+        const tile = tiles.find((t): t is VideoTile => t.kind === 'video' && t.id === tileId)
+        const container = detachedContainers[tileId]
+        if (!tile || !container) return null
+        return createPortal(
+          <DetachedStreamCard tile={tile} onReturn={() => reattachTile(tileId)} />,
+          container,
+        )
+      })}
+
+      {/* Detached window: shared */}
+      {sharedContainer && createPortal(
+        <div className="w-full h-full bg-sp-bg text-sp-text p-3 flex flex-col gap-3">
+          <div className="shrink-0 flex items-center gap-2 border-b border-sp-divider/50 pb-2">
+            <Icon name="monitor" size={16} className="text-sp-mention" />
+            <span className="font-semibold text-sm">Shared Detached Streams</span>
+          </div>
+          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr content-start">
+            {Object.entries(detachedTiles)
+              .filter(([, mode]) => mode === 'shared')
+              .map(([tileId]) => {
+                const tile = tiles.find((t): t is VideoTile => t.kind === 'video' && t.id === tileId)
+                if (!tile) return null
+                return (
+                  <div key={tileId} className="rounded-xl overflow-hidden border border-sp-divider/50 bg-black min-h-[220px]">
+                    <DetachedStreamCard tile={tile} onReturn={() => reattachTile(tileId)} />
+                  </div>
+                )
+              })}
+          </div>
+        </div>,
+        sharedContainer,
       )}
     </div>
   )
