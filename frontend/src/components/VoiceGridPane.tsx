@@ -578,6 +578,10 @@ export function VoiceGridPane({ session, onLeave }: Props) {
 
   // Participant count label ──────────────────────────────────────────────────
   const participantCount = state.participants.length + 1
+  const sharedDetachedIds = Object.entries(detachedTiles)
+    .filter(([, mode]) => mode === 'shared')
+    .map(([tileId]) => tileId)
+  const isSingleSharedTile = sharedDetachedIds.length === 1
 
   return (
     <div className="flex flex-col h-full bg-sp-bg select-none">
@@ -737,14 +741,15 @@ export function VoiceGridPane({ session, onLeave }: Props) {
             <Icon name="monitor" size={16} className="text-sp-mention" />
             <span className="font-semibold text-sm">Shared Detached Streams</span>
           </div>
-          <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr content-start">
-            {Object.entries(detachedTiles)
-              .filter(([, mode]) => mode === 'shared')
-              .map(([tileId]) => {
+          <div className={`flex-1 min-h-0 grid ${isSingleSharedTile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} gap-3 auto-rows-fr content-start`}>
+            {sharedDetachedIds.map((tileId) => {
                 const tile = tiles.find((t): t is VideoTile => t.kind === 'video' && t.id === tileId)
                 if (!tile) return null
                 return (
-                  <div key={tileId} className="rounded-xl overflow-hidden border border-sp-divider/50 bg-black min-h-[220px]">
+                  <div
+                    key={tileId}
+                    className={`rounded-xl overflow-hidden border border-sp-divider/50 bg-black ${isSingleSharedTile ? 'h-full min-h-0' : 'min-h-[220px]'}`}
+                  >
                     <DetachedStreamCard tile={tile} onReturn={() => reattachTile(tileId)} />
                   </div>
                 )
