@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { createPortal } from 'react-dom'
 import { getPins, unpinMessage } from '../api/messages'
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
@@ -22,11 +23,17 @@ export function PinnedMessagesPanel({ channelId, onScrollToMessage, onClose }: P
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pins', channelId] }),
   })
 
-  return (
-    <div className="w-80 shrink-0 flex flex-col border-l border-black/20 bg-sp-bg">
+  const modal = (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="w-full max-w-2xl max-h-[80vh] flex flex-col bg-sp-popup border border-sp-divider/60 rounded-sp-xl shadow-sp-3 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-black/20 shrink-0">
-        <div className="flex items-center gap-2 font-bold text-sm">
+      <div className="flex items-center justify-between px-4 h-12 border-b border-sp-divider/60 shrink-0">
+        <div className="flex items-center gap-2 font-bold text-sm text-sp-text">
           <Icon name="pin" size={16} className="text-sp-muted" />
           Pinned Messages
         </div>
@@ -100,6 +107,9 @@ export function PinnedMessagesPanel({ channelId, onScrollToMessage, onClose }: P
           </div>
         ))}
       </div>
+      </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
