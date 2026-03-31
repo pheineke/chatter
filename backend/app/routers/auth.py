@@ -16,7 +16,7 @@ from app.auth import (
 )
 from app.config import settings
 from app.dependencies import CurrentUser, DB
-from app.rate_limiter import rate_limit_auth
+from app.rate_limiter import rate_limit_auth, rate_limit_auth_login
 from app.schemas.user import UserCreate, UserRead, Token
 from models.refresh_token import RefreshToken
 from models.user import User
@@ -73,6 +73,7 @@ async def login(
     db: DB,
     _rl: None = Depends(rate_limit_auth),
 ):
+    await rate_limit_auth_login(request, form.username)
     result = await db.execute(select(User).where(User.username == form.username))
     user = result.scalar_one_or_none()
     if not user or not verify_password(form.password, user.password_hash):

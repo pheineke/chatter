@@ -173,9 +173,26 @@ async def rate_limit_auth(request: Request) -> None:
     ip = request.client.host if request.client else "unknown"
     await _enforce_limit(
         key=f"auth:{ip}",
-        limit=10,
+        limit=settings.ratelimit_auth_ip_per_minute,
         window_seconds=60.0,
         detail="Too many requests. Please try again later.",
+    )
+
+
+async def rate_limit_auth_login(request: Request, username: str) -> None:
+    """Extra anti-bruteforce guard for /auth/login.
+
+    Limits repeated login attempts for the same username from the same IP.
+    """
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return
+    ip = request.client.host if request.client else "unknown"
+    normalized = (username or "").strip().lower()[:128] or "unknown-user"
+    await _enforce_limit(
+        key=f"auth-login:{ip}:{normalized}",
+        limit=settings.ratelimit_auth_login_ip_user_per_minute,
+        window_seconds=60.0,
+        detail="Too many login attempts for this account. Please try again later.",
     )
 
 
