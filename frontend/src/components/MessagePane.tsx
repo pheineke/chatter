@@ -178,7 +178,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
   // If we're already in a voice session for this channel, show the grid immediately
   // (don't wait for the channels query — we know it's a voice channel).
   if (voiceSession?.channelId === channelId) {
-    return <VoiceGridPane session={voiceSession} onLeave={onLeaveVoice} />
+    return <VoiceGridPane session={voiceSession} onLeave={onLeaveVoice} onOpenNav={onOpenNav} />
   }
 
   // Still loading channel list — don't render a text-channel layout for a voice channel

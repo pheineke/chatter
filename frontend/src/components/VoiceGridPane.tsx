@@ -351,9 +351,10 @@ function gridCols(n: number) {
 interface Props {
   session: VoiceSession
   onLeave: () => void
+  onOpenNav?: () => void
 }
 
-export function VoiceGridPane({ session, onLeave }: Props) {
+export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
   const { user: selfUser } = useAuth()
   const { state, remoteScreenStreams, remoteWebcamStreams, remoteScreenAudioStreams, localScreenStream, localWebcamStream, toggleWebcam, isSelfSpeaking } = useVoiceCall()
   const [focused, setFocused] = useState<string | null>(null)
@@ -652,6 +653,15 @@ export function VoiceGridPane({ session, onLeave }: Props) {
     <div className="flex flex-col h-full bg-sp-bg select-none">
       {/* Header */}
       <div className="h-12 flex items-center gap-2 px-4 border-b border-black/20 shrink-0">
+        {onOpenNav && (
+          <button
+            className="md:hidden p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5"
+            onClick={onOpenNav}
+            aria-label="Open navigation"
+          >
+            <Icon name="menu" size={22} />
+          </button>
+        )}
         <Icon name="headphones" size={16} className="text-sp-online shrink-0" />
         <span className="font-semibold truncate">{session.channelName}</span>
         <span className="text-sp-muted text-xs ml-1 shrink-0">
