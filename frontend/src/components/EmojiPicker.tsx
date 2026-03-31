@@ -13,14 +13,32 @@ interface Props {
   position: { x: number; y: number }
   customEmojis?: CustomEmoji[]
   showServerSection?: boolean
+  enableGifSearch?: boolean
 }
 
 const PICKER_W = 352
 const PICKER_H = 435
+const TENOR_LIMIT = 24
+const TENOR_KEY = (import.meta.env.VITE_TENOR_API_KEY as string | undefined) || 'LIVDSRZULELA'
 
-export function EmojiPicker({ onPick, onClose, position, customEmojis = [], showServerSection = false }: Props) {
+type TenorResponse = {
+  results: Array<{
+    id: string
+    media_formats?: {
+      tinygif?: { url: string }
+      gif?: { url: string }
+    }
+  }>
+}
+
+export function EmojiPicker({ onPick, onClose, position, customEmojis = [], showServerSection = false, enableGifSearch = false }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<'unicode' | 'gifs' | 'server'>('unicode')
+  const [gifQuery, setGifQuery] = useState('')
+  const [gifResults, setGifResults] = useState<Array<{ id: string; previewUrl: string; gifUrl: string }>>([])
+  const [gifLoading, setGifLoading] = useState(false)
+  const [gifError, setGifError] = useState<string | null>(null)
+  const showTabs = enableGifSearch || showServerSection
 
   // Clamp to viewport
   const vw = window.innerWidth
@@ -44,6 +62,53 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
     }
   }, [onClose])
 
+  useEffect(() => {
+    if (!enableGifSearch || tab !== 'gifs') return
+    const controller = new AbortController()
+    const timeout = setTimeout(async () => {
+      setGifLoading(true)
+      setGifError(null)
+      try {
+        const q = gifQuery.trim()
+        const params = new URLSearchParams({
+          key: TENOR_KEY,
+          client_key: 'chatter',
+          limit: String(TENOR_LIMIT),
+          media_filter: 'tinygif,gif',
+          contentfilter: 'medium',
+        })
+        const endpoint = q.length > 0 ? 'search' : 'featured'
+        if (q.length > 0) params.set('q', q)
+        const res = await fetch(`https://tenor.googleapis.com/v2/${endpoint}?${params.toString()}`, {
+          signal: controller.signal,
+        })
+        if (!res.ok) throw new Error(`GIF search failed (${res.status})`)
+        const payload = (await res.json()) as TenorResponse
+        const parsed = (payload.results || [])
+          .map((r) => {
+            const preview = r.media_formats?.tinygif?.url ?? r.media_formats?.gif?.url
+            const full = r.media_formats?.gif?.url ?? r.media_formats?.tinygif?.url
+            if (!preview || !full) return null
+            return { id: r.id, previewUrl: preview, gifUrl: full }
+          })
+          .filter((v): v is { id: string; previewUrl: string; gifUrl: string } => v !== null)
+        setGifResults(parsed)
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          setGifResults([])
+          setGifError('Could not load GIFs.')
+        }
+      } finally {
+        setGifLoading(false)
+      }
+    }, 250)
+
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [enableGifSearch, gifQuery, tab])
+
   return createPortal(
     <div
       ref={ref}
@@ -52,7 +117,7 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="w-[352px] overflow-hidden rounded-lg border border-sp-divider/60 bg-sp-popup shadow-sp-3">
-        {showServerSection && (
+        {showTabs && (
           <div className="flex items-center border-b border-sp-divider/60 px-1 py-1">
             <button
               type="button"
@@ -63,24 +128,28 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
             >
               Emoji
             </button>
-            <button
-              type="button"
-              className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
-                tab === 'gifs' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
-              }`}
-              onClick={() => setTab('gifs')}
-            >
-              GIFs
-            </button>
-            <button
-              type="button"
-              className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
-                tab === 'server' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
-              }`}
-              onClick={() => setTab('server')}
-            >
-              Server
-            </button>
+            {enableGifSearch && (
+              <button
+                type="button"
+                className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  tab === 'gifs' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
+                }`}
+                onClick={() => setTab('gifs')}
+              >
+                GIFs
+              </button>
+            )}
+            {showServerSection && (
+              <button
+                type="button"
+                className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  tab === 'server' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
+                }`}
+                onClick={() => setTab('server')}
+              >
+                Server
+              </button>
+            )}
           </div>
         )}
 
@@ -112,11 +181,38 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
               </div>
             )}
           </div>
-        ) : tab === 'gifs' ? (
-          <div className="h-[435px] p-3">
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-sp-muted">GIFs</div>
-            <div className="rounded-md border border-sp-divider/60 bg-sp-input p-3 text-xs text-sp-muted">
-              GIF picker tab is ready; GIF search will be added next.
+        ) : enableGifSearch && tab === 'gifs' ? (
+          <div className="h-[435px] p-2">
+            <input
+              value={gifQuery}
+              onChange={(e) => setGifQuery(e.target.value)}
+              className="input mb-2 w-full"
+              placeholder="Search GIFs"
+            />
+            <div className="h-[375px] overflow-y-auto">
+              {gifLoading ? (
+                <div className="px-2 py-4 text-xs text-sp-muted">Searching GIFs…</div>
+              ) : gifError ? (
+                <div className="px-2 py-4 text-xs text-red-400">{gifError}</div>
+              ) : gifResults.length === 0 ? (
+                <div className="px-2 py-4 text-xs text-sp-muted">No GIFs found.</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {gifResults.map((gif) => (
+                    <button
+                      key={gif.id}
+                      type="button"
+                      className="overflow-hidden rounded border border-sp-divider/40 hover:border-sp-mention/60"
+                      onClick={() => {
+                        onPick(gif.gifUrl)
+                        onClose()
+                      }}
+                    >
+                      <img src={gif.previewUrl} alt="GIF" className="h-24 w-full object-cover" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : (
