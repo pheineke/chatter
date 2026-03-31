@@ -92,14 +92,6 @@ function AccountTab() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
 
-  // Change-password form state
-  const [pwCurrent, setPwCurrent] = useState('')
-  const [pwNew, setPwNew] = useState('')
-  const [pwConfirm, setPwConfirm] = useState('')
-  const [pwError, setPwError] = useState<string | null>(null)
-  const [pwSuccess, setPwSuccess] = useState(false)
-  const [pwLoading, setPwLoading] = useState(false)
-
   const updateMut = useMutation({
     mutationFn: (patch: any) => updateMe(patch),
     onSuccess: async () => {
@@ -141,26 +133,6 @@ function AccountTab() {
   async function saveEdit() {
     setIsSubmitting(true)
     if (editing) updateMut.mutate({ [editing]: editValue })
-  }
-
-  async function handleChangePassword() {
-    setPwError(null)
-    setPwSuccess(false)
-    if (!pwCurrent) { setPwError('Please enter your current password'); return }
-    if (pwNew.length < 8) { setPwError('New password must be at least 8 characters'); return }
-    if (pwNew !== pwConfirm) { setPwError('New passwords do not match'); return }
-    setPwLoading(true)
-    try {
-      await changePassword(pwCurrent, pwNew)
-      setPwCurrent(''); setPwNew(''); setPwConfirm('')
-      setPwSuccess(true)
-      setTimeout(() => setPwSuccess(false), 4000)
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail
-      setPwError(typeof detail === 'string' ? detail : 'Failed to update password')
-    } finally {
-      setPwLoading(false)
-    }
   }
 
   const statusColors: Record<string, string> = {
@@ -272,35 +244,63 @@ function AccountTab() {
         </div>
       )}
 
-      {/* Change Password */}
-      <div className="bg-sp-sidebar rounded-lg p-4 mt-6">
-        <div className="text-xs font-bold text-sp-muted uppercase mb-4">Change Password</div>
-        <div className="space-y-2">
-          <input
-            type="password" className="input w-full" placeholder="Current password"
-            value={pwCurrent} onChange={e => setPwCurrent(e.target.value)}
-          />
-          <input
-            type="password" className="input w-full" placeholder="New password (min. 8 characters)"
-            value={pwNew} onChange={e => setPwNew(e.target.value)}
-          />
-          <input
-            type="password" className="input w-full" placeholder="Confirm new password"
-            value={pwConfirm} onChange={e => setPwConfirm(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleChangePassword() }}
-          />
-          {pwError && <p className="text-red-400 text-sm">{pwError}</p>}
-          {pwSuccess && <p className="text-green-400 text-sm">Password updated successfully!</p>}
-          <div className="flex justify-end pt-1">
-            <button onClick={handleChangePassword} disabled={pwLoading} className="btn py-1.5">
-              {pwLoading ? 'Saving…' : 'Update Password'}
-            </button>
-          </div>
+    </div>
+  )
+}
+
+function ChangePasswordSection() {
+  const [pwCurrent, setPwCurrent] = useState('')
+  const [pwNew, setPwNew] = useState('')
+  const [pwConfirm, setPwConfirm] = useState('')
+  const [pwError, setPwError] = useState<string | null>(null)
+  const [pwSuccess, setPwSuccess] = useState(false)
+  const [pwLoading, setPwLoading] = useState(false)
+
+  async function handleChangePassword() {
+    setPwError(null)
+    setPwSuccess(false)
+    if (!pwCurrent) { setPwError('Please enter your current password'); return }
+    if (pwNew.length < 8) { setPwError('New password must be at least 8 characters'); return }
+    if (pwNew !== pwConfirm) { setPwError('New passwords do not match'); return }
+    setPwLoading(true)
+    try {
+      await changePassword(pwCurrent, pwNew)
+      setPwCurrent(''); setPwNew(''); setPwConfirm('')
+      setPwSuccess(true)
+      setTimeout(() => setPwSuccess(false), 4000)
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      setPwError(typeof detail === 'string' ? detail : 'Failed to update password')
+    } finally {
+      setPwLoading(false)
+    }
+  }
+
+  return (
+    <div className="bg-sp-sidebar rounded-lg p-4">
+      <div className="text-xs font-bold text-sp-muted uppercase mb-4">Change Password</div>
+      <div className="space-y-2">
+        <input
+          type="password" className="input w-full" placeholder="Current password"
+          value={pwCurrent} onChange={e => setPwCurrent(e.target.value)}
+        />
+        <input
+          type="password" className="input w-full" placeholder="New password (min. 8 characters)"
+          value={pwNew} onChange={e => setPwNew(e.target.value)}
+        />
+        <input
+          type="password" className="input w-full" placeholder="Confirm new password"
+          value={pwConfirm} onChange={e => setPwConfirm(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleChangePassword() }}
+        />
+        {pwError && <p className="text-red-400 text-sm">{pwError}</p>}
+        {pwSuccess && <p className="text-green-400 text-sm">Password updated successfully!</p>}
+        <div className="flex justify-end pt-1">
+          <button onClick={handleChangePassword} disabled={pwLoading} className="btn py-1.5">
+            {pwLoading ? 'Saving…' : 'Update Password'}
+          </button>
         </div>
       </div>
-
-      {/* Active sessions */}
-      <SessionsSection />
     </div>
   )
 }
@@ -458,7 +458,7 @@ function SessionsSection() {
   }
 
   return (
-    <div className="bg-sp-sidebar rounded-lg p-4 mt-6">
+    <div className="bg-sp-sidebar rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="text-xs font-bold text-sp-muted uppercase">Active Sessions</div>
         {sessions.length > 1 && (
@@ -1007,6 +1007,10 @@ function PrivacyTab() {
           </div>
         </label>
       </div>
+
+      {/* Security */}
+      <ChangePasswordSection />
+      <SessionsSection />
 
       {/* DM permissions */}
       <div className="bg-sp-sidebar rounded-lg p-4">
