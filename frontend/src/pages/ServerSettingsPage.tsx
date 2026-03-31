@@ -132,7 +132,7 @@ export function ServerSettingsPage() {
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: { title: string; description: string | null; image: string | null; banner: string | null; owner_id: string; text_channel_icon: string; voice_channel_icon: string }; onSaved: () => void }) {
+function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: { title: string; description: string | null; image: string | null; banner: string | null; owner_id: string; text_channel_icon: string; voice_channel_icon: string; created_at: string }; onSaved: () => void }) {
   const [name, setName] = useState(server.title)
   const [desc, setDesc] = useState(server.description ?? '')
   const [textChannelIcon, setTextChannelIcon] = useState(server.text_channel_icon)
@@ -297,6 +297,9 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
             <Icon name={voiceChannelIcon} size={16} className="text-sp-text" />
             Voice Preview
           </span>
+        </div>
+        <div className="text-xs text-sp-muted">
+          Server created: {new Date(server.created_at).toLocaleDateString()}
         </div>
       </div>
 

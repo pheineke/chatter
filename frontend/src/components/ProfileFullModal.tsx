@@ -148,6 +148,7 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
           <div className="mt-14">
             <div className="text-xl font-bold leading-tight">{user.username}</div>
             <div className="text-xs text-sp-muted mt-0.5 font-mono">{user.id}</div>
+            <div className="text-xs text-sp-muted mt-0.5">Account created: {new Date(user.created_at).toLocaleDateString()}</div>
             {user.pronouns && (
               <div className="text-xs text-sp-muted mt-0.5">{user.pronouns}</div>
             )}

@@ -237,6 +237,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
              </div>
              <UserTag userId={user.id} />
              <div className="text-sm text-sp-muted">{user.pronouns}</div>
+             <div className="text-xs text-sp-muted mt-1">Account created: {new Date(user.created_at).toLocaleDateString()}</div>
              
              <div className="mt-4 border-t border-sp-input pt-2">
                  <div className="text-xs font-bold text-sp-muted uppercase mb-1">About Me</div>
