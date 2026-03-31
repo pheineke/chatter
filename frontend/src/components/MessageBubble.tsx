@@ -600,6 +600,7 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
       <EmojiPicker
         position={emojiPickerPos}
         customEmojis={customEmojis}
+        showServerSection={!!serverId}
         onPick={(emoji) => reactWith(emoji)}
         onClose={() => setEmojiPickerPos(null)}
       />

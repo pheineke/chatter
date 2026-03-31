@@ -651,6 +651,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
         <EmojiPicker
           position={emojiPickerPos}
           customEmojis={customEmojis}
+          showServerSection={!!serverId}
           onPick={(emoji) => { insertEmoji(emoji); setEmojiPickerPos(null) }}
           onClose={() => setEmojiPickerPos(null)}
         />
