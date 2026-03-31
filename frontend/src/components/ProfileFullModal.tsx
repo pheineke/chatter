@@ -5,7 +5,25 @@ import { Icon } from './Icon'
 import { Linkified } from '../utils/linkify'
 import { getNote, setNote } from '../api/users'
 import { useAuth } from '../contexts/AuthContext'
+import { useE2EE } from '../contexts/E2EEContext'
 import type { User } from '../api/types'
+
+const NOTE_E2EE_PREFIX = 'chatter-note-e2ee-v1:'
+
+function encodeEncryptedNote(ciphertext: string, nonce: string): string {
+  return `${NOTE_E2EE_PREFIX}${nonce}:${ciphertext}`
+}
+
+function decodeEncryptedNote(content: string): { nonce: string; ciphertext: string } | null {
+  if (!content.startsWith(NOTE_E2EE_PREFIX)) return null
+  const payload = content.slice(NOTE_E2EE_PREFIX.length)
+  const sep = payload.indexOf(':')
+  if (sep <= 0 || sep === payload.length - 1) return null
+  return {
+    nonce: payload.slice(0, sep),
+    ciphertext: payload.slice(sep + 1),
+  }
+}
 
 interface Props {
   user: User
@@ -18,14 +36,32 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
   const noteRef = useRef<HTMLTextAreaElement>(null)
   const qc = useQueryClient()
   const { user: currentUser } = useAuth()
+  const e2ee = useE2EE()
   const isSelf = !!currentUser && currentUser.id === user.id
   const [noteText, setNoteText] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
+  const [noteDecryptError, setNoteDecryptError] = useState(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { data: savedNote } = useQuery({
-    queryKey: ['note', user.id],
-    queryFn: () => getNote(user.id),
+    queryKey: ['note', user.id, e2ee.isEnabled],
+    queryFn: async () => {
+      const content = await getNote(user.id)
+      const encrypted = decodeEncryptedNote(content)
+      if (!encrypted) {
+        setNoteDecryptError(false)
+        return content
+      }
+
+      const decrypted = await e2ee.decryptFromUser(user.id, encrypted.ciphertext, encrypted.nonce)
+      if (decrypted == null) {
+        setNoteDecryptError(true)
+        return ''
+      }
+
+      setNoteDecryptError(false)
+      return decrypted
+    },
     enabled: !isSelf,
   })
 
@@ -34,7 +70,17 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
   }, [savedNote])
 
   const noteMut = useMutation({
-    mutationFn: (content: string) => setNote(user.id, content),
+    mutationFn: async (content: string) => {
+      // E2EE notes reuse DM key derivation against the note target user.
+      if (e2ee.isEnabled) {
+        const encrypted = await e2ee.encryptForUser(user.id, content)
+        if (encrypted) {
+          await setNote(user.id, encodeEncryptedNote(encrypted.ciphertext, encrypted.nonce))
+          return
+        }
+      }
+      await setNote(user.id, content)
+    },
     onSuccess: () => {
       setNoteSaving(false)
       qc.invalidateQueries({ queryKey: ['note', user.id] })
@@ -130,6 +176,11 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
                   <div className="text-xs font-bold text-sp-muted uppercase tracking-wider">Note</div>
                   {noteSaving && <span className="text-[10px] text-sp-muted">Saving…</span>}
                 </div>
+                {noteDecryptError && (
+                  <div className="mb-2 text-[11px] text-amber-400">
+                    Could not decrypt this note on this device.
+                  </div>
+                )}
                 <textarea
                   ref={noteRef}
                   className="input w-full text-sm bg-black/20 border-0 px-3 py-2 placeholder:text-sp-muted resize-none rounded-md"
