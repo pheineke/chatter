@@ -15,6 +15,33 @@ import { LinkEmbed } from './LinkEmbed'
 import { extractURLs, getDismissed } from '../utils/embeds'
 import { useE2EE } from '../contexts/E2EEContext'
 
+const RECENT_REACTIONS_KEY = 'recentReactions'
+const FALLBACK_QUICK_REACTIONS = ['👍', '❤️', '😂']
+
+function getRecentReactions(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_REACTIONS_KEY)
+    if (!raw) return [...FALLBACK_QUICK_REACTIONS]
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return [...FALLBACK_QUICK_REACTIONS]
+    const cleaned = parsed.filter((e): e is string => typeof e === 'string' && e.trim().length > 0)
+    if (cleaned.length === 0) return [...FALLBACK_QUICK_REACTIONS]
+    return cleaned.slice(0, 3)
+  } catch {
+    return [...FALLBACK_QUICK_REACTIONS]
+  }
+}
+
+function rememberReaction(emoji: string) {
+  try {
+    const existing = getRecentReactions()
+    const next = [emoji, ...existing.filter((e) => e !== emoji)]
+    localStorage.setItem(RECENT_REACTIONS_KEY, JSON.stringify(next.slice(0, 20)))
+  } catch {
+    // Ignore localStorage failures (private mode / quota).
+  }
+}
+
 interface Props {
   message: Message
   channelId: string
@@ -60,6 +87,7 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [userContextMenu, setUserContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [quickReactions, setQuickReactions] = useState<string[]>(() => getRecentReactions())
 
   // E2EE: decrypt the message content if it was sent encrypted
   const [decryptedContent, setDecryptedContent] = useState<string | null>(null)
@@ -151,6 +179,12 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
       setActionError(String(detail))
     },
   })
+
+  function reactWith(emoji: string) {
+    rememberReaction(emoji)
+    setQuickReactions(getRecentReactions())
+    reactMut.mutate(emoji)
+  }
 
   // Blocked-user early return (all hooks already called above)
   const isBlocked = !isOwn && blockedIds.has(msg.author.id)
@@ -425,6 +459,11 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
 
       {/* Action toolbar on hover */}
       <div className="absolute right-4 top-0 -translate-y-1/2 flex items-center gap-1 bg-sp-popup border border-sp-divider/60 rounded-sp-sm px-1 py-0.5 shadow-sp-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity">
+          {quickReactions.map((emoji) => (
+            <ActionBtn key={emoji} title={`React with ${emoji}`} onClick={() => reactWith(emoji)}>
+              <span className="text-sm leading-none">{emoji}</span>
+            </ActionBtn>
+          ))}
           <ActionBtn
             title="Add Reaction"
             onClick={(e) => {
@@ -459,7 +498,7 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
     {emojiPickerPos && (
       <EmojiPicker
         position={emojiPickerPos}
-        onPick={(emoji) => reactMut.mutate(emoji)}
+        onPick={(emoji) => reactWith(emoji)}
         onClose={() => setEmojiPickerPos(null)}
       />
     )}
