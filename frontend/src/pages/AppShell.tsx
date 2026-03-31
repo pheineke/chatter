@@ -86,18 +86,22 @@ export default function AppShell() {
       {showShortcuts && <KeyboardShortcutsDialog onClose={() => setShowShortcuts(false)} />}
 
       <Routes>
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path=":serverId/settings" element={<ServerSettingsPage />} />
-        <Route path=":serverId/channels/:channelId/settings" element={<ChannelSettingsPage />} />
         <Route path="*" element={
           <VoiceCallProvider session={voiceSession} userId={user?.id ?? ''}>
-            {/* Mobile backdrop — tap outside drawer to close */}
-            {showLeftDrawer && (
-              <div
-                className="md:hidden fixed inset-0 z-30 bg-black/60"
-                onClick={() => setShowLeftDrawer(false)}
-              />
-            )}
+            {/* Outer routes that should preserve voice call connection */}
+            <Routes>
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path=":serverId/settings" element={<ServerSettingsPage />} />
+              <Route path=":serverId/channels/:channelId/settings" element={<ChannelSettingsPage />} />
+              <Route path="*" element={
+                <>
+                  {/* Mobile backdrop — tap outside drawer to close */}
+                  {showLeftDrawer && (
+                    <div
+                      className="md:hidden fixed inset-0 z-30 bg-black/60"
+                      onClick={() => setShowLeftDrawer(false)}
+                    />
+                  )}
 
             {/* ── Left panel: server tabs (outside) + channel card (bordered tile) ──
                 Mobile (<md): fixed off-screen, slides in from left.
@@ -172,10 +176,12 @@ export default function AppShell() {
                     path=":serverId/:channelId"
                     element={<MessagePane voiceSession={voiceSession} onJoinVoice={setVoiceSession} onLeaveVoice={handleLeaveVoice} onOpenNav={() => setShowLeftDrawer(true)} />}
                   />
-                  <Route path=":serverId/settings" element={<ServerSettingsPage />} />
                 </Routes>
               </div>
             </div>
+                </>
+              } />
+            </Routes>
           </VoiceCallProvider>
         } />
       </Routes>
