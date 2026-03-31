@@ -113,8 +113,8 @@ function ParticipantCard({
             {/* Badges */}
             <div className="flex gap-1 ml-auto">
               {tile.isMuted && (
-                <span className="w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
-                  <Icon name="mic-off" size={9} className="text-red-400" />
+                <span className="inline-flex items-center justify-center" title="Muted">
+                  <Icon name="mic-off" size={12} className="text-white/85 drop-shadow" />
                 </span>
               )}
               {tile.isDeafened && (
@@ -136,8 +136,8 @@ function ParticipantCard({
           {/* Muted / deafened badges */}
           <div className={`absolute flex gap-1 ${compact ? 'bottom-1 right-1' : 'bottom-2 right-2'}`}>
             {tile.isMuted && (
-              <span className="w-5 h-5 rounded-full bg-sp-bg/80 flex items-center justify-center">
-                <Icon name="mic-off" size={11} className="text-red-400" />
+              <span className="inline-flex items-center justify-center" title="Muted">
+                <Icon name="mic-off" size={14} className="text-sp-muted" />
               </span>
             )}
             {tile.isDeafened && (
