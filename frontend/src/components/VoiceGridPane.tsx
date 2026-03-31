@@ -160,12 +160,46 @@ function ParticipantCard({
 // ─── Video tile card ─────────────────────────────────────────────────────────
 
 function VideoCard({
-  tile, compact = false, focused = false, active = false, onActivate, onDeactivate, onClick, onDetach,
+  tile, compact = false, focused = false, active = false, isDetached = false, detachMode, onActivate, onDeactivate, onClick, onDetach, onFocusDetached,
 }: {
   tile: VideoTile; compact?: boolean; focused?: boolean
-  active?: boolean; onActivate?: () => void; onDeactivate?: () => void; onClick?: () => void
-  onDetach?: (mode: DetachMode) => void
+  active?: boolean; isDetached?: boolean; detachMode?: DetachMode
+  onActivate?: () => void; onDeactivate?: () => void; onClick?: () => void
+  onDetach?: (mode: DetachMode) => void; onFocusDetached?: () => void
 }) {
+  // Detached placeholder — shown when stream is popped out
+  if (isDetached) {
+    return (
+      <div
+        className={`relative flex flex-col items-center justify-center rounded-xl bg-gradient-to-br from-blue-600/20 to-blue-900/20 border-2 border-blue-500/50 cursor-pointer group
+          ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}
+        onClick={onFocusDetached}
+      >
+        <div className="flex flex-col items-center gap-2 text-blue-300 group-hover:text-blue-200 transition-colors">
+          <Icon name={detachMode === 'shared' ? 'monitor' : 'external-link'} size={compact ? 20 : 36} />
+          {!compact && <span className="text-xs font-semibold">Stream Popped Out</span>}
+        </div>
+        {!compact && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <span className="text-white text-xs font-semibold bg-black/70 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+              <Icon name="arrow-up-right" size={12} /> Focus Window
+            </span>
+          </div>
+        )}
+        <div className="absolute top-2 right-2">
+          <span className="text-[10px] uppercase font-bold text-blue-300 bg-blue-500/30 px-1.5 py-0.5 rounded">
+            {detachMode === 'shared' ? 'Shared' : 'Separate'}
+          </span>
+        </div>
+        {compact && (
+          <span className="mt-1 text-[10px] text-blue-300 truncate max-w-[88px] px-1 text-center leading-none">
+            {tile.label}
+          </span>
+        )}
+      </div>
+    )
+  }
+
   // Inactive placeholder — shown for remote tiles until the user clicks to watch.
   if (!active) {
     return (
@@ -453,6 +487,21 @@ export function VoiceGridPane({ session, onLeave }: Props) {
     setFullscreen(false)
   }
 
+  // Focus a detached window
+  function focusDetachedWindow(tileId: string) {
+    const mode = detachedTiles[tileId]
+    if (mode === 'shared') {
+      if (sharedWindowRef.current && !sharedWindowRef.current.closed) {
+        sharedWindowRef.current.focus()
+      }
+    } else if (mode === 'separate') {
+      const win = detachedWindowsRef.current[tileId]
+      if (win && !win.closed) {
+        win.focus()
+      }
+    }
+  }
+
   // ESC exits fullscreen first, then theater
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -550,16 +599,14 @@ export function VoiceGridPane({ session, onLeave }: Props) {
   }
 
   // Theater mode helpers ─────────────────────────────────────────────────────
-  const visibleTiles = tiles.filter((t) => !(t.kind === 'video' && detachedTiles[t.id]))
-
-  const focusedTile = focused != null ? visibleTiles.find(t => t.id === focused) : null
+  const focusedTile = focused != null ? tiles.find(t => t.id === focused) : null
   // Only video tiles can be theaters
   const theaterTile = focusedTile?.kind === 'video' ? focusedTile : null
-  const filmstripTiles = theaterTile ? visibleTiles.filter(t => t.id !== theaterTile.id) : []
+  const filmstripTiles = theaterTile ? tiles.filter(t => t.id !== theaterTile.id) : []
 
   // Validate focus — if the focused tile no longer exists (stream ended), clear
   useEffect(() => {
-    if (focused && !visibleTiles.find(t => t.id === focused)) clearFocused()
+    if (focused && !tiles.find(t => t.id === focused)) clearFocused()
   })
 
   // When a stream disappears (share stopped), remove it from activeTiles so that
@@ -628,10 +675,15 @@ export function VoiceGridPane({ session, onLeave }: Props) {
             {/* Focused video */}
             <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-black border border-white/10">
               <VideoCard
-                tile={theaterTile} focused active
+                tile={theaterTile}
+                focused
+                isDetached={!!detachedTiles[theaterTile.id]}
+                detachMode={detachedTiles[theaterTile.id]}
+                active
                 onDeactivate={theaterTile.isLocal ? undefined : () => deactivateTile(theaterTile.id)}
                 onClick={clearFocused}
                 onDetach={!theaterTile.isLocal ? (mode) => detachTile(theaterTile.id, mode) : undefined}
+                onFocusDetached={() => focusDetachedWindow(theaterTile.id)}
               />
               {/* Fullscreen button — bottom right */}
               <button
@@ -651,11 +703,14 @@ export function VoiceGridPane({ session, onLeave }: Props) {
                       key={t.id}
                       tile={t}
                       compact
+                      isDetached={!!detachedTiles[t.id]}
+                      detachMode={detachedTiles[t.id]}
                       active={t.isLocal || activeTiles.has(t.id)}
                       onActivate={() => activateTile(t.id)}
                       onDeactivate={t.isLocal ? undefined : () => deactivateTile(t.id)}
                       onClick={() => setFocused(t.id)}
                       onDetach={!t.isLocal ? (mode) => detachTile(t.id, mode) : undefined}
+                      onFocusDetached={() => focusDetachedWindow(t.id)}
                     />
                   ) : (
                     <ParticipantCard
@@ -672,17 +727,20 @@ export function VoiceGridPane({ session, onLeave }: Props) {
           </div>
         ) : (
           // ── Standard grid ────────────────────────────────────────────────
-          <div className={`h-full grid ${gridCols(visibleTiles.length)} gap-4 auto-rows-fr content-start`}>
-            {visibleTiles.map(t =>
+          <div className={`h-full grid ${gridCols(tiles.filter(t => t.kind === 'video').length)} gap-4 auto-rows-fr content-start`}>
+            {tiles.map(t =>
               t.kind === 'video' ? (
                 <VideoCard
                   key={t.id}
                   tile={t}
+                  isDetached={!!detachedTiles[t.id]}
+                  detachMode={detachedTiles[t.id]}
                   active={t.isLocal || activeTiles.has(t.id)}
                   onActivate={() => activateTile(t.id)}
                   onDeactivate={t.isLocal ? undefined : () => deactivateTile(t.id)}
                   onClick={() => setFocused(t.id)}
                   onDetach={!t.isLocal ? (mode) => detachTile(t.id, mode) : undefined}
+                  onFocusDetached={() => focusDetachedWindow(t.id)}
                 />
               ) : (
                 <ParticipantCard
