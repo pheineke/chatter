@@ -36,7 +36,7 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
   return (
     <div className="flex flex-col shrink-0 gap-0 border-b border-sp-divider/20">
       {/* Connection status bar */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-sp-channel-hover/20">
+      <div className="flex items-center justify-between px-2 py-1.5 bg-sp-user">
         <div className="flex flex-col min-w-0 pointer-events-none select-none">
           <div className="flex items-center gap-1.5 font-bold text-sp-online text-xs uppercase tracking-wide">
             <span className="w-1.5 h-1.5 rounded-full bg-sp-online" />

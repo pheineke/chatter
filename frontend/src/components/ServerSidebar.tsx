@@ -51,7 +51,7 @@ function DMTab({ active, unreadCount = 0, onClick, onContextMenu }: { active: bo
               ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
                 ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
-                : 'bg-sp-surface-variant/80 text-sp-muted rounded-l-lg'}`}
+                : 'bg-sp-user/90 text-sp-muted rounded-l-lg'}`}
         >
           <Icon name="message-circle" size={24} />
         </button>
@@ -111,7 +111,7 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
               ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
                 ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
-                : 'bg-sp-surface-variant/80 text-sp-on-surface rounded-l-lg'}`}
+                : 'bg-sp-user/90 text-sp-on-surface rounded-l-lg'}`}
         >
           {server.image ? (
             <>
@@ -179,7 +179,7 @@ function UnreadDMItem({ conversation, onContextMenu }: { conversation: DMConvers
           className={`absolute inset-0 w-full h-full flex items-center justify-center select-none font-bold text-sm
             ${hovered
                 ? 'bg-sp-primary/15 text-sp-primary'
-                : 'bg-sp-surface-variant/80 text-sp-on-surface'}`}
+                : 'bg-sp-user/90 text-sp-on-surface'}`}
         >
           {user.avatar ? (
              <img
