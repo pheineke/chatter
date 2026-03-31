@@ -13,6 +13,7 @@ const WINDOW_OVERSCAN = 30
 
 interface Props {
   channelId: string
+  serverId?: string
   /** If set, decrypt E2EE messages from this DM partner */
   partnerId?: string
   /** Called with a msg id so parent can provide scroll-to-message capability */
@@ -30,7 +31,7 @@ function isSameAuthorAndRecent(a: Message, b: Message): boolean {
   )
 }
 
-export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply, pinnedIds }: Props) {
+export function MessageList({ channelId, serverId, partnerId, onRegisterScrollTo, onReply, pinnedIds }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const topSentinelRef = useRef<HTMLDivElement>(null)
@@ -241,6 +242,7 @@ export function MessageList({ channelId, partnerId, onRegisterScrollTo, onReply,
             <MessageBubble
               message={msg}
               channelId={channelId}
+              serverId={serverId}
               partnerId={partnerId}
               compact={compact}
               onReply={onReply}

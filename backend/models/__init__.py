@@ -22,6 +22,7 @@ from models.decoration_code import DecorationCode
 from models.e2ee import QRSession, QRSessionStatus, UserE2EEKey
 from models.audit_log import AuditLog, AuditLogAction
 from models.interaction import ApplicationCommand, ApplicationCommandType, InteractionType, InteractionCallbackType
+from models.custom_emoji import CustomEmoji
 
 __all__ = [
     "Base",
@@ -61,4 +62,5 @@ __all__ = [
     "ServerBan",
     "WordFilterAction",
     "DecorationCode",
+    "CustomEmoji",
 ]

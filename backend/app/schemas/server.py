@@ -133,3 +133,16 @@ class ServerBanRead(BaseModel):
     user_id: uuid.UUID
     reason: str | None
     banned_at: datetime
+
+
+# ---- Custom Emojis ----------------------------------------------------------
+
+class CustomEmojiRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    server_id: uuid.UUID
+    name: str
+    image_path: str
+    created_by_id: uuid.UUID
+    created_at: datetime

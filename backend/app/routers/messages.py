@@ -26,6 +26,7 @@ from app.utils.file_validation import verify_attachment_magic
 from app.ws_manager import manager
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
+from models.custom_emoji import CustomEmoji
 from models.message import Message, Attachment, Reaction, Mention
 from models.pinned_message import PinnedMessage
 from models.server import Role, ServerMember
@@ -35,6 +36,7 @@ from models.word_filter import WordFilter, ServerBan
 router = APIRouter(prefix="/channels/{channel_id}", tags=["messages"])
 
 _MENTION_RE = re.compile(r"@(\w+)")
+_CUSTOM_REACTION_RE = re.compile(r"^:ce:([0-9a-fA-F-]{36}):$")
 
 
 def _pattern_matches(content: str, pattern: str) -> bool:
@@ -198,6 +200,30 @@ async def _get_dm_participants(channel_id: uuid.UUID, db) -> tuple[uuid.UUID, uu
     if not dmc:
         return ()
     return (dmc.user_a_id, dmc.user_b_id)
+
+
+async def _validate_reaction_emoji(emoji: str, channel: Channel, db) -> None:
+    """Allow native unicode emoji and validate custom emoji references for server channels."""
+    match = _CUSTOM_REACTION_RE.fullmatch(emoji)
+    if not match:
+        return
+
+    if not channel.server_id:
+        raise HTTPException(status_code=400, detail="Custom server emojis cannot be used in DMs.")
+
+    try:
+        emoji_id = uuid.UUID(match.group(1))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid custom emoji format.") from exc
+
+    exists = await db.execute(
+        select(CustomEmoji.id).where(
+            CustomEmoji.id == emoji_id,
+            CustomEmoji.server_id == channel.server_id,
+        )
+    )
+    if not exists.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Custom emoji does not belong to this server.")
 
 
 def _message_load_options():
@@ -548,9 +574,12 @@ async def add_reaction(
     db: DB,
     _rl: None = Depends(rate_limit_reactions),
 ):
+    channel = await _get_channel_or_404(channel_id, db)
+    await _require_channel_access(channel, current_user.id, db)
     msg = await _get_message_or_404(message_id, db)
     if msg.channel_id != channel_id:
         raise HTTPException(status_code=404, detail="Message not found")
+    await _validate_reaction_emoji(emoji, channel, db)
 
     existing = await db.execute(
         select(Reaction).where(
@@ -583,6 +612,9 @@ async def remove_reaction(
     db: DB,
     _rl: None = Depends(rate_limit_reactions),
 ):
+    channel = await _get_channel_or_404(channel_id, db)
+    await _require_channel_access(channel, current_user.id, db)
+    await _validate_reaction_emoji(emoji, channel, db)
     result = await db.execute(
         select(Reaction).where(
             Reaction.message_id == message_id,

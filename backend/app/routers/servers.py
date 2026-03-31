@@ -1,9 +1,10 @@
 import os
+import re
 import uuid
 from collections import defaultdict
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -23,18 +24,22 @@ from app.schemas.server import (
     WordFilterCreate,
     WordFilterRead,
     ServerBanRead,
+    CustomEmojiRead,
 )
 from app.schemas.user import UserRead, UserPublicRead
 from app.ws_manager import manager
 from app.services.audit_log_service import create_audit_log
 from models.audit_log import AuditLogAction
 from models.server import Server, ServerMember, Role, UserRole
+from models.custom_emoji import CustomEmoji
 from models.user import User, UserStatus
 from models.word_filter import WordFilter, ServerBan
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+CUSTOM_EMOJI_MAX = (256, 256)
+CUSTOM_EMOJI_NAME_RE = re.compile(r"^[a-z0-9_]{2,32}$")
 
 
 async def _get_server_or_404(server_id: uuid.UUID, db) -> Server:
@@ -143,6 +148,18 @@ async def _upload_server_image(server_id: uuid.UUID, file: UploadFile, field: st
     # Validate magic bytes and enforce maximum dimensions
     content, ext = await verify_image_magic_with_dims(file, SERVER_IMAGE_MAX, label="Server image")
     filename = f"servers/{server_id}/{field}.{ext}"
+    dest = os.path.join(settings.static_dir, filename)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    async with aiofiles.open(dest, "wb") as f:
+        await f.write(content)
+    return filename
+
+
+async def _upload_custom_emoji_image(server_id: uuid.UUID, emoji_id: uuid.UUID, file: UploadFile) -> str:
+    content, ext = await verify_image_magic_with_dims(
+        file, CUSTOM_EMOJI_MAX, label="Custom emoji"
+    )
+    filename = f"servers/{server_id}/emojis/{emoji_id}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     async with aiofiles.open(dest, "wb") as f:
@@ -635,3 +652,97 @@ async def _check_not_banned(server_id: uuid.UUID, user_id: uuid.UUID, db) -> Non
     )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=403, detail="You are banned from this server")
+
+
+# ---- Custom Emojis ----------------------------------------------------------
+
+@router.get("/{server_id}/emojis", response_model=list[CustomEmojiRead])
+async def list_custom_emojis(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    await _require_member(server_id, current_user.id, db)
+    result = await db.execute(
+        select(CustomEmoji)
+        .where(CustomEmoji.server_id == server_id)
+        .order_by(CustomEmoji.created_at.asc())
+    )
+    return result.scalars().all()
+
+
+@router.post("/{server_id}/emojis", response_model=CustomEmojiRead, status_code=status.HTTP_201_CREATED)
+async def create_custom_emoji(
+    server_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+    name: str = Form(...),
+    file: UploadFile = File(...),
+):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+
+    cleaned = name.strip().lower()
+    if not CUSTOM_EMOJI_NAME_RE.fullmatch(cleaned):
+        raise HTTPException(
+            status_code=400,
+            detail="Emoji name must be 2-32 chars of lowercase letters, numbers, or underscores.",
+        )
+
+    exists = await db.execute(
+        select(CustomEmoji).where(CustomEmoji.server_id == server_id, CustomEmoji.name == cleaned)
+    )
+    if exists.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="An emoji with that name already exists.")
+
+    emoji = CustomEmoji(server_id=server_id, name=cleaned, image_path="", created_by_id=current_user.id)
+    db.add(emoji)
+    await db.flush()
+
+    emoji.image_path = await _upload_custom_emoji_image(server_id, emoji.id, file)
+
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.EMOJI_CREATE,
+        target_id=emoji.id,
+        changes={"name": emoji.name, "image_path": emoji.image_path},
+    )
+
+    await db.commit()
+    await db.refresh(emoji)
+    return emoji
+
+
+@router.delete("/{server_id}/emojis/{emoji_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_custom_emoji(
+    server_id: uuid.UUID,
+    emoji_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    result = await db.execute(
+        select(CustomEmoji).where(CustomEmoji.server_id == server_id, CustomEmoji.id == emoji_id)
+    )
+    emoji = result.scalar_one_or_none()
+    if not emoji:
+        raise HTTPException(status_code=404, detail="Custom emoji not found")
+
+    await create_audit_log(
+        session=db,
+        server_id=server_id,
+        user_id=current_user.id,
+        action=AuditLogAction.EMOJI_DELETE,
+        target_id=emoji.id,
+        changes={"name": emoji.name},
+    )
+
+    # Best-effort file cleanup; deletion failure should not block DB delete.
+    try:
+        os.remove(os.path.join(settings.static_dir, emoji.image_path))
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+    await db.delete(emoji)
+    await db.commit()

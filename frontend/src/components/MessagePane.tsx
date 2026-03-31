@@ -388,6 +388,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
           {/* Messages */}
           <MessageList
             channelId={channelId}
+            serverId={serverId}
             onReply={handleReply}
             onRegisterScrollTo={handleRegisterScrollTo}
             pinnedIds={pinnedIds}

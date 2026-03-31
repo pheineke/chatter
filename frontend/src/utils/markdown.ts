@@ -98,10 +98,11 @@ const ALLOWED_TAGS = [
   'blockquote',
   'ul', 'ol', 'li',
   'a',
+  'img',
   'span',
 ]
 
-const ALLOWED_ATTR = ['href', 'target', 'rel', 'class', 'data-spoiler']
+const ALLOWED_ATTR = ['href', 'target', 'rel', 'class', 'data-spoiler', 'src', 'alt', 'title']
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

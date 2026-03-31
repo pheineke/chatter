@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useLayoutEffect, type Keyboar
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 import { sendMessage, uploadAttachment } from '../api/messages'
-import { getMembers } from '../api/servers'
+import { getMembers, getCustomEmojis } from '../api/servers'
 import { getCommands, createInteraction } from '../api/interactions'
 import { Icon } from './Icon'
 import { EmojiPicker } from './EmojiPicker'
@@ -106,6 +106,13 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     queryFn: () => getMembers(serverId || ''),
     enabled: !!serverId,
     staleTime: Infinity,
+  })
+
+  const { data: customEmojis = [] } = useQuery({
+    queryKey: ['server-emojis', serverId],
+    queryFn: () => getCustomEmojis(serverId || ''),
+    enabled: !!serverId,
+    staleTime: 60_000,
   })
 
   // Load commands
@@ -643,6 +650,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       {emojiPickerPos && (
         <EmojiPicker
           position={emojiPickerPos}
+          customEmojis={customEmojis}
           onPick={(emoji) => { insertEmoji(emoji); setEmojiPickerPos(null) }}
           onClose={() => setEmojiPickerPos(null)}
         />

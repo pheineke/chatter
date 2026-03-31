@@ -5,6 +5,7 @@ import { editMessage, deleteMessage, addReaction, removeReaction, pinMessage, un
 import { sendMessage } from '../api/messages'
 import { getConversations, getDMChannel } from '../api/dms'
 import { getFriends } from '../api/friends'
+import { getCustomEmojis } from '../api/servers'
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
 import { ProfileCard } from './ProfileCard'
@@ -17,6 +18,7 @@ import { MarkdownContent } from './MarkdownContent'
 import { LinkEmbed } from './LinkEmbed'
 import { extractURLs, getDismissed } from '../utils/embeds'
 import { useE2EE } from '../contexts/E2EEContext'
+import { parseCustomEmojiToken, replaceCustomEmojiTokens } from '../utils/customEmojis'
 
 const RECENT_REACTIONS_KEY = 'recentReactions'
 const FALLBACK_QUICK_REACTIONS = ['👍', '❤️', '😂']
@@ -55,6 +57,7 @@ function buildForwardText(msg: Message, displayContent: string | null): string {
 interface Props {
   message: Message
   channelId: string
+  serverId?: string
   /** If this is a DM channel, pass the partner's userId so we can decrypt */
   partnerId?: string
   /** If true, collapse the header (same author, within 7 min of previous) */
@@ -80,7 +83,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export const MessageBubble = memo(function MessageBubble({ message: msg, channelId, partnerId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
+export const MessageBubble = memo(function MessageBubble({ message: msg, channelId, serverId, partnerId, compact = false, onReply, onScrollToMessage, isPinned = false }: Props) {
   const { user } = useAuth()
   const { blockedIds, block, unblock } = useBlocks()
   const qc = useQueryClient()
@@ -206,6 +209,16 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
     staleTime: 30_000,
     enabled: showForwardModal,
   })
+
+  const { data: customEmojis = [] } = useQuery({
+    queryKey: ['server-emojis', serverId],
+    queryFn: () => getCustomEmojis(serverId || ''),
+    enabled: !!serverId,
+    staleTime: 60_000,
+  })
+
+  const customEmojiById = new Map(customEmojis.map((emoji) => [emoji.id, emoji]))
+  const renderedContent = displayContent ? replaceCustomEmojiTokens(displayContent, customEmojiById) : null
 
   function reactWith(emoji: string) {
     rememberReaction(emoji)
@@ -432,7 +445,7 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
                 Could not decrypt message (key mismatch or missing)
               </span>
             )}
-            {displayContent && <MarkdownContent text={displayContent} />}
+            {renderedContent && <MarkdownContent text={renderedContent} />}
           </div>
         )}
         {msg.is_edited && (
@@ -511,7 +524,19 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
                   className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors
                     ${me ? 'bg-sp-mention/20 border-sp-mention' : 'bg-sp-input border-transparent hover:border-sp-mention/50'}`}
                 >
-                  <span>{emoji}</span>
+                  {(() => {
+                    const customId = parseCustomEmojiToken(emoji)
+                    if (!customId) return <span>{emoji}</span>
+                    const custom = customEmojiById.get(customId)
+                    if (!custom) return <span>{emoji}</span>
+                    return (
+                      <img
+                        src={`/api/static/${custom.image_path}`}
+                        alt={custom.name}
+                        className="h-4 w-4 object-contain"
+                      />
+                    )
+                  })()}
                   <span className="text-sp-text">{count}</span>
                 </button>
               ))}
@@ -574,6 +599,7 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
     {emojiPickerPos && (
       <EmojiPicker
         position={emojiPickerPos}
+        customEmojis={customEmojis}
         onPick={(emoji) => reactWith(emoji)}
         onClose={() => setEmojiPickerPos(null)}
       />

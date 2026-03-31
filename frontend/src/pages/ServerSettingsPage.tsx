@@ -5,6 +5,7 @@ import {
   getServer, updateServer, deleteServer, leaveServer,
   getMembers, kickMember, getRoles, createRole, updateRole, deleteRole,
   uploadServerIcon, uploadServerBanner, assignRole, removeRole,
+  getCustomEmojis, createCustomEmoji, deleteCustomEmoji,
   getWordFilters, createWordFilter, deleteWordFilter,
   getBans, unbanMember,
   type WordFilter, type WordFilterAction, type ServerBan,
@@ -25,6 +26,7 @@ const TABS: (SettingsTab & { adminOnly?: boolean })[] = [
   { id: 'overview',      label: 'Overview',      icon: 'settings-2' },
   { id: 'members',       label: 'Members',       icon: 'people',      adminOnly: true },
   { id: 'roles',         label: 'Roles',         icon: 'shield',      adminOnly: true },
+  { id: 'emojis',        label: 'Emojis',        icon: 'smiling-face', adminOnly: true },
   { id: 'invites',       label: 'Invites',       icon: 'link-2',      adminOnly: true },
   { id: 'word-filters',  label: 'Word Filters',  icon: 'funnel',      adminOnly: true },
   { id: 'bans',          label: 'Bans',          icon: 'slash',       adminOnly: true },
@@ -105,6 +107,7 @@ export function ServerSettingsPage() {
       {tab === 'overview'      && <OverviewTab serverId={serverId} server={server} onSaved={() => qc.invalidateQueries({ queryKey: ['server', serverId] })} />}
       {tab === 'members'       && <MembersTab  serverId={serverId} members={members} ownerId={server.owner_id} currentUserId={currentUser?.id ?? ''} onChanged={() => qc.invalidateQueries({ queryKey: ['members', serverId] })} />}
       {tab === 'roles'         && <RolesTab    serverId={serverId} />}
+      {tab === 'emojis'        && <EmojisTab   serverId={serverId} />}
       {tab === 'invites'       && <InvitesTab  serverId={serverId} serverTitle={server?.title ?? ''} />}
       {tab === 'word-filters'  && <WordFiltersTab serverId={serverId} />}
       {tab === 'bans'          && <BansTab serverId={serverId} />}
@@ -554,6 +557,96 @@ function RolesTab({ serverId }: { serverId: string }) {
               <button onClick={handleCreateRole} className="btn text-sm" disabled={!newName.trim()}>Create</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EmojisTab({ serverId }: { serverId: string }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const { data: emojis = [] } = useQuery({
+    queryKey: ['server-emojis', serverId],
+    queryFn: () => getCustomEmojis(serverId),
+  })
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const cleaned = name.trim().toLowerCase()
+    if (!cleaned) {
+      setError('Set an emoji name first.')
+      return
+    }
+    setUploading(true)
+    setError(null)
+    try {
+      await createCustomEmoji(serverId, cleaned, file)
+      setName('')
+      qc.invalidateQueries({ queryKey: ['server-emojis', serverId] })
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to upload emoji.'
+      setError(String(detail))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleDelete(emojiId: string) {
+    await deleteCustomEmoji(serverId, emojiId)
+    qc.invalidateQueries({ queryKey: ['server-emojis', serverId] })
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold">Custom Emojis</h2>
+        <p className="text-sm text-sp-muted mt-1">Upload server emojis for messages and reactions.</p>
+      </div>
+
+      <div className="bg-sp-sidebar rounded-lg p-4 space-y-3">
+        <div>
+          <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Emoji Name</label>
+          <input
+            className="input w-full"
+            value={name}
+            maxLength={32}
+            onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase())}
+            placeholder="party_parrot"
+          />
+        </div>
+        <label className="inline-flex items-center gap-2 bg-sp-mention text-white text-sm font-semibold px-3 py-2 rounded-lg hover:bg-sp-mention/80 transition-colors cursor-pointer">
+          <Icon name="add" size={16} />
+          {uploading ? 'Uploading…' : 'Upload Emoji'}
+          <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={handleUpload} />
+        </label>
+        <p className="text-xs text-sp-muted">Allowed characters: a-z, 0-9, _. Max size: 256x256.</p>
+        {error && <p className="text-sm text-red-400">{error}</p>}
+      </div>
+
+      {emojis.length === 0 ? (
+        <div className="text-sp-muted text-center py-10">No custom emojis uploaded yet.</div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {emojis.map((emoji) => (
+            <div key={emoji.id} className="bg-sp-sidebar rounded-lg p-3 border border-sp-divider/40">
+              <div className="h-14 flex items-center justify-center rounded-md bg-sp-input mb-2">
+                <img src={`/api/static/${emoji.image_path}`} alt={emoji.name} className="h-10 w-10 object-contain" />
+              </div>
+              <div className="text-xs text-sp-text font-semibold truncate mb-2">:{emoji.name}:</div>
+              <button
+                onClick={() => handleDelete(emoji.id)}
+                className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

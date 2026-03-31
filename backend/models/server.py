@@ -43,6 +43,9 @@ class Server(Base):
     audit_logs: Mapped[list["AuditLog"]] = relationship(
         "AuditLog", back_populates="server", cascade="all, delete-orphan"
     )
+    custom_emojis: Mapped[list["CustomEmoji"]] = relationship(
+        "CustomEmoji", back_populates="server", cascade="all, delete-orphan"
+    )
 
 
 class ServerMember(Base):

@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import client from './client'
-import type { Server, Member, Role, AuditLogEntry } from './types'
+import type { Server, Member, Role, AuditLogEntry, CustomEmoji } from './types'
 
 export async function getMyServers(): Promise<Server[]> {
   const { data } = await client.get<Server[]>('/servers/')
@@ -111,6 +111,23 @@ export async function uploadServerBanner(serverId: string, file: File): Promise<
   form.append('file', file)
   const { data } = await client.post<Server>(`/servers/${serverId}/banner`, form)
   return data
+}
+
+export async function getCustomEmojis(serverId: string): Promise<CustomEmoji[]> {
+  const { data } = await client.get<CustomEmoji[]>(`/servers/${serverId}/emojis`)
+  return data
+}
+
+export async function createCustomEmoji(serverId: string, name: string, file: File): Promise<CustomEmoji> {
+  const form = new FormData()
+  form.append('name', name)
+  form.append('file', file)
+  const { data } = await client.post<CustomEmoji>(`/servers/${serverId}/emojis`, form)
+  return data
+}
+
+export async function deleteCustomEmoji(serverId: string, emojiId: string): Promise<void> {
+  await client.delete(`/servers/${serverId}/emojis/${emojiId}`)
 }
 
 // ── Word Filters ─────────────────────────────────────────────────────────────

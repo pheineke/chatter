@@ -186,6 +186,9 @@ input.input {
 .sp-markdown li {
   @apply my-0.5;
 }
+.sp-markdown img {
+  @apply inline-block h-5 w-5 object-contain align-[-0.2em] mx-[1px];
+}
 /* External link */
 .md-link {
   @apply text-sp-mention underline hover:opacity-80 transition-opacity;

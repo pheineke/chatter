@@ -38,6 +38,15 @@ export interface Server {
   created_at: string
 }
 
+export interface CustomEmoji {
+  id: string
+  server_id: string
+  name: string
+  image_path: string
+  created_by_id: string
+  created_at: string
+}
+
 export interface Role {
   id: string
   server_id: string

@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Picker from '@emoji-mart/react'
 import data from '@emoji-mart/data'
+import type { CustomEmoji } from '../api/types'
+import { asCustomEmojiToken } from '../utils/customEmojis'
 
 interface Props {
   /** Called with the native emoji string (e.g. "👍") */
@@ -9,12 +11,13 @@ interface Props {
   onClose: () => void
   /** Preferred top-left anchor in viewport coords. The picker repositions itself if it overflows. */
   position: { x: number; y: number }
+  customEmojis?: CustomEmoji[]
 }
 
 const PICKER_W = 352
 const PICKER_H = 435
 
-export function EmojiPicker({ onPick, onClose, position }: Props) {
+export function EmojiPicker({ onPick, onClose, position, customEmojis = [] }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   // Clamp to viewport
@@ -46,6 +49,31 @@ export function EmojiPicker({ onPick, onClose, position }: Props) {
       // Stop propagation so mousedown inside the picker doesn't close it
       onMouseDown={(e) => e.stopPropagation()}
     >
+      {customEmojis.length > 0 && (
+        <div className="mb-2 w-[352px] rounded-lg border border-sp-divider/50 bg-sp-popup p-2 shadow-sp-2">
+          <div className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wider text-sp-muted">Server Emojis</div>
+          <div className="grid grid-cols-8 gap-1">
+            {customEmojis.slice(0, 48).map((emoji) => (
+              <button
+                key={emoji.id}
+                type="button"
+                className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-sp-hover"
+                title={`:${emoji.name}:`}
+                onClick={() => {
+                  onPick(asCustomEmojiToken(emoji.id))
+                  onClose()
+                }}
+              >
+                <img
+                  src={`/api/static/${emoji.image_path}`}
+                  alt={emoji.name}
+                  className="h-6 w-6 object-contain"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <Picker
         data={data}
         theme="dark"
