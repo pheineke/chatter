@@ -119,7 +119,7 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
                 src={`/api/static/${server.image}`}
                 alt={server.title}
                 className="absolute inset-0 w-full h-full object-cover"
-                style={{ opacity: (!active && hovered) ? 0.8 : 1, transition: 'opacity 150ms ease-out' }}
+                style={{ borderRadius: 'inherit' }}
               />
             </>
           ) : (
@@ -186,7 +186,7 @@ function UnreadDMItem({ conversation, onContextMenu }: { conversation: DMConvers
                src={`/api/static/${user.avatar}`}
                alt={user.username}
                className="absolute inset-0 w-full h-full object-cover"
-               style={{ opacity: hovered ? 0.8 : 1, transition: 'opacity 150ms ease-out' }}
+               style={{ borderRadius: 'inherit' }}
              />
           ) : (
             initials
