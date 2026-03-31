@@ -310,7 +310,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
               }}
               onKeyDown={e => { if (e.key === 'Escape') { closeSearch() } }}
               placeholder={`Search ${channel?.title ?? ''}…`}
-              className="bg-sp-input/60 border border-white/[0.07] rounded px-2.5 h-7 text-sm text-sp-text placeholder:text-sp-muted outline-none mr-1"
+              className="bg-sp-input border border-sp-divider/60 rounded px-2.5 h-7 text-sm text-sp-text placeholder:text-sp-muted outline-none mr-1"
               style={{ width: 220 }}
             />
           )}
@@ -325,7 +325,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
           {searchFocused && (
             <div
               ref={searchCardRef}
-              className="absolute right-0 top-full mt-2 w-80 bg-[#1e1f22] rounded-lg shadow-2xl z-50 border border-white/[0.07] overflow-hidden"
+              className="absolute right-0 top-full mt-2 w-80 bg-sp-popup rounded-lg shadow-2xl z-50 border border-sp-divider/60 overflow-hidden"
             >
               {!searchQuery.trim() ? (
                 <>
