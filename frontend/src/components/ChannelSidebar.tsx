@@ -925,8 +925,8 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
         <Icon name={isVoice ? 'headphones' : 'hash'} size={18} className={`shrink-0 transition-colors ${active ? 'text-sp-primary' : 'opacity-70'}`} />
         <span className="truncate">{channel.title}</span>
         {isMuted && (
-          <span className="ml-1 text-sp-muted" title="Notifications muted">
-            <Icon name="bell-off" size={14} />
+          <span className="ml-1 inline-flex items-center justify-center leading-none text-sp-muted shrink-0" title="Notifications muted">
+            <Icon name="bell-off" size={14} className="align-middle" />
           </span>
         )}
         {hasUnread && !active && (
