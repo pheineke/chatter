@@ -1032,7 +1032,7 @@ function SortableChannelItem({ id, children }: { id: string; children: ReactNode
         ref={setActivatorNodeRef}
         {...listeners}
         title="Drag to reorder"
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing text-sp-muted transition-opacity"
+        className="absolute right-1.5 top-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-80 cursor-grab active:cursor-grabbing text-sp-muted transition-opacity"
       >
         <Icon name="menu" size={11} />
       </span>
