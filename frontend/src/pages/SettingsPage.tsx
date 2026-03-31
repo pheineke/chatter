@@ -29,8 +29,8 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     label: 'User Settings',
     items: [
       { id: 'account', label: 'My Account', icon: 'person' },
-      { id: 'privacy', label: 'Privacy & Safety', icon: 'lock-closed' },
-      { id: 'tokens', label: 'API Tokens', icon: 'key' },
+      { id: 'privacy', label: 'Privacy & Safety', icon: 'lock' },
+      { id: 'tokens', label: 'API Tokens', icon: 'keypad' },
     ],
   },
   {
@@ -39,7 +39,7 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     items: [
       { id: 'appearance', label: 'Appearance', icon: 'color-palette' },
       { id: 'voice', label: 'Voice & Video', icon: 'mic' },
-      { id: 'notifications', label: 'Notifications', icon: 'notifications' },
+      { id: 'notifications', label: 'Notifications', icon: 'bell' },
     ],
   },
 ]
