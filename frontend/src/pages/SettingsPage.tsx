@@ -1020,6 +1020,22 @@ function PrivacyTab() {
         <div className="text-xs font-bold text-sp-muted uppercase mb-3">Presence</div>
         <label className="flex items-center justify-between cursor-pointer py-2 px-3 rounded hover:bg-sp-bg transition-colors select-none">
           <div>
+
+          <div className="bg-sp-sidebar rounded-lg p-4">
+            <div className="text-xs font-bold text-sp-muted uppercase mb-2">Server Fonts</div>
+            <label className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-sp-text">Allow server custom fonts</div>
+                <div className="text-xs text-sp-muted">When disabled, custom server fonts are ignored everywhere.</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={user?.allow_server_fonts !== false}
+                onChange={e => updateMut.mutate({ allow_server_fonts: e.target.checked })}
+                className="h-4 w-4"
+              />
+            </label>
+          </div>
             <div className="text-sm font-medium">Hide my online status</div>
             <div className="text-xs text-sp-muted mt-0.5">You will appear offline to all other users</div>
           </div>

@@ -54,6 +54,8 @@ class ServerRead(ServerBase):
     id: uuid.UUID
     image: str | None
     banner: str | None
+    custom_font_name: str | None
+    custom_font_path: str | None
     text_channel_icon: ChannelIconName
     voice_channel_icon: ChannelIconName
     owner_id: uuid.UUID
@@ -98,6 +100,7 @@ class MemberRead(BaseModel):
     joined_at: datetime
     nickname: str | None = None
     allow_dms: bool | None = None
+    use_server_font: bool | None = None
     roles: list[RoleRead] = []
 
 
@@ -117,6 +120,7 @@ class MemberNickUpdate(BaseModel):
 
 class MemberSettingsUpdate(BaseModel):
     allow_dms: bool | None = None
+    use_server_font: bool | None = None
 
 
 # ---- Word Filters -----------------------------------------------------------

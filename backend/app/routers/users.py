@@ -91,6 +91,8 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
         current_user.banner = body.banner
     if body.dm_permission is not None:
         current_user.dm_permission = body.dm_permission
+    if body.allow_server_fonts is not None:
+        current_user.allow_server_fonts = body.allow_server_fonts
     if body.hide_status is not None:
         current_user.hide_status = body.hide_status
     if body.avatar_decoration is not None:

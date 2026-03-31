@@ -72,6 +72,35 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
   const me = members?.find(m => m.user.id === user?.id)
 
+  useEffect(() => {
+    const styleId = 'server-font-face'
+    const prevStyle = document.getElementById(styleId)
+    if (prevStyle) prevStyle.remove()
+
+    const allowGlobal = user?.allow_server_fonts !== false
+    const allowServer = me?.use_server_font !== false
+    const fontPath = server?.custom_font_path
+    const fontName = server?.custom_font_name?.trim()
+    if (!allowGlobal || !allowServer || !fontPath || !fontName) {
+      document.documentElement.style.removeProperty('--server-font-family')
+      return
+    }
+
+    const ext = fontPath.split('.').pop()?.toLowerCase()
+    const format = ext === 'woff2' ? 'woff2' : ext === 'woff' ? 'woff' : ext === 'otf' ? 'opentype' : 'truetype'
+    const style = document.createElement('style')
+    style.id = styleId
+    style.textContent = `@font-face { font-family: '${fontName.replace(/'/g, "\\'")}'; src: url('/api/static/${fontPath}') format('${format}'); font-display: swap; }`
+    document.head.appendChild(style)
+    document.documentElement.style.setProperty('--server-font-family', `'${fontName.replace(/'/g, "\\'")}', 'Outfit', 'Inter', sans-serif`)
+
+    return () => {
+      const el = document.getElementById(styleId)
+      if (el) el.remove()
+      document.documentElement.style.removeProperty('--server-font-family')
+    }
+  }, [server?.custom_font_name, server?.custom_font_path, me?.use_server_font, user?.allow_server_fonts])
+
   // Derive admin status: owner, or member with an is_admin role
   const isAdmin =
     !!server && !!user && (
@@ -173,11 +202,25 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         const nextState = !isAllowed
         // If next state matches global default, set to null to inherit
         const payload = (nextState === globalAllow) ? null : nextState
-        updateMySettings(server.id, payload).then(() => {
+        updateMySettings(server.id, { allowDms: payload }).then(() => {
           qc.invalidateQueries({ queryKey: ['members', serverId] })
         })
       },
     })
+
+    const hasServerFont = !!server.custom_font_path
+    if (hasServerFont) {
+      const useServerFont = me?.use_server_font !== false
+      items.push({
+        label: useServerFont ? 'Disable Server Font' : 'Enable Server Font',
+        icon: useServerFont ? 'checkmark-square' : 'square',
+        onClick: () => {
+          updateMySettings(server.id, { useServerFont: useServerFont ? false : true }).then(() => {
+            qc.invalidateQueries({ queryKey: ['members', serverId] })
+          })
+        },
+      })
+    }
 
     items.push({ separator: true })
 
@@ -487,7 +530,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-sp-channels">
+    <div className="server-font-scope flex flex-col h-full overflow-hidden bg-sp-channels">
       {/* Server name header */}
       <div
         className="px-4 font-bold border-b border-sp-divider/50 flex items-center justify-between cursor-pointer hover:bg-sp-hover/60 transition-colors select-none h-12 shrink-0"

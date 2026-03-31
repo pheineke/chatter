@@ -38,6 +38,11 @@ body {
   overflow: hidden;
 }
 
+.server-font-scope,
+.server-font-scope * {
+  font-family: var(--server-font-family, 'Outfit', 'Inter', sans-serif);
+}
+
 /* Custom scrollbar – soft lavender */
 ::-webkit-scrollbar {
   width: 6px;

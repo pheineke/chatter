@@ -47,6 +47,7 @@ class User(Base):
     dm_permission: Mapped[DMPermission] = mapped_column(
         String(20), default=DMPermission.everyone, server_default="everyone"
     )
+    allow_server_fonts: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     hide_status: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     avatar_decoration: Mapped[str | None] = mapped_column(String(50), nullable=True)

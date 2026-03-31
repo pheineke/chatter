@@ -215,7 +215,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="server-font-scope flex flex-col h-full">
       {/* Channel header */}
       <div className="flex items-center gap-2 px-4 border-b border-sp-divider/60 shrink-0 h-12 min-w-0">
         {/* Mobile: open left-panel drawer */}

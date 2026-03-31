@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getServer, updateServer, deleteServer, leaveServer,
   getMembers, kickMember, getRoles, createRole, updateRole, deleteRole,
-  uploadServerIcon, uploadServerBanner, assignRole, removeRole,
+  uploadServerIcon, uploadServerBanner, uploadServerFont, clearServerFont, assignRole, removeRole,
   getCustomEmojis, createCustomEmoji, deleteCustomEmoji,
   getWordFilters, createWordFilter, deleteWordFilter,
   getBans, unbanMember,
@@ -132,13 +132,16 @@ export function ServerSettingsPage() {
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: { title: string; description: string | null; image: string | null; banner: string | null; owner_id: string; text_channel_icon: string; voice_channel_icon: string; created_at: string }; onSaved: () => void }) {
+function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: { title: string; description: string | null; image: string | null; banner: string | null; owner_id: string; text_channel_icon: string; voice_channel_icon: string; custom_font_name?: string | null; custom_font_path?: string | null; created_at: string }; onSaved: () => void }) {
   const [name, setName] = useState(server.title)
   const [desc, setDesc] = useState(server.description ?? '')
   const [textChannelIcon, setTextChannelIcon] = useState(server.text_channel_icon)
   const [voiceChannelIcon, setVoiceChannelIcon] = useState(server.voice_channel_icon)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [fontName, setFontName] = useState(server.custom_font_name ?? '')
+  const [fontFile, setFontFile] = useState<File | null>(null)
+  const [fontUploading, setFontUploading] = useState(false)
   const iconRef  = useRef<HTMLInputElement>(null)
   const bannerRef = useRef<HTMLInputElement>(null)
 
@@ -148,7 +151,8 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
     setDesc(server.description ?? '')
     setTextChannelIcon(server.text_channel_icon)
     setVoiceChannelIcon(server.voice_channel_icon)
-  }, [server.title, server.description, server.text_channel_icon, server.voice_channel_icon])
+    setFontName(server.custom_font_name ?? '')
+  }, [server.title, server.description, server.text_channel_icon, server.voice_channel_icon, server.custom_font_name])
 
   const isDirty =
     name !== server.title ||
@@ -161,6 +165,7 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
     setDesc(server.description ?? '')
     setTextChannelIcon(server.text_channel_icon)
     setVoiceChannelIcon(server.voice_channel_icon)
+    setFontName(server.custom_font_name ?? '')
   }
 
   async function handleSave() {
@@ -189,6 +194,30 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
     if (!file) return
     await uploadServerBanner(serverId, file)
     onSaved()
+  }
+
+  async function handleUploadFont() {
+    if (!fontFile || !fontName.trim()) return
+    setFontUploading(true)
+    try {
+      await uploadServerFont(serverId, fontName.trim(), fontFile)
+      setFontFile(null)
+      onSaved()
+    } finally {
+      setFontUploading(false)
+    }
+  }
+
+  async function handleClearFont() {
+    setFontUploading(true)
+    try {
+      await clearServerFont(serverId)
+      setFontFile(null)
+      setFontName('')
+      onSaved()
+    } finally {
+      setFontUploading(false)
+    }
   }
 
   return (
@@ -300,6 +329,46 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
         </div>
         <div className="text-xs text-sp-muted">
           Server created: {new Date(server.created_at).toLocaleDateString()}
+        </div>
+
+        <div className="pt-2 border-t border-sp-divider/40 space-y-2">
+          <label className="block text-xs font-bold uppercase text-sp-muted">Server Custom Font</label>
+          <input
+            className="input w-full"
+            value={fontName}
+            onChange={e => setFontName(e.target.value)}
+            placeholder="Display name (e.g. Retro Sans)"
+            maxLength={80}
+          />
+          <input
+            type="file"
+            accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf"
+            onChange={e => setFontFile(e.target.files?.[0] ?? null)}
+            className="block w-full text-xs text-sp-muted"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              className="btn"
+              onClick={handleUploadFont}
+              disabled={fontUploading || !fontFile || !fontName.trim()}
+            >
+              {fontUploading ? 'Uploading…' : 'Upload Font'}
+            </button>
+            {server.custom_font_path && (
+              <button
+                className="btn btn-ghost"
+                onClick={handleClearFont}
+                disabled={fontUploading}
+              >
+                Remove Font
+              </button>
+            )}
+          </div>
+          {server.custom_font_name && (
+            <div className="text-xs text-sp-muted">
+              Active font: {server.custom_font_name}
+            </div>
+          )}
         </div>
       </div>
 

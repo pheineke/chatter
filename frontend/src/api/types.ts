@@ -15,6 +15,7 @@ export interface User {
   status: UserStatus
   preferred_status: UserStatus
   dm_permission: DMPermission
+  allow_server_fonts?: boolean
   hide_status: boolean
   theme_preset?: string | null
   theme_colors?: string | null
@@ -34,6 +35,8 @@ export interface Server {
   description: string | null
   image: string | null
   banner: string | null
+  custom_font_name?: string | null
+  custom_font_path?: string | null
   text_channel_icon: string
   voice_channel_icon: string
   owner_id: string
@@ -66,6 +69,7 @@ export interface Member {
   joined_at: string
   nickname: string | null
   allow_dms: boolean | null
+  use_server_font?: boolean | null
   user: User
   roles: Role[]
 }

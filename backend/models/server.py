@@ -15,6 +15,8 @@ class Server(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     image: Mapped[str | None] = mapped_column(String(255), nullable=True)
     banner: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    custom_font_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    custom_font_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     text_channel_icon: Mapped[str] = mapped_column(String(32), nullable=False, default="hash")
     voice_channel_icon: Mapped[str] = mapped_column(String(32), nullable=False, default="headphones")
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -65,6 +67,7 @@ class ServerMember(Base):
     nickname: Mapped[str | None] = mapped_column(String(32), nullable=True)  # per-server display name
     # Privacy Override: None = use global default; True = Allow; False = Block
     allow_dms: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    use_server_font: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     server: Mapped["Server"] = relationship("Server", back_populates="members")
     user: Mapped["User"] = relationship("User", back_populates="server_memberships")

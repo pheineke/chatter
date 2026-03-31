@@ -40,6 +40,8 @@ router = APIRouter(prefix="/servers", tags=["servers"])
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 CUSTOM_EMOJI_MAX = (256, 256)
 CUSTOM_EMOJI_NAME_RE = re.compile(r"^[a-z0-9_]{2,32}$")
+ALLOWED_FONT_EXTENSIONS = {"woff", "woff2", "ttf", "otf"}
+SERVER_FONT_NAME_RE = re.compile(r"^[A-Za-z0-9 _.-]{2,80}$")
 
 
 async def _get_server_or_404(server_id: uuid.UUID, db) -> Server:
@@ -159,6 +161,25 @@ async def _upload_server_image(server_id: uuid.UUID, file: UploadFile, field: st
     return filename
 
 
+async def _upload_server_font(server_id: uuid.UUID, file: UploadFile) -> str:
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if file.filename else ""
+    if ext not in ALLOWED_FONT_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Unsupported font file type")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty font file")
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Font file too large (max 5MB)")
+
+    filename = f"servers/{server_id}/fonts/{uuid.uuid4()}.{ext}"
+    dest = os.path.join(settings.static_dir, filename)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    async with aiofiles.open(dest, "wb") as f:
+        await f.write(content)
+    return filename
+
+
 async def _upload_custom_emoji_image(server_id: uuid.UUID, emoji_id: uuid.UUID, file: UploadFile) -> str:
     content, ext = await verify_image_magic_with_dims(
         file, CUSTOM_EMOJI_MAX, label="Custom emoji"
@@ -203,6 +224,62 @@ async def upload_server_banner(
     return server
 
 
+@router.post("/{server_id}/font", response_model=ServerRead)
+async def upload_server_font(
+    server_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+    name: str = Form(...),
+    file: UploadFile = File(...),
+):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    cleaned_name = name.strip()
+    if not SERVER_FONT_NAME_RE.fullmatch(cleaned_name):
+        raise HTTPException(status_code=400, detail="Invalid font name")
+
+    old_path = server.custom_font_path
+    server.custom_font_name = cleaned_name
+    server.custom_font_path = await _upload_server_font(server_id, file)
+    await db.commit()
+    await db.refresh(server)
+
+    if old_path:
+        try:
+            os.remove(os.path.join(settings.static_dir, old_path))
+        except FileNotFoundError:
+            pass
+
+    await manager.broadcast_server(
+        server_id,
+        {"type": "server.updated", "data": ServerRead.model_validate(server).model_dump(mode="json")},
+    )
+    return server
+
+
+@router.delete("/{server_id}/font", response_model=ServerRead)
+async def clear_server_font(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    server = await _get_server_or_404(server_id, db)
+    await _require_admin(server, current_user.id, db)
+    old_path = server.custom_font_path
+    server.custom_font_name = None
+    server.custom_font_path = None
+    await db.commit()
+    await db.refresh(server)
+
+    if old_path:
+        try:
+            os.remove(os.path.join(settings.static_dir, old_path))
+        except FileNotFoundError:
+            pass
+
+    await manager.broadcast_server(
+        server_id,
+        {"type": "server.updated", "data": ServerRead.model_validate(server).model_dump(mode="json")},
+    )
+    return server
+
+
 # ---- Members ----------------------------------------------------------------
 
 @router.get("/{server_id}/members", response_model=list[MemberRead])
@@ -240,6 +317,8 @@ async def list_members(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
                 else UserPublicRead.model_validate(m.user)
             ),
             joined_at=m.joined_at,
+            allow_dms=m.allow_dms,
+            use_server_font=m.use_server_font,
             roles=sorted(user_role_map.get(m.user_id, []), key=lambda r: r.position, reverse=True),
         )
         for m in members
@@ -335,6 +414,8 @@ async def update_member_nick(
         nickname=member.nickname,
         user=UserPublicRead.model_validate(member.user),
         joined_at=member.joined_at,
+        allow_dms=member.allow_dms,
+        use_server_font=member.use_server_font,
         roles=[],
     )
 
@@ -355,6 +436,8 @@ async def update_my_settings(
             
     if body.allow_dms is not None:
         member.allow_dms = body.allow_dms
+    if body.use_server_font is not None:
+        member.use_server_font = body.use_server_font
 
     await db.commit()
     
@@ -365,6 +448,7 @@ async def update_my_settings(
         user=UserPublicRead.model_validate(member.user),
         joined_at=member.joined_at,
         allow_dms=member.allow_dms,
+        use_server_font=member.use_server_font,
         roles=[],
     )
 

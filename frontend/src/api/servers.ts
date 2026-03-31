@@ -85,9 +85,12 @@ export async function updateMemberNick(serverId: string, userId: string, nicknam
 
 export async function updateMySettings(
   serverId: string,
-  allowDms: boolean | null
+  patch: { allowDms?: boolean | null; useServerFont?: boolean | null }
 ): Promise<Member> {
-  const { data } = await client.patch<Member>(`/servers/${serverId}/members/me/settings`, { allow_dms: allowDms })
+  const body: { allow_dms?: boolean | null; use_server_font?: boolean | null } = {}
+  if ('allowDms' in patch) body.allow_dms = patch.allowDms
+  if ('useServerFont' in patch) body.use_server_font = patch.useServerFont
+  const { data } = await client.patch<Member>(`/servers/${serverId}/members/me/settings`, body)
   return data
 }
 
@@ -118,6 +121,19 @@ export async function uploadServerBanner(serverId: string, file: File): Promise<
   const form = new FormData()
   form.append('file', file)
   const { data } = await client.post<Server>(`/servers/${serverId}/banner`, form)
+  return data
+}
+
+export async function uploadServerFont(serverId: string, name: string, file: File): Promise<Server> {
+  const form = new FormData()
+  form.append('name', name)
+  form.append('file', file)
+  const { data } = await client.post<Server>(`/servers/${serverId}/font`, form)
+  return data
+}
+
+export async function clearServerFont(serverId: string): Promise<Server> {
+  const { data } = await client.delete<Server>(`/servers/${serverId}/font`)
   return data
 }
 
