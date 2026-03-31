@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useBlocks } from '../hooks/useBlocks'
 import { Linkified } from '../utils/linkify'
 import { ProfileFullModal } from './ProfileFullModal'
+import { Portal } from './Portal'
 
 function UserTag({ userId }: { userId: string }) {
   const [copied, setCopied] = useState(false)
@@ -122,6 +123,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   if (!user) return null // If no user loaded yet
 
   return (
+    <Portal>
     <div ref={ref} style={{ ...style, boxShadow: 'var(--m3-shadow-4)' }} className="group/card w-80 bg-sp-popup border border-sp-divider/60 rounded-m3-lg overflow-visible flex flex-col text-sp-text animate-fade-in-up">
        {/* Banner */}
        <div 
@@ -263,6 +265,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
 
        {/* Full profile modal */}
        {showFullProfile && <ProfileFullModal user={user} onClose={() => { setShowFullProfile(false); setFocusNote(false) }} focusNote={focusNote} />}
-    </div>
+     </div>
+     </Portal>
   )
 }
