@@ -1,7 +1,6 @@
 import { PortalModal } from './PortalModal'
 import { markDMRead, getConversations } from '../api/dms'
 import { useNavigate, useParams, useLocation, useMatch } from 'react-router-dom'
-import { getLastChannel } from '../utils/lastChannel'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { getMyServers, createServer, leaveServer } from '../api/servers'
@@ -96,10 +95,7 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
           title={server.title}
           onMouseDown={() => setPressing(true)}
           onMouseUp={() => setPressing(false)}
-          onClick={() => {
-            const last = getLastChannel(server.id)
-            navigate(last ? `/channels/${server.id}/${last}` : `/channels/${server.id}`)
-          }}
+          onClick={() => navigate(`/channels/${server.id}`)}
           onContextMenu={onContextMenu}
           style={{
             transform: pressing ? 'scale(0.92)' : 'scale(1)',
