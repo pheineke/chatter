@@ -65,6 +65,31 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   // (or the attempt has definitively failed). This ensures localStream.current is
   // populated before the first offer/answer exchange happens.
   const [streamReady, setStreamReady] = useState(false)
+  const peerVolumes = useRef<Record<string, number>>({})
+
+  function clampVolume(v: number): number {
+    if (!Number.isFinite(v)) return 1
+    return Math.min(2, Math.max(0, v))
+  }
+
+  function storedVolume(peerId: string): number {
+    const fromMem = peerVolumes.current[peerId]
+    if (typeof fromMem === 'number') return clampVolume(fromMem)
+    const raw = localStorage.getItem(`voicePeerVolume_${peerId}`)
+    const parsed = raw == null ? NaN : Number(raw)
+    const vol = Number.isFinite(parsed) ? clampVolume(parsed) : 1
+    peerVolumes.current[peerId] = vol
+    return vol
+  }
+
+  function applyPeerVolume(peerId: string, volume: number) {
+    const clamped = clampVolume(volume)
+    peerVolumes.current[peerId] = clamped
+    localStorage.setItem(`voicePeerVolume_${peerId}`, String(clamped))
+    document
+      .querySelectorAll<HTMLAudioElement>(`audio[data-peer="${peerId}"]`)
+      .forEach((el) => { el.volume = clamped })
+  }
 
   /**
    * Tie-breaking: the peer with the lexicographically smaller user ID is the
@@ -241,6 +266,7 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
             document.body.appendChild(audio)
           }
           audio.srcObject = remoteStream
+          audio.volume = storedVolume(peerId)
           const tryPlay = () =>
             audio!.play().catch(() => document.addEventListener('click', tryPlay, { once: true }))
           tryPlay()
@@ -547,5 +573,26 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     videoTrack.addEventListener('ended', () => stopWebcam(), { once: true })
   }, [state.isSharingWebcam, stopWebcam, send])
 
-  return { state, toggleMute, toggleDeafen, toggleScreenShare, toggleWebcam, sendSpeaking, remoteScreenStreams, remoteWebcamStreams, remoteScreenAudioStreams, localScreenStream, localWebcamStream, localStream }
+  const setUserVolume = useCallback((peerId: string, volume: number) => {
+    applyPeerVolume(peerId, volume)
+  }, [])
+
+  const getUserVolume = useCallback((peerId: string) => storedVolume(peerId), [])
+
+  return {
+    state,
+    toggleMute,
+    toggleDeafen,
+    toggleScreenShare,
+    toggleWebcam,
+    sendSpeaking,
+    remoteScreenStreams,
+    remoteWebcamStreams,
+    remoteScreenAudioStreams,
+    localScreenStream,
+    localWebcamStream,
+    localStream,
+    setUserVolume,
+    getUserVolume,
+  }
 }

@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { getMembers } from '../api/servers'
+import { getMembers, getServer, kickMember } from '../api/servers'
+import { getDMChannel } from '../api/dms'
+import { getFriends, removeFriend } from '../api/friends'
 import { UserAvatar } from './UserAvatar'
 import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
+import { ContextMenu, type ContextMenuItem } from './ContextMenu'
+import { ProfileCard } from './ProfileCard'
 import { useVoiceCall } from '../contexts/VoiceCallContext'
 import type { VoiceSession } from '../pages/AppShell'
 import type { User } from '../api/types'
@@ -69,10 +74,10 @@ function AudioEl({ stream }: { stream: MediaStream }) {
 // ─── Participant tile card ───────────────────────────────────────────────────
 
 function ParticipantCard({
-  tile, compact = false, isSpeaking = false, onClick, onStopCamera,
+  tile, compact = false, isSpeaking = false, onClick, onStopCamera, onContextMenu,
 }: {
   tile: ParticipantTile; compact?: boolean; isSpeaking?: boolean
-  onClick?: () => void; onStopCamera?: () => void
+  onClick?: () => void; onStopCamera?: () => void; onContextMenu?: (e: React.MouseEvent) => void
 }) {
   const hasVideo = !!tile.webcamStream
 
@@ -83,6 +88,7 @@ function ParticipantCard({
         ${isSpeaking ? 'border-2 border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.25)]' : 'border border-white/5'}
         ${compact ? 'w-24 h-24 shrink-0' : 'w-full h-full min-h-[120px]'}`}
       onClick={onClick}
+      onContextMenu={onContextMenu}
     >
       {hasVideo ? (
         <>
@@ -355,8 +361,10 @@ interface Props {
 }
 
 export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { user: selfUser } = useAuth()
-  const { state, remoteScreenStreams, remoteWebcamStreams, remoteScreenAudioStreams, localScreenStream, localWebcamStream, toggleWebcam, isSelfSpeaking } = useVoiceCall()
+  const { state, remoteScreenStreams, remoteWebcamStreams, remoteScreenAudioStreams, localScreenStream, localWebcamStream, toggleWebcam, isSelfSpeaking, setUserVolume, getUserVolume } = useVoiceCall()
   const [focused, setFocused] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
   // Tile IDs the user has explicitly activated (clicked to watch/listen).
@@ -367,6 +375,10 @@ export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
   const [detachedTiles, setDetachedTiles] = useState<Record<string, DetachMode>>({})
   const [detachedContainers, setDetachedContainers] = useState<Record<string, HTMLElement>>({})
   const [sharedContainer, setSharedContainer] = useState<HTMLElement | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tile: ParticipantTile } | null>(null)
+  const [profileOpen, setProfileOpen] = useState<{ userId: string; x: number; y: number } | null>(null)
+  const [hiddenVideoUsers, setHiddenVideoUsers] = useState<Set<string>>(new Set())
+  const [mutedSoundboardUsers, setMutedSoundboardUsers] = useState<Set<string>>(new Set())
   const detachedWindowsRef = useRef<Record<string, Window | null>>({})
   const sharedWindowRef = useRef<Window | null>(null)
 
@@ -520,6 +532,107 @@ export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
     staleTime: 30_000,
   })
 
+  const { data: server } = useQuery({
+    queryKey: ['server', session.serverId],
+    queryFn: () => getServer(session.serverId),
+    staleTime: 30_000,
+  })
+
+  const { data: friends = [] } = useQuery({
+    queryKey: ['friends'],
+    queryFn: getFriends,
+    staleTime: 30_000,
+  })
+
+  const friendIds = new Set(friends.map((f) => f.user.id))
+
+  const myMember = members.find((m) => m.user.id === selfUser?.id)
+  const isOwner = server?.owner_id === selfUser?.id
+  const isAdmin = !!(isOwner || myMember?.roles.some((r) => r.is_admin))
+
+  function canManageUser(targetUserId: string): boolean {
+    if (!isAdmin || !selfUser || !server) return false
+    if (targetUserId === selfUser.id) return false
+    if (targetUserId === server.owner_id) return false
+    if (isOwner) return true
+    const targetMember = members.find((m) => m.user.id === targetUserId)
+    if (!targetMember) return false
+    const myHighestRole = myMember?.roles.reduce((max, r) => Math.max(max, r.position), -1) ?? -1
+    const targetHighestRole = targetMember.roles.reduce((max, r) => Math.max(max, r.position), -1)
+    return myHighestRole > targetHighestRole
+  }
+
+  function openParticipantMenu(tile: ParticipantTile, e: React.MouseEvent) {
+    if (tile.isSelf) return
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.pageX, y: e.pageY, tile })
+  }
+
+  function volumeItems(userId: string): ContextMenuItem[] {
+    const current = Math.round(getUserVolume(userId) * 100)
+    const presets = [0, 25, 50, 75, 100, 125, 150, 200]
+    const base: ContextMenuItem[] = [
+      { separator: true },
+      { label: `User Volume (${current}%)`, icon: 'volume-up', active: true },
+    ]
+    return base.concat(
+      presets.map((pct) => ({
+        label: `${pct}%`,
+        icon: pct === 0 ? 'volume-off' : 'volume-up',
+        active: pct === current,
+        onClick: () => setUserVolume(userId, pct / 100),
+      }))
+    )
+  }
+
+  function adminItems(userId: string): ContextMenuItem[] {
+    if (!canManageUser(userId)) return []
+    const soundboardMuted = mutedSoundboardUsers.has(userId)
+    const videoDisabled = hiddenVideoUsers.has(userId)
+    return [
+      { separator: true },
+      {
+        label: soundboardMuted ? 'Unmute Soundboard' : 'Mute Soundboard',
+        icon: soundboardMuted ? 'volume-up' : 'volume-off',
+        onClick: () => {
+          setMutedSoundboardUsers((prev) => {
+            const next = new Set(prev)
+            if (next.has(userId)) next.delete(userId)
+            else next.add(userId)
+            return next
+          })
+        },
+      },
+      {
+        label: videoDisabled ? 'Enable Video' : 'Disable Video',
+        icon: videoDisabled ? 'video' : 'video-off',
+        onClick: () => {
+          setHiddenVideoUsers((prev) => {
+            const next = new Set(prev)
+            if (next.has(userId)) next.delete(userId)
+            else next.add(userId)
+            return next
+          })
+        },
+      },
+      {
+        label: 'Kick',
+        icon: 'user-minus',
+        danger: true,
+        onClick: async () => {
+          await kickMember(session.serverId, userId)
+          queryClient.invalidateQueries({ queryKey: ['members', session.serverId] })
+        },
+      },
+    ]
+  }
+
+  async function messageUser(userId: string) {
+    const dm = await getDMChannel(userId)
+    navigate(`/channels/@me/${dm.channel_id}`)
+  }
+
   // Build tile list ──────────────────────────────────────────────────────────
 
   const tiles: Tile[] = []
@@ -568,7 +681,7 @@ export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
       isSelf: false,
       // Webcam always goes in the participant tile — independent of screen-sharing state
       webcamStream: p.is_sharing_webcam && remoteWebcamStreams[p.user_id]
-        ? remoteWebcamStreams[p.user_id] : undefined,
+        ? (hiddenVideoUsers.has(p.user_id) ? undefined : remoteWebcamStreams[p.user_id]) : undefined,
     })
     // Remote screen share tile — audioStream carries system audio if the user shared it
     if (p.is_sharing_screen) {
@@ -729,6 +842,7 @@ export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
                       compact
                       isSpeaking={t.isSelf ? isSelfSpeaking : state.participants.find(p => p.user_id === t.user.id)?.is_speaking ?? false}
                       onStopCamera={t.isSelf && t.webcamStream ? toggleWebcam : undefined}
+                      onContextMenu={e => openParticipantMenu(t, e)}
                     />
                   )
                 )}
@@ -758,12 +872,58 @@ export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
                   tile={t}
                   isSpeaking={t.isSelf ? isSelfSpeaking : state.participants.find(p => p.user_id === t.user.id)?.is_speaking ?? false}
                   onStopCamera={t.isSelf && t.webcamStream ? toggleWebcam : undefined}
+                  onContextMenu={e => openParticipantMenu(t, e)}
                 />
               )
             )}
           </div>
         )}
       </div>
+
+      {profileOpen && (
+        <ProfileCard
+          userId={profileOpen.userId}
+          position={{ x: profileOpen.x - 330, y: profileOpen.y }}
+          onClose={() => setProfileOpen(null)}
+        />
+      )}
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              label: 'View Profile',
+              icon: 'user',
+              onClick: () => {
+                setProfileOpen({ userId: contextMenu.tile.user.id, x: contextMenu.x, y: contextMenu.y })
+              },
+            },
+            {
+              label: 'Message',
+              icon: 'message-circle',
+              onClick: () => { void messageUser(contextMenu.tile.user.id) },
+            },
+            ...volumeItems(contextMenu.tile.user.id),
+            ...(friendIds.has(contextMenu.tile.user.id)
+              ? [{
+                  separator: true,
+                } as ContextMenuItem, {
+                  label: 'Remove Friend',
+                  icon: 'user-minus',
+                  danger: true,
+                  onClick: async () => {
+                    await removeFriend(contextMenu.tile.user.id)
+                    queryClient.invalidateQueries({ queryKey: ['friends'] })
+                  },
+                } as ContextMenuItem]
+              : []),
+            ...adminItems(contextMenu.tile.user.id),
+          ]}
+        />
+      )}
 
       {/* Fullscreen overlay — rendered in a portal so it covers the entire viewport */}
       {fullscreen && theaterTile && createPortal(
