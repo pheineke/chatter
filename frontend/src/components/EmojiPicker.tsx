@@ -19,7 +19,7 @@ interface Props {
 const PICKER_W = 352
 const PICKER_H = 435
 const TENOR_LIMIT = 24
-const TENOR_KEY = (import.meta.env.VITE_TENOR_API_KEY as string | undefined) || 'LIVDSRZULELA'
+const TENOR_KEY = (import.meta.env.VITE_TENOR_API_KEY as string | undefined)?.trim() || ''
 
 type TenorResponse = {
   results: Array<{
@@ -39,6 +39,7 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
   const [gifLoading, setGifLoading] = useState(false)
   const [gifError, setGifError] = useState<string | null>(null)
   const showTabs = enableGifSearch || showServerSection
+  const hasTenorKey = TENOR_KEY.length > 0
 
   // Clamp to viewport
   const vw = window.innerWidth
@@ -64,6 +65,12 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
 
   useEffect(() => {
     if (!enableGifSearch || tab !== 'gifs') return
+    if (!hasTenorKey) {
+      setGifResults([])
+      setGifLoading(false)
+      setGifError('GIF search is not configured. Set VITE_TENOR_API_KEY in frontend env.')
+      return
+    }
     const controller = new AbortController()
     const timeout = setTimeout(async () => {
       setGifLoading(true)
@@ -82,7 +89,11 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
         const res = await fetch(`https://tenor.googleapis.com/v2/${endpoint}?${params.toString()}`, {
           signal: controller.signal,
         })
-        if (!res.ok) throw new Error(`GIF search failed (${res.status})`)
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
+          const detail = body?.error?.message || `GIF search failed (${res.status})`
+          throw new Error(detail)
+        }
         const payload = (await res.json()) as TenorResponse
         const parsed = (payload.results || [])
           .map((r) => {
@@ -96,7 +107,7 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
       } catch (err: any) {
         if (err?.name !== 'AbortError') {
           setGifResults([])
-          setGifError('Could not load GIFs.')
+          setGifError(String(err?.message || 'Could not load GIFs.'))
         }
       } finally {
         setGifLoading(false)
@@ -107,7 +118,7 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
       clearTimeout(timeout)
       controller.abort()
     }
-  }, [enableGifSearch, gifQuery, tab])
+  }, [enableGifSearch, gifQuery, hasTenorKey, tab])
 
   return createPortal(
     <div
