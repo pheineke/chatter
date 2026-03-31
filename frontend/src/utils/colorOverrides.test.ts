@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { loadColorOverrides, applyColorOverrides } from './colorOverrides'
+import { loadColorOverrides, applyColorOverrides, DEFAULT_DARK_OVERRIDES } from './colorOverrides'
 
 describe('loadColorOverrides', () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
-  it('returns empty object when nothing stored', () => {
-    expect(loadColorOverrides()).toEqual({})
+  it('returns default dark overrides when nothing stored', () => {
+    expect(loadColorOverrides()).toEqual(DEFAULT_DARK_OVERRIDES)
   })
 
   it('returns stored overrides', () => {

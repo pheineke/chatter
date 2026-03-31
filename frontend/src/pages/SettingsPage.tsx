@@ -534,7 +534,7 @@ function AppearanceTab() {
   const qc = useQueryClient()
 
   const initSaved   = loadColorOverrides
-  const initPreset  = () => localStorage.getItem('appPreset') ?? 'softpop'
+  const initPreset  = () => localStorage.getItem('appPreset') ?? 'default'
 
   const [saved,        setSaved]        = useState<Record<string, string>>(initSaved)
   const [savedPreset,  setSavedPreset]  = useState<string>(initPreset)
@@ -586,13 +586,13 @@ function AppearanceTab() {
 
   function resetColors() {
     setSaved({})
-    setSavedPreset('softpop')
+    setSavedPreset('default')
     setPending({})
-    setPendingPreset('softpop')
+    setPendingPreset('default')
     localStorage.removeItem('colorOverrides')
-    localStorage.setItem('appPreset', 'softpop')
+    localStorage.setItem('appPreset', 'default')
     applyColorOverrides({})
-    updateMut.mutate({ theme_preset: 'softpop', theme_colors: null })
+    updateMut.mutate({ theme_preset: 'default', theme_colors: null })
   }
 
   function applyStyleTag(css: string) {

@@ -79,17 +79,29 @@ export const COLOR_SWATCHES: { key: string; label: string; default: string; gene
   },
 ]
 
+export const DEFAULT_DARK_OVERRIDES: Record<string, string> = {
+  accent: '#a78bfa',
+  bg: '#1c1c22',
+  sidebar: '#141418',
+  servers: '#0e0e12',
+  input: '#28282f',
+  text: '#e4e3eb',
+  muted: '#7e7d91',
+}
+
 export function loadColorOverrides(): Record<string, string> {
   try {
     const raw = localStorage.getItem('colorOverrides')
     const preset = localStorage.getItem('appPreset')
+
+    // First app load: no persisted theme yet -> force default dark.
+    if (!raw && !preset) {
+      return DEFAULT_DARK_OVERRIDES
+    }
     
     // Auto-fix for users stuck in the old "Reset" state where appPreset was 'default' but overrides were cleared
     if (!raw && preset === 'default') {
-      return { 
-        accent: '#a78bfa', bg: '#1c1c22', sidebar: '#141418', 
-        servers: '#0e0e12', input: '#28282f', text: '#e4e3eb', muted: '#7e7d91' 
-      }
+      return DEFAULT_DARK_OVERRIDES
     }
 
     return JSON.parse(raw ?? '{}') 
