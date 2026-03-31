@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Picker from '@emoji-mart/react'
 import data from '@emoji-mart/data'
@@ -20,6 +20,7 @@ const PICKER_H = 435
 
 export function EmojiPicker({ onPick, onClose, position, customEmojis = [], showServerSection = false }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  const [tab, setTab] = useState<'server' | 'unicode'>(showServerSection ? 'server' : 'unicode')
 
   // Clamp to viewport
   const vw = window.innerWidth
@@ -50,49 +51,75 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
       // Stop propagation so mousedown inside the picker doesn't close it
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {showServerSection && (
-        <div className="mb-2 w-[352px] rounded-lg border border-sp-divider/50 bg-sp-popup p-2 shadow-sp-2">
-          <div className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wider text-sp-muted">Server Emojis</div>
-          {customEmojis.length === 0 ? (
-            <div className="px-1 py-2 text-xs text-sp-muted">No server emojis uploaded yet.</div>
-          ) : (
-            <div className="grid grid-cols-8 gap-1">
-              {customEmojis.slice(0, 48).map((emoji) => (
-                <button
-                  key={emoji.id}
-                  type="button"
-                  className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-sp-hover"
-                  title={`:${emoji.name}:`}
-                  onClick={() => {
-                    onPick(asCustomEmojiToken(emoji.id))
-                    onClose()
-                  }}
-                >
-                  <img
-                    src={`/api/static/${emoji.image_path}`}
-                    alt={emoji.name}
-                    className="h-6 w-6 object-contain"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-      <Picker
-        data={data}
-        theme="dark"
-        onEmojiSelect={(e: { native: string }) => {
-          onPick(e.native)
-          onClose()
-        }}
-        previewPosition="none"
-        skinTonePosition="search"
-        navPosition="top"
-        perLine={9}
-        emojiSize={28}
-        emojiButtonSize={36}
-      />
+      <div className="w-[352px] overflow-hidden rounded-lg border border-sp-divider/60 bg-sp-popup shadow-sp-3">
+        {showServerSection && (
+          <div className="flex items-center border-b border-sp-divider/60 px-1 py-1">
+            <button
+              type="button"
+              className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                tab === 'server' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
+              }`}
+              onClick={() => setTab('server')}
+            >
+              Server
+            </button>
+            <button
+              type="button"
+              className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                tab === 'unicode' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
+              }`}
+              onClick={() => setTab('unicode')}
+            >
+              Emoji
+            </button>
+          </div>
+        )}
+
+        {showServerSection && tab === 'server' ? (
+          <div className="h-[392px] overflow-y-auto p-2">
+            <div className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wider text-sp-muted">Server Emojis</div>
+            {customEmojis.length === 0 ? (
+              <div className="px-1 py-2 text-xs text-sp-muted">No server emojis uploaded yet.</div>
+            ) : (
+              <div className="grid grid-cols-8 gap-1">
+                {customEmojis.slice(0, 96).map((emoji) => (
+                  <button
+                    key={emoji.id}
+                    type="button"
+                    className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-sp-hover"
+                    title={`:${emoji.name}:`}
+                    onClick={() => {
+                      onPick(asCustomEmojiToken(emoji.id))
+                      onClose()
+                    }}
+                  >
+                    <img
+                      src={`/api/static/${emoji.image_path}`}
+                      alt={emoji.name}
+                      className="h-6 w-6 object-contain"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <Picker
+            data={data}
+            theme="dark"
+            onEmojiSelect={(e: { native: string }) => {
+              onPick(e.native)
+              onClose()
+            }}
+            previewPosition="none"
+            skinTonePosition="search"
+            navPosition="top"
+            perLine={9}
+            emojiSize={28}
+            emojiButtonSize={36}
+          />
+        )}
+      </div>
     </div>,
     document.body,
   )
