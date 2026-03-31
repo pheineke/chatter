@@ -1,4 +1,4 @@
-﻿import { useNavigate } from 'react-router-dom'
+﻿import { useLocation, useNavigate } from 'react-router-dom'
 import { useRef, useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icon'
@@ -20,6 +20,10 @@ import { clearDMCache } from '../db/dmCache'
 import { SettingsLayout, type SettingsGroup } from '../components/SettingsLayout'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications' | 'tokens'
+
+function isTab(value: string | null): value is Tab {
+  return value === 'account' || value === 'appearance' || value === 'voice' || value === 'privacy' || value === 'notifications' || value === 'tokens'
+}
 
 // ─── Sidebar nav ─────────────────────────────────────────────────────────────
 
@@ -46,8 +50,17 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
 
 export function SettingsPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('account')
+  const location = useLocation()
+  const [tab, setTab] = useState<Tab>(() => {
+    const qTab = new URLSearchParams(location.search).get('tab')
+    return isTab(qTab) ? qTab : 'account'
+  })
   const { logout } = useAuth()
+
+  useEffect(() => {
+    const qTab = new URLSearchParams(location.search).get('tab')
+    if (isTab(qTab)) setTab(qTab)
+  }, [location.search])
 
   return (
     <SettingsLayout
