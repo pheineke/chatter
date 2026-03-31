@@ -271,10 +271,9 @@ async def voice_ws(
                     participant_data = voice_manager.get_participant(channel_id, user_id)
                     if participant_data:
                         payload = {"type": "voice.state_changed", "channel_id": str(channel_id), "data": participant_data}
-                        # Voice channel: update peer speaking indicators
+                        # Speaking indicators are high-frequency and should only be
+                        # visible to users currently connected to the same voice channel.
                         await voice_manager._broadcast_all(channel_id, payload)
-                        # Server WS: update sidebar speaking indicators for all viewers
-                        await ws_manager.broadcast_server(channel.server_id, payload)
 
             # -- Unknown message types → silently ignore ------------------
 
