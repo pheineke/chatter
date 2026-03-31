@@ -12,7 +12,9 @@ interface Props extends HTMLAttributes<HTMLSpanElement> {
  * No SVG code is copied — the file is referenced by URL.
  */
 export function Icon({ name, size = 20, style, className = '', ...rest }: Props) {
-  const url = `/icons/${name}-outline.svg`
+  // Keep compatibility with legacy icon names used across the app.
+  const resolvedName = name === 'x' ? 'close' : name
+  const url = `/icons/${resolvedName}-outline.svg`
   return (
     <span
       aria-hidden="true"
