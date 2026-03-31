@@ -66,7 +66,9 @@ export function SettingsPage() {
     <SettingsLayout
       groups={SETTINGS_GROUPS}
       activeTab={tab}
-      onTabChange={setTab}
+      onTabChange={(tabId) => {
+        if (isTab(tabId)) setTab(tabId)
+      }}
       onClose={() => navigate(-1)}
       sidebarFooter={(
         <button
