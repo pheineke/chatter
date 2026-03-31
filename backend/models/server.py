@@ -15,6 +15,8 @@ class Server(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     image: Mapped[str | None] = mapped_column(String(255), nullable=True)
     banner: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    text_channel_icon: Mapped[str] = mapped_column(String(32), nullable=False, default="hash")
+    voice_channel_icon: Mapped[str] = mapped_column(String(32), nullable=False, default="headphones")
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

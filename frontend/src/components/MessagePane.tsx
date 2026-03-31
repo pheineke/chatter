@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getChannels } from '../api/channels'
+import { getServer } from '../api/servers'
 import { getPins, searchMessages } from '../api/messages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -157,6 +158,13 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
     queryFn: () => getChannels(serverId!),
     enabled: !!serverId,
   })
+  const { data: server } = useQuery({
+    queryKey: ['server', serverId],
+    queryFn: () => getServer(serverId!),
+    enabled: !!serverId,
+  })
+
+  const textChannelIcon = server?.text_channel_icon ?? 'hash'
 
   const channel = channels.find((c) => c.id === channelId)
 
@@ -220,7 +228,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
             <Icon name="menu" size={22} />
           </button>
         )}
-        <Icon name="hash" size={16} className="text-sp-muted shrink-0" />
+        <Icon name={textChannelIcon} size={16} className="text-sp-muted shrink-0" />
         <span className="font-bold truncate select-none">{channel?.title ?? channelId}</span>
         {channel?.description && (
           <>

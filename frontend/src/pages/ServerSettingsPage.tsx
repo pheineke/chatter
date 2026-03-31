@@ -33,6 +33,19 @@ const TABS: (SettingsTab & { adminOnly?: boolean })[] = [
   { id: 'audit-logs',    label: 'Audit Log',     icon: 'activity',    adminOnly: true },
 ]
 
+const CHANNEL_ICON_OPTIONS = [
+  { value: 'hash', label: 'Hash' },
+  { value: 'at', label: 'At' },
+  { value: 'message-circle', label: 'Message Circle' },
+  { value: 'message-square', label: 'Message Square' },
+  { value: 'edit-2', label: 'Edit' },
+  { value: 'file-text', label: 'File Text' },
+  { value: 'headphones', label: 'Headphones' },
+  { value: 'mic', label: 'Mic' },
+  { value: 'volume-up', label: 'Volume Up' },
+  { value: 'radio', label: 'Radio' },
+] as const
+
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -119,9 +132,11 @@ export function ServerSettingsPage() {
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: { title: string; description: string | null; image: string | null; banner: string | null; owner_id: string }; onSaved: () => void }) {
+function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: { title: string; description: string | null; image: string | null; banner: string | null; owner_id: string; text_channel_icon: string; voice_channel_icon: string }; onSaved: () => void }) {
   const [name, setName] = useState(server.title)
   const [desc, setDesc] = useState(server.description ?? '')
+  const [textChannelIcon, setTextChannelIcon] = useState(server.text_channel_icon)
+  const [voiceChannelIcon, setVoiceChannelIcon] = useState(server.voice_channel_icon)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const iconRef  = useRef<HTMLInputElement>(null)
@@ -131,18 +146,31 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
   useEffect(() => {
     setName(server.title)
     setDesc(server.description ?? '')
-  }, [server.title, server.description])
+    setTextChannelIcon(server.text_channel_icon)
+    setVoiceChannelIcon(server.voice_channel_icon)
+  }, [server.title, server.description, server.text_channel_icon, server.voice_channel_icon])
 
-  const isDirty = name !== server.title || desc !== (server.description ?? '')
+  const isDirty =
+    name !== server.title ||
+    desc !== (server.description ?? '') ||
+    textChannelIcon !== server.text_channel_icon ||
+    voiceChannelIcon !== server.voice_channel_icon
 
   function handleDiscard() {
     setName(server.title)
     setDesc(server.description ?? '')
+    setTextChannelIcon(server.text_channel_icon)
+    setVoiceChannelIcon(server.voice_channel_icon)
   }
 
   async function handleSave() {
     setSaving(true)
-    await updateServer(serverId, { title: name.trim() || server.title, description: desc.trim() || undefined })
+    await updateServer(serverId, {
+      title: name.trim() || server.title,
+      description: desc.trim() || undefined,
+      text_channel_icon: textChannelIcon,
+      voice_channel_icon: voiceChannelIcon,
+    })
     onSaved()
     setSaving(false)
     setSaved(true)
@@ -229,6 +257,46 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
             onChange={e => setDesc(e.target.value)}
             placeholder="What's this server about?"
           />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Text Channel Icon</label>
+            <select
+              className="input w-full"
+              value={textChannelIcon}
+              onChange={e => setTextChannelIcon(e.target.value)}
+            >
+              {CHANNEL_ICON_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Voice Channel Icon</label>
+            <select
+              className="input w-full"
+              value={voiceChannelIcon}
+              onChange={e => setVoiceChannelIcon(e.target.value)}
+            >
+              {CHANNEL_ICON_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center gap-5 text-sm text-sp-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name={textChannelIcon} size={16} className="text-sp-text" />
+            Text Preview
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name={voiceChannelIcon} size={16} className="text-sp-text" />
+            Voice Preview
+          </span>
         </div>
       </div>
 

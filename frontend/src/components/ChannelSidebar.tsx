@@ -49,6 +49,9 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     enabled: !!serverId,
   })
 
+  const textChannelIcon = server?.text_channel_icon ?? 'hash'
+  const voiceChannelIcon = server?.voice_channel_icon ?? 'headphones'
+
   const { data: channels = [] } = useQuery({
     queryKey: ['channels', serverId],
     queryFn: () => getChannels(serverId!),
@@ -516,6 +519,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                     active={ch.id === channelId}
                     hasUnread={unreadChannels.has(ch.id)}
                     serverId={serverId!}
+                    textChannelIcon={textChannelIcon}
+                    voiceChannelIcon={voiceChannelIcon}
                     voiceSession={voiceSession}
                     channelPresence={voicePresence[ch.id] ?? []}
                     members={members}
@@ -560,6 +565,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                                   active={ch.id === channelId}
                                   hasUnread={unreadChannels.has(ch.id)}
                                   serverId={serverId!}
+                                  textChannelIcon={textChannelIcon}
+                                  voiceChannelIcon={voiceChannelIcon}
                                   voiceSession={voiceSession}
                                   channelPresence={voicePresence[ch.id] ?? []}
                                   members={members}
@@ -588,7 +595,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   if (!ch) return null
                   return (
                     <div className="bg-sp-input/90 rounded px-2 py-1 mx-1 flex items-center gap-1.5 text-sm text-sp-text shadow-xl cursor-grabbing">
-                      <Icon name={ch.type === 'voice' ? 'headphones' : 'hash'} size={16} className="opacity-60 shrink-0" />
+                      <Icon name={ch.type === 'voice' ? voiceChannelIcon : textChannelIcon} size={16} className="opacity-60 shrink-0" />
                       <span className="truncate">{ch.title}</span>
                     </div>
                   )
@@ -616,6 +623,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                 active={ch.id === channelId}
                 hasUnread={unreadChannels.has(ch.id)}
                 serverId={serverId!}
+                textChannelIcon={textChannelIcon}
+                voiceChannelIcon={voiceChannelIcon}
                 voiceSession={voiceSession}
                 channelPresence={voicePresence[ch.id] ?? []}
                 members={members}
@@ -648,6 +657,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                           active={ch.id === channelId}
                           hasUnread={unreadChannels.has(ch.id)}
                           serverId={serverId!}
+                          textChannelIcon={textChannelIcon}
+                          voiceChannelIcon={voiceChannelIcon}
                           voiceSession={voiceSession}
                           channelPresence={voicePresence[ch.id] ?? []}
                           members={members}
@@ -735,8 +746,8 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                   className={`flex-1 py-1 rounded text-sm flex items-center justify-center gap-1 ${newChannelType === t ? 'bg-sp-mention text-white' : 'bg-sp-input text-sp-text'}`}
                 >
                   {t === 'text'
-                    ? <><Icon name="hash" size={14} /> Text</>
-                    : <><Icon name="headphones" size={14} /> Voice</>}
+                    ? <><Icon name={textChannelIcon} size={14} /> Text</>
+                    : <><Icon name={voiceChannelIcon} size={14} /> Voice</>}
                 </button>
               ))}
             </div>
@@ -841,6 +852,8 @@ interface RowProps {
   active: boolean
   hasUnread?: boolean
   serverId: string
+  textChannelIcon: string
+  voiceChannelIcon: string
   voiceSession: VoiceSession | null
   channelPresence: VoiceParticipant[]
   members: Member[]
@@ -851,7 +864,7 @@ interface RowProps {
   onContextMenu?: (e: React.MouseEvent) => void
 }
 
-function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {
+function ChannelRow({ channel, active, hasUnread = false, serverId, textChannelIcon, voiceChannelIcon, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {
   const isVoice = channel.type === 'voice'
   const inThisVoice = voiceSession?.channelId === channel.id
   const { channelLevel } = useNotificationSettings()
@@ -923,7 +936,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
               ? 'text-sp-text font-semibold hover:bg-sp-hover/60 hover:-translate-x-1'
               : 'text-sp-muted hover:bg-sp-hover/60 hover:text-sp-text hover:-translate-x-1'}`}
       >
-        <Icon name={isVoice ? 'headphones' : 'hash'} size={18} className={`shrink-0 transition-colors ${active ? 'text-sp-primary' : 'opacity-70'}`} />
+        <Icon name={isVoice ? voiceChannelIcon : textChannelIcon} size={18} className={`shrink-0 transition-colors ${active ? 'text-sp-primary' : 'opacity-70'}`} />
         <span className="truncate">{channel.title}</span>
         {isMuted && (
           <span className="ml-1 inline-flex items-center justify-center leading-none text-sp-muted shrink-0" title="Notifications muted">

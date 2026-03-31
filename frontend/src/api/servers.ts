@@ -17,7 +17,15 @@ export async function createServer(title: string, description?: string): Promise
   return data
 }
 
-export async function updateServer(id: string, patch: { title?: string; description?: string }): Promise<Server> {
+export async function updateServer(
+  id: string,
+  patch: {
+    title?: string
+    description?: string
+    text_channel_icon?: string
+    voice_channel_icon?: string
+  },
+): Promise<Server> {
   const { data } = await client.patch<Server>(`/servers/${id}`, patch)
   return data
 }

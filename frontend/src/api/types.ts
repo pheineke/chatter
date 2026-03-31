@@ -34,6 +34,8 @@ export interface Server {
   description: string | null
   image: string | null
   banner: string | null
+  text_channel_icon: string
+  voice_channel_icon: string
   owner_id: string
   created_at: string
 }

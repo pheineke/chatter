@@ -1,11 +1,26 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.user import UserRead, UserPublicRead
 from app.utils.sanitize import strip_html
+
+
+ChannelIconName = Literal[
+    'hash',
+    'at',
+    'message-circle',
+    'message-square',
+    'edit-2',
+    'file-text',
+    'headphones',
+    'mic',
+    'volume-up',
+    'radio',
+]
 
 class ServerBase(BaseModel):
     title: str = Field(min_length=1, max_length=50)
@@ -24,6 +39,8 @@ class ServerCreate(ServerBase):
 class ServerUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=50)
     description: str | None = None
+    text_channel_icon: ChannelIconName | None = None
+    voice_channel_icon: ChannelIconName | None = None
 
     @field_validator('title', 'description', mode='before')
     @classmethod
@@ -37,6 +54,8 @@ class ServerRead(ServerBase):
     id: uuid.UUID
     image: str | None
     banner: str | None
+    text_channel_icon: ChannelIconName
+    voice_channel_icon: ChannelIconName
     owner_id: uuid.UUID
     created_at: datetime
 

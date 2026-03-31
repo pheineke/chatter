@@ -117,6 +117,10 @@ async def update_server(server_id: uuid.UUID, body: ServerUpdate, current_user: 
         server.title = body.title
     if body.description is not None:
         server.description = body.description
+    if body.text_channel_icon is not None:
+        server.text_channel_icon = body.text_channel_icon
+    if body.voice_channel_icon is not None:
+        server.voice_channel_icon = body.voice_channel_icon
     
     await create_audit_log(
         session=db,
