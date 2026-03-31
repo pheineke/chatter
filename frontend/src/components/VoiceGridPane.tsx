@@ -267,18 +267,18 @@ function VideoCard({
         {onDetach && (
           <>
             <button
-              title="Detach into new window"
+              title="Open this stream in its own window"
               className="opacity-0 group-hover:opacity-100 transition text-[10px] font-bold text-white bg-black/65 hover:bg-black/90 px-1.5 py-0.5 rounded flex items-center gap-1"
               onClick={e => { e.stopPropagation(); onDetach('separate') }}
             >
-              <Icon name="external-link" size={10} />{!compact && 'Popout'}
+              <Icon name="external-link" size={10} />{!compact && 'Separate Window'}
             </button>
             <button
-              title="Detach into shared window"
+              title="Open this stream in the combined streams window"
               className="opacity-0 group-hover:opacity-100 transition text-[10px] font-bold text-white bg-black/65 hover:bg-black/90 px-1.5 py-0.5 rounded flex items-center gap-1"
               onClick={e => { e.stopPropagation(); onDetach('shared') }}
             >
-              <Icon name="monitor" size={10} />{!compact && 'Shared'}
+              <Icon name="monitor" size={10} />{!compact && 'Combined Window'}
             </button>
           </>
         )}
