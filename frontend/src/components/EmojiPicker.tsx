@@ -20,7 +20,7 @@ const PICKER_H = 435
 
 export function EmojiPicker({ onPick, onClose, position, customEmojis = [], showServerSection = false }: Props) {
   const ref = useRef<HTMLDivElement>(null)
-  const [tab, setTab] = useState<'server' | 'unicode'>(showServerSection ? 'server' : 'unicode')
+  const [tab, setTab] = useState<'unicode' | 'gifs' | 'server'>('unicode')
 
   // Clamp to viewport
   const vw = window.innerWidth
@@ -57,20 +57,29 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
             <button
               type="button"
               className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
-                tab === 'server' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
-              }`}
-              onClick={() => setTab('server')}
-            >
-              Server
-            </button>
-            <button
-              type="button"
-              className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
                 tab === 'unicode' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
               }`}
               onClick={() => setTab('unicode')}
             >
               Emoji
+            </button>
+            <button
+              type="button"
+              className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                tab === 'gifs' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
+              }`}
+              onClick={() => setTab('gifs')}
+            >
+              GIFs
+            </button>
+            <button
+              type="button"
+              className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                tab === 'server' ? 'bg-sp-mention text-white' : 'text-sp-muted hover:bg-sp-hover hover:text-sp-text'
+              }`}
+              onClick={() => setTab('server')}
+            >
+              Server
             </button>
           </div>
         )}
@@ -102,6 +111,13 @@ export function EmojiPicker({ onPick, onClose, position, customEmojis = [], show
                 ))}
               </div>
             )}
+          </div>
+        ) : tab === 'gifs' ? (
+          <div className="h-[435px] p-3">
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-sp-muted">GIFs</div>
+            <div className="rounded-md border border-sp-divider/60 bg-sp-input p-3 text-xs text-sp-muted">
+              GIF picker tab is ready; GIF search will be added next.
+            </div>
           </div>
         ) : (
           <Picker
