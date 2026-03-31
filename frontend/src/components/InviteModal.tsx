@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { createPortal } from 'react-dom'
 import { createInvite, type ServerInvite } from '../api/invites'
 import { Icon } from './Icon'
 
@@ -57,9 +58,9 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
     return d.toLocaleString()
   }
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="bg-sp-popup border border-sp-divider/50 w-full max-w-md rounded-sp-xl shadow-sp-3 p-6 flex flex-col gap-5">
@@ -163,4 +164,6 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
