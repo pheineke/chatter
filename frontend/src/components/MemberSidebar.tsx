@@ -304,13 +304,20 @@ function MemberRow({ member, onClick, onContextMenu }: { member: Member; onClick
       style={{ width: 'calc(100% - 8px)', '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#2c2d32' } as React.CSSProperties}
     >
       <AvatarWithStatus user={member.user} size={32} />
-      <span
-        className={`text-sm font-medium truncate transition-colors ${
-          member.user.status === 'offline' ? 'text-sp-muted' : 'text-sp-text'
-        } group-hover:text-sp-text`}
-        style={nameColor && member.user.status !== 'offline' ? { color: nameColor } : undefined}
-      >
-        {member.nickname ?? member.user.username}
+      <span className="flex-1 min-w-0 flex flex-col leading-tight">
+        <span
+          className={`text-sm font-medium truncate transition-colors ${
+            member.user.status === 'offline' ? 'text-sp-muted' : 'text-sp-text'
+          } group-hover:text-sp-text`}
+          style={nameColor && member.user.status !== 'offline' ? { color: nameColor } : undefined}
+        >
+          {member.nickname ?? member.user.username}
+        </span>
+        {member.user.custom_status && (
+          <span className="text-xs text-sp-muted truncate">
+            {member.user.custom_status}
+          </span>
+        )}
       </span>
     </button>
   )

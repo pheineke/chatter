@@ -85,6 +85,8 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
         current_user.preferred_status = body.status
     if body.pronouns is not None:
         current_user.pronouns = body.pronouns
+    if 'custom_status' in body.model_fields_set:
+        current_user.custom_status = body.custom_status
     if body.banner is not None:
         current_user.banner = body.banner
     if body.dm_permission is not None:

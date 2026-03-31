@@ -40,6 +40,7 @@ const fakeUser = {
   avatar_decoration: null,
   description: null,
   pronouns: null,
+  custom_status: null,
   dm_permission: 'everyone' as const,
   preferred_status: 'online' as const,
   hide_status: false,

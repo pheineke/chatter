@@ -36,6 +36,7 @@ class User(Base):
     avatar: Mapped[str | None] = mapped_column(String(255), nullable=True)
     banner: Mapped[str | None] = mapped_column(String(255), nullable=True)
     pronouns: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    custom_status: Mapped[str | None] = mapped_column(String(120), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), default=UserStatus.offline)
     # The user's chosen non-transient status: restored when they reconnect.

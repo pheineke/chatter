@@ -11,6 +11,7 @@ class UserBase(BaseModel):
     username: str
     description: str | None = None
     pronouns: str | None = None
+    custom_status: str | None = None
     status: UserStatus = UserStatus.offline
 
 
@@ -39,6 +40,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     description: str | None = None
     pronouns: str | None = None
+    custom_status: str | None = None
     status: UserStatus | None = None
     banner: str | None = None
     dm_permission: DMPermission | None = None
@@ -47,7 +49,7 @@ class UserUpdate(BaseModel):
     theme_preset: str | None = None
     theme_colors: str | None = None
 
-    @field_validator('description', 'pronouns', mode='before')
+    @field_validator('description', 'pronouns', 'custom_status', mode='before')
     @classmethod
     def sanitize_text_fields(cls, v):
         return strip_html(v)
@@ -58,6 +60,18 @@ class UserUpdate(BaseModel):
         if v is not None and len(v) > 2000:
             raise ValueError('About Me cannot exceed 2000 characters')
         return v
+
+    @field_validator('custom_status')
+    @classmethod
+    def validate_custom_status_length(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        trimmed = v.strip()
+        if not trimmed:
+            return None
+        if len(trimmed) > 120:
+            raise ValueError('Custom status cannot exceed 120 characters')
+        return trimmed
 
 
 class UserPublicRead(UserBase):

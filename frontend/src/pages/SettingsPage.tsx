@@ -202,6 +202,7 @@ function AccountTab() {
             <div className="pb-1">
               <p className="font-bold text-lg leading-tight">{user?.username}</p>
               {user?.pronouns && <p className="text-sp-muted text-sm">{user.pronouns}</p>}
+              {user?.custom_status && <p className="text-sp-muted text-sm">{user.custom_status}</p>}
             </div>
           </div>
         </div>
@@ -239,6 +240,14 @@ function AccountTab() {
             label="Pronouns" value={user?.pronouns} placeholder="e.g. he/him"
             isEditing={editing === 'pronouns'} editValue={editValue} setEditValue={setEditValue}
             onEdit={() => startEdit('pronouns', user?.pronouns ?? null)}
+            onSave={saveEdit} onCancel={() => setEditing(null)} disabled={isSubmitting}
+          />
+        </div>
+        <div className="pt-2">
+          <EditableField
+            label="Custom Status" value={user?.custom_status} placeholder="What's on your mind?"
+            isEditing={editing === 'custom_status'} editValue={editValue} setEditValue={setEditValue}
+            onEdit={() => startEdit('custom_status', user?.custom_status ?? null)}
             onSave={saveEdit} onCancel={() => setEditing(null)} disabled={isSubmitting}
           />
         </div>
@@ -1282,7 +1291,7 @@ function NotificationsTab() {
 // ─── Shared EditableField ─────────────────────────────────────────────────────
 
 function EditableField({ label, value, placeholder, readOnly, multiline, isEditing, editValue, setEditValue, onEdit, onSave, onCancel, disabled }: any) {
-  const maxLen = label === 'About Me' ? 2000 : undefined
+  const maxLen = label === 'About Me' ? 2000 : label === 'Custom Status' ? 120 : undefined
   return (
     <div className="flex flex-col gap-1 py-2">
       <div className="flex items-start justify-between gap-4">

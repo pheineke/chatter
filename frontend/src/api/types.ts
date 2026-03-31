@@ -11,6 +11,7 @@ export interface User {
   avatar_decoration: string | null
   description: string | null
   pronouns: string | null
+  custom_status: string | null
   status: UserStatus
   preferred_status: UserStatus
   dm_permission: DMPermission
