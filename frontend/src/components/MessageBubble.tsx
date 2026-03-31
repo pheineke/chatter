@@ -1,7 +1,10 @@
 import { format, isToday, isYesterday } from 'date-fns'
 import { memo, useState, useEffect, useCallback } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { editMessage, deleteMessage, addReaction, removeReaction, pinMessage, unpinMessage } from '../api/messages'
+import { sendMessage } from '../api/messages'
+import { getConversations, getDMChannel } from '../api/dms'
+import { getFriends } from '../api/friends'
 import { UserAvatar } from './UserAvatar'
 import { Icon } from './Icon'
 import { ProfileCard } from './ProfileCard'
@@ -40,6 +43,13 @@ function rememberReaction(emoji: string) {
   } catch {
     // Ignore localStorage failures (private mode / quota).
   }
+}
+
+function buildForwardText(msg: Message, displayContent: string | null): string {
+  const base = displayContent?.trim() || msg.content?.trim() || ''
+  if (base) return `Forwarded from ${msg.author.username}: ${base}`
+  if (msg.attachments?.length) return `Forwarded from ${msg.author.username}: [Attachment]`
+  return `Forwarded from ${msg.author.username}`
 }
 
 interface Props {
@@ -88,6 +98,9 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
   const [userContextMenu, setUserContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [quickReactions, setQuickReactions] = useState<string[]>(() => getRecentReactions())
+  const [showForwardModal, setShowForwardModal] = useState(false)
+  const [forwardQuery, setForwardQuery] = useState('')
+  const [forwardBusyUserId, setForwardBusyUserId] = useState<string | null>(null)
 
   // E2EE: decrypt the message content if it was sent encrypted
   const [decryptedContent, setDecryptedContent] = useState<string | null>(null)
@@ -180,10 +193,70 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
     },
   })
 
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['dm-conversations'],
+    queryFn: getConversations,
+    staleTime: 30_000,
+    enabled: showForwardModal,
+  })
+
+  const { data: friends = [] } = useQuery({
+    queryKey: ['friends'],
+    queryFn: getFriends,
+    staleTime: 30_000,
+    enabled: showForwardModal,
+  })
+
   function reactWith(emoji: string) {
     rememberReaction(emoji)
     setQuickReactions(getRecentReactions())
     reactMut.mutate(emoji)
+  }
+
+  const forwardTargets = (() => {
+    const map = new Map<string, { id: string; username: string; avatar: string | null; source: 'dm' | 'friend' }>()
+    conversations.forEach((c) => {
+      map.set(c.other_user.id, {
+        id: c.other_user.id,
+        username: c.other_user.username,
+        avatar: c.other_user.avatar,
+        source: 'dm',
+      })
+    })
+    friends.forEach((f) => {
+      if (!map.has(f.user.id)) {
+        map.set(f.user.id, {
+          id: f.user.id,
+          username: f.user.username,
+          avatar: f.user.avatar,
+          source: 'friend',
+        })
+      }
+    })
+    const q = forwardQuery.trim().toLowerCase()
+    const items = [...map.values()]
+    if (!q) return items.sort((a, b) => a.username.localeCompare(b.username)).slice(0, 20)
+    return items
+      .filter((u) => u.username.toLowerCase().includes(q))
+      .sort((a, b) => a.username.localeCompare(b.username))
+      .slice(0, 20)
+  })()
+
+  async function forwardToUser(userId: string) {
+    setForwardBusyUserId(userId)
+    setActionError(null)
+    try {
+      const dm = await getDMChannel(userId)
+      const payload = buildForwardText(msg, displayContent)
+      await sendMessage(dm.channel_id, payload)
+      setShowForwardModal(false)
+      setForwardQuery('')
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to forward message.'
+      setActionError(String(detail))
+    } finally {
+      setForwardBusyUserId(null)
+    }
   }
 
   // Blocked-user early return (all hooks already called above)
@@ -476,6 +549,9 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
           <ActionBtn title="Reply" onClick={() => onReply?.(msg)}>
             <Icon name="corner-up-left" size={16} />
           </ActionBtn>
+          <ActionBtn title="Forward" onClick={() => setShowForwardModal(true)}>
+            <Icon name="paper-plane" size={16} />
+          </ActionBtn>
           <ActionBtn
             title={isPinned ? 'Unpin' : 'Pin'}
             onClick={() => pinMut.mutate()}
@@ -501,6 +577,52 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
         onPick={(emoji) => reactWith(emoji)}
         onClose={() => setEmojiPickerPos(null)}
       />
+    )}
+    {showForwardModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowForwardModal(false) }}>
+        <div className="w-full max-w-md bg-sp-popup border border-sp-divider/60 rounded-sp-xl shadow-sp-3 overflow-hidden">
+          <div className="h-12 px-4 flex items-center justify-between border-b border-sp-divider/60">
+            <div className="font-semibold text-sm text-sp-text">Forward Message</div>
+            <button className="text-sp-muted hover:text-sp-text" onClick={() => setShowForwardModal(false)}>
+              <Icon name="x" size={16} />
+            </button>
+          </div>
+          <div className="p-3 border-b border-sp-divider/60">
+            <input
+              autoFocus
+              value={forwardQuery}
+              onChange={(e) => setForwardQuery(e.target.value)}
+              placeholder="Search recipient"
+              className="input w-full"
+            />
+          </div>
+          <div className="max-h-80 overflow-y-auto p-2">
+            {forwardTargets.length === 0 ? (
+              <div className="text-sm text-sp-muted px-2 py-6 text-center">No recipients found.</div>
+            ) : (
+              forwardTargets.map((u) => (
+                <button
+                  key={u.id}
+                  className="w-full flex items-center gap-2 px-2 py-2 rounded hover:bg-sp-hover text-left"
+                  onClick={() => { void forwardToUser(u.id) }}
+                  disabled={forwardBusyUserId === u.id}
+                >
+                  <UserAvatar user={{ ...msg.author, id: u.id, username: u.username, avatar: u.avatar }} size={30} />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm text-sp-text truncate">{u.username}</span>
+                    <span className="block text-xs text-sp-muted">{u.source === 'dm' ? 'Recent DM' : 'Friend'}</span>
+                  </span>
+                  {forwardBusyUserId === u.id ? (
+                    <Icon name="loader" size={14} className="animate-spin text-sp-muted" />
+                  ) : (
+                    <Icon name="arrow-forward" size={14} className="text-sp-muted" />
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     )}
     {contextMenu && (
       <ContextMenu
