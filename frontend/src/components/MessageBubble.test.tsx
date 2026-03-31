@@ -51,7 +51,7 @@ vi.mock('./Icon', () => ({
 
 // ---- helpers ----
 
-const baseAuthor: import('../api/types').User = { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' }
+const baseAuthor: import('../api/types').User = { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, custom_status: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' }
 
 function makeMsg(overrides: Partial<Message> = {}): Message {
   return {

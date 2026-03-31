@@ -17,7 +17,7 @@ const mockLogin = usersApi.login as ReturnType<typeof vi.fn>
 const mockRegister = usersApi.register as ReturnType<typeof vi.fn>
 const mockLogout = usersApi.logout as ReturnType<typeof vi.fn>
 
-const fakeUser = { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' }
+const fakeUser = { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, custom_status: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' }
 
 /** Small consumer component so we can test the hook */
 function Consumer() {

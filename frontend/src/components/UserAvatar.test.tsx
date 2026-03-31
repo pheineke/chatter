@@ -17,6 +17,7 @@ const makeUser = (overrides: Partial<User> = {}): User => ({
   hide_status: false,
   created_at: '',
   ...overrides,
+  custom_status: overrides.custom_status ?? null,
 })
 
 describe('UserAvatar', () => {

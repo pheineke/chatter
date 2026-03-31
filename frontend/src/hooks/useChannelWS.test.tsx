@@ -25,7 +25,7 @@ function makeMsg(overrides: Partial<Message> = {}): Message {
   return {
     id: 'msg-1',
     channel_id: 'chan-1',
-    author: { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' },
+    author: { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, custom_status: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' },
     content: 'hello',
     created_at: '2024-01-01T00:00:00Z',
     edited_at: null,

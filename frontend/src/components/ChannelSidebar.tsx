@@ -895,6 +895,7 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, voiceSession
             username: p.username ?? `User ${p.user_id.slice(0, 4)}`,
             avatar: p.avatar ?? null,
             description: null,
+            custom_status: null,
             status: 'offline' as const,
             preferred_status: 'offline' as const,
             created_at: '',

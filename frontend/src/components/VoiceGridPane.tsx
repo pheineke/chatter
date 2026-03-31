@@ -662,6 +662,7 @@ export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
       avatar: p.avatar ?? null,
       avatar_decoration: null,
       description: null,
+      custom_status: null,
       status: 'offline' as const,
       preferred_status: 'offline' as const,
       created_at: '',

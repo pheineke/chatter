@@ -11,7 +11,7 @@ vi.mock('../api/messages', () => ({
   sendMessage: vi.fn().mockResolvedValue({
     id: 'new-msg',
     channel_id: 'chan-1',
-    author: { id: 'me', username: 'me', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' },
+    author: { id: 'me', username: 'me', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, custom_status: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' },
     content: 'hello',
     created_at: new Date().toISOString(),
     edited_at: null,
@@ -132,7 +132,7 @@ describe('MessageInput', () => {
     const replyTo = {
       id: 'orig',
       channel_id: 'chan-1',
-      author: { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' },
+      author: { id: 'u1', username: 'alice', status: 'online' as const, avatar: null, banner: null, avatar_decoration: null, description: null, custom_status: null, pronouns: null, dm_permission: 'everyone' as const, preferred_status: 'online' as const, hide_status: false, created_at: '' },
       content: 'original',
       created_at: new Date().toISOString(),
       edited_at: null,

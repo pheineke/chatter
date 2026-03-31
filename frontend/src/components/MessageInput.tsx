@@ -259,6 +259,7 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
               banner: null, 
               avatar_decoration: null, 
               description: null, 
+              custom_status: null,
               pronouns: null, 
               dm_permission: 'everyone' 
             },
