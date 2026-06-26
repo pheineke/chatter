@@ -963,9 +963,6 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, textChannelI
 
   function handleClick() {
     setLastChannel(serverId, channel.id)
-    if (isVoice) {
-      onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId })
-    }
     onCloseNav?.()
     navigate(`/channels/${serverId}/${channel.id}`)
   }
