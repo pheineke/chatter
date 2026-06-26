@@ -21,12 +21,6 @@ class DMPermission(str, enum.Enum):
     server_members_only = "server_members_only"
 
 
-class DMPermission(str, enum.Enum):
-    everyone = "everyone"
-    friends_only = "friends_only"
-    server_members_only = "server_members_only"
-
-
 class User(Base):
     __tablename__ = "users"
 
@@ -53,6 +47,7 @@ class User(Base):
     avatar_decoration: Mapped[str | None] = mapped_column(String(50), nullable=True)
     theme_preset: Mapped[str | None] = mapped_column(String(50), nullable=True)
     theme_colors: Mapped[str | None] = mapped_column(Text, nullable=True)
+    backup_downloaded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

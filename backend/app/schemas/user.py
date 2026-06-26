@@ -49,6 +49,7 @@ class UserUpdate(BaseModel):
     avatar_decoration: str | None = None
     theme_preset: str | None = None
     theme_colors: str | None = None
+    backup_downloaded: bool | None = None
 
     @field_validator('description', 'pronouns', 'custom_status', mode='before')
     @classmethod
@@ -105,6 +106,7 @@ class UserRead(UserPublicRead):
     hide_status: bool = False
     theme_preset: str | None = None
     theme_colors: str | None = None
+    backup_downloaded: bool = False
 
 
 class Token(BaseModel):

@@ -347,9 +347,9 @@ function DetachedStreamCard({
 
 function gridCols(n: number) {
   if (n <= 1) return 'grid-cols-1'
-  if (n <= 4) return 'grid-cols-2'
-  if (n <= 9) return 'grid-cols-3'
-  return 'grid-cols-4'
+  if (n <= 4) return 'grid-cols-2 md:grid-cols-2'
+  if (n <= 9) return 'grid-cols-2 md:grid-cols-3'
+  return 'grid-cols-2 md:grid-cols-4'
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────

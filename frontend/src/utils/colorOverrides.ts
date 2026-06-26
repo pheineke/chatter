@@ -94,17 +94,12 @@ export function loadColorOverrides(): Record<string, string> {
     const raw = localStorage.getItem('colorOverrides')
     const preset = localStorage.getItem('appPreset')
 
-    // First app load: no persisted theme yet -> force default dark.
-    if (!raw && !preset) {
-      return DEFAULT_DARK_OVERRIDES
-    }
-    
-    // Auto-fix for users stuck in the old "Reset" state where appPreset was 'default' but overrides were cleared
-    if (!raw && preset === 'default') {
-      return DEFAULT_DARK_OVERRIDES
+    if (raw) {
+      return JSON.parse(raw)
     }
 
-    return JSON.parse(raw ?? '{}') 
+    // No raw overrides found — resolve from preset or fall back to default dark.
+    return DEFAULT_DARK_OVERRIDES
   } catch { 
     return {} 
   }

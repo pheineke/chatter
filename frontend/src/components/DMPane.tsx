@@ -142,7 +142,7 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-black/20 shadow-sm shrink-0">
         {onOpenNav && (

@@ -11,6 +11,7 @@ import { Icon } from './Icon'
 import { ProfileCard } from './ProfileCard'
 import { EmojiPicker } from './EmojiPicker'
 import { ContextMenu } from './ContextMenu'
+import { BottomSheet } from './BottomSheet'
 import type { Message } from '../api/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useBlocks } from '../hooks/useBlocks'
@@ -555,8 +556,8 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
         )}
       </div>
 
-      {/* Action toolbar on hover */}
-      <div className="absolute right-4 top-0 -translate-y-1/2 flex items-center gap-1 bg-sp-popup border border-sp-divider/60 rounded-sp-sm px-1 py-0.5 shadow-sp-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity">
+      {/* Action toolbar on hover (desktop only — mobile uses bottom sheet) */}
+      <div className="hidden md:flex absolute right-4 top-0 -translate-y-1/2 items-center gap-1 bg-sp-popup border border-sp-divider/60 rounded-sp-sm px-1 py-0.5 shadow-sp-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity">
           {quickReactions.map((emoji) => (
             <ActionBtn key={emoji} title={`React with ${emoji}`} onClick={() => reactWith(emoji)}>
               <span className="text-sm leading-none">{emoji}</span>
@@ -605,12 +606,13 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
         onClose={() => setEmojiPickerPos(null)}
       />
     )}
-    {showForwardModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowForwardModal(false) }}>
-        <div className="w-full max-w-md bg-sp-popup border border-sp-divider/60 rounded-sp-xl shadow-sp-3 overflow-hidden">
+    {showForwardModal && (() => {
+      const closeForward = () => setShowForwardModal(false)
+      const body = (
+        <>
           <div className="h-12 px-4 flex items-center justify-between border-b border-sp-divider/60">
             <div className="font-semibold text-sm text-sp-text">Forward Message</div>
-            <button className="text-sp-muted hover:text-sp-text" onClick={() => setShowForwardModal(false)}>
+            <button className="text-sp-muted hover:text-sp-text" onClick={closeForward}>
               <Icon name="x" size={16} />
             </button>
           </div>
@@ -648,15 +650,57 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
               ))
             )}
           </div>
+        </>
+      )
+      if (window.innerWidth < 768) return <BottomSheet open onClose={closeForward}><div className="p-0">{body}</div></BottomSheet>
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) closeForward() }}>
+          <div className="w-full max-w-md bg-sp-popup border border-sp-divider/60 rounded-sp-xl shadow-sp-3 overflow-hidden">
+            {body}
+          </div>
         </div>
-      </div>
-    )}
+      )
+    })()}
     {contextMenu && (
       <ContextMenu
         x={contextMenu.x}
         y={contextMenu.y}
         onClose={() => setContextMenu(null)}
+        beforeItems={
+          <div className="flex items-center gap-1 px-4 pt-3 pb-1 border-b border-sp-divider/60">
+            {quickReactions.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => { reactWith(emoji); setContextMenu(null) }}
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-sp-hover active:bg-sp-hover text-lg transition-colors"
+              >
+                {emoji}
+              </button>
+            ))}
+            <button
+              onClick={(e) => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                setEmojiPickerPos({ x: rect.left, y: rect.bottom + 4 })
+              }}
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-sp-hover active:bg-sp-hover transition-colors"
+            >
+              <Icon name="smiling-face" size={20} />
+            </button>
+          </div>
+        }
         items={[
+          {
+            label: isPinned ? 'Unpin' : 'Pin',
+            icon: 'pin',
+            active: isPinned,
+            onClick: () => { pinMut.mutate(); setContextMenu(null) },
+          },
+          {
+            label: 'Forward',
+            icon: 'paper-plane',
+            onClick: () => { setShowForwardModal(true); setContextMenu(null) },
+          },
+          { separator: true },
           {
             label: 'Reply',
             icon: 'corner-up-left',

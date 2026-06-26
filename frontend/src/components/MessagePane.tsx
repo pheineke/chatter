@@ -200,16 +200,33 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
 
   if (channel?.type === 'voice') {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-4 text-sp-muted">
-        <div className="text-5xl">🔊</div>
-        <h2 className="text-xl font-bold text-sp-text">{channel.title}</h2>
-        <p className="text-sm">Voice Channel</p>
-        <button
-          onClick={() => onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId: serverId! })}
-          className="btn"
-        >
-          Join Voice
-        </button>
+      <div className="flex flex-col h-full">
+        {/* Channel header */}
+        <div className="flex items-center gap-2 px-4 border-b border-sp-divider/60 shrink-0 h-12 min-w-0">
+          {onOpenNav && (
+            <button
+              className="md:hidden p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5"
+              onClick={onOpenNav}
+              aria-label="Open navigation"
+            >
+              <Icon name="menu" size={22} />
+            </button>
+          )}
+          <Icon name="headphones" size={16} className="text-sp-muted shrink-0" />
+          <span className="font-bold truncate select-none">{channel.title}</span>
+        </div>
+        {/* Join Voice content */}
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-sp-muted">
+          <div className="text-5xl">🔊</div>
+          <h2 className="text-xl font-bold text-sp-text">{channel.title}</h2>
+          <p className="text-sm">Voice Channel</p>
+          <button
+            onClick={() => onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId: serverId! })}
+            className="btn"
+          >
+            Join Voice
+          </button>
+        </div>
       </div>
     )
   }
@@ -318,8 +335,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
               }}
               onKeyDown={e => { if (e.key === 'Escape') { closeSearch() } }}
               placeholder={`Search ${channel?.title ?? ''}…`}
-              className="bg-sp-input border border-sp-divider/60 rounded px-2.5 h-7 text-sm text-sp-text placeholder:text-sp-muted outline-none mr-1"
-              style={{ width: 220 }}
+              className="bg-sp-input border border-sp-divider/60 rounded px-2.5 h-7 text-sm text-sp-text placeholder:text-sp-muted outline-none mr-1 w-[30vw] max-w-[220px] min-w-[80px]"
             />
           )}
           <button

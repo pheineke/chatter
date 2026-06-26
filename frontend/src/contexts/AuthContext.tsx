@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import type { User } from '../api/types'
 import { getMe, login as apiLogin, register as apiRegister, logout as apiLogout } from '../api/users'
 
-import { applyColorOverrides } from '../utils/colorOverrides'
+import { applyColorOverrides, loadColorOverrides } from '../utils/colorOverrides'
 
 interface AuthContextValue {
   user: User | null
@@ -72,10 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('colorOverrides', user.theme_colors)
       } catch { /* ignore */ }
     } else {
-      applyColorOverrides({})
-      localStorage.removeItem('colorOverrides')
+      const fallback = loadColorOverrides()
+      applyColorOverrides(fallback)
     }
-  }, [user?.theme_colors, user?.theme_preset, user])
+  }, [user?.theme_colors, user?.theme_preset])
 
   const login = async (username: string, password: string) => {
     const data = await apiLogin(username, password)

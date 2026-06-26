@@ -283,7 +283,7 @@ async def update_channel(
         session=db,
         server_id=server_id,
         user_id=current_user.id,
-        action=AuditLogAction.CHANNEL_DELETE,
+        action=AuditLogAction.CHANNEL_UPDATE,
         target_id=channel_id,
         changes={"title": channel.title, "type": channel.type},
     )

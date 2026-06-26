@@ -1,14 +1,9 @@
-/**
- * Bridges the AuthContext (user.id) into the E2EEProvider.
- *
- * Renders nothing while the user is not logged in — the E2EEProvider only
- * starts when there is a confirmed userId available.
- */
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { E2EEProvider, useE2EE } from '../contexts/E2EEContext'
 import type { ReactNode } from 'react'
 import { Icon } from './Icon'
+import { updateMe } from '../api/users'
 
 export function E2EEWrapper({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -17,7 +12,7 @@ export function E2EEWrapper({ children }: { children: ReactNode }) {
 
   return (
     <E2EEProvider userId={user.id}>
-      <ForcedKeyBackupGate userId={user.id} username={user.username}>
+      <ForcedKeyBackupGate username={user.username}>
         {children}
       </ForcedKeyBackupGate>
     </E2EEProvider>
@@ -25,33 +20,35 @@ export function E2EEWrapper({ children }: { children: ReactNode }) {
 }
 
 function ForcedKeyBackupGate({
-  userId,
   username,
   children,
 }: {
-  userId: string
   username: string
   children: ReactNode
 }) {
+  const { user, refreshUser } = useAuth()
   const { ready, initialising, isEnabled, downloadBackup } = useE2EE()
   const [showGate, setShowGate] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
-
-  const markerKey = `e2ee_backup_done_${userId}`
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (initialising || !ready || !isEnabled) return
-    const alreadyBackedUp = localStorage.getItem(markerKey) === '1'
-    setShowGate(!alreadyBackedUp)
-  }, [initialising, ready, isEnabled, markerKey])
+    if (initialising || !ready || !isEnabled || !user) return
+    setShowGate(!user.backup_downloaded)
+  }, [initialising, ready, isEnabled, user?.backup_downloaded])
 
   async function handleDownload() {
     await downloadBackup(username || 'chatter')
     setDownloaded(true)
+    setSaving(true)
+    try {
+      await updateMe({ backup_downloaded: true })
+      await refreshUser()
+    } catch { /* non-fatal */ }
+    setSaving(false)
   }
 
   function handleContinue() {
-    localStorage.setItem(markerKey, '1')
     setShowGate(false)
   }
 
@@ -82,10 +79,17 @@ function ForcedKeyBackupGate({
             <div className="flex flex-col sm:flex-row gap-2 justify-end">
               <button
                 onClick={handleDownload}
+                disabled={saving}
                 className="px-4 py-2 rounded bg-sp-input hover:bg-sp-muted/20 text-sp-text text-sm font-medium transition-colors flex items-center justify-center gap-2"
               >
-                <Icon name="download" size={16} />
-                Download key backup
+                {saving ? (
+                  <span>Saving…</span>
+                ) : (
+                  <>
+                    <Icon name="download" size={16} />
+                    Download key backup
+                  </>
+                )}
               </button>
               <button
                 onClick={handleContinue}

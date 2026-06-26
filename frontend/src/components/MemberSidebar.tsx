@@ -134,7 +134,7 @@ export function MemberSidebar({ serverId, onClose }: Props) {
         className="md:hidden fixed inset-0 z-40 bg-black/60" 
         onClick={onClose} 
       />
-<div className="fixed inset-y-0 right-0 z-40 md:static flex flex-col w-full md:w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50 shadow-sp-3 md:shadow-none transition-transform">
+<div className="fixed inset-y-0 right-0 z-40 md:static flex flex-col w-80 max-w-[85vw] md:w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50 shadow-sp-3 md:shadow-none transition-transform duration-200 translate-x-0 md:translate-x-0">
         <div className="px-3 flex items-center gap-2 h-12 shrink-0 border-b border-sp-divider/50 shadow-sm">
           {/* Mobile close button */}
           {onClose && (

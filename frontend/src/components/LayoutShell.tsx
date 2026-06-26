@@ -19,7 +19,7 @@ type Props = { children: ReactNode; className?: string }
 /** Outer flex container for a full-screen two-panel layout. */
 export function LayoutShell({ children, className }: Props) {
   return (
-    <div className={`flex h-screen w-full bg-sp-bg text-sp-text overflow-hidden${className ? ` ${className}` : ''}`}>
+    <div className={`flex h-dvh w-full bg-sp-bg text-sp-text overflow-hidden${className ? ` ${className}` : ''}`}>
       {children}
     </div>
   )

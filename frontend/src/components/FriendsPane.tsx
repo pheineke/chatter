@@ -111,7 +111,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
   }, [])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="flex items-center gap-0 px-4 py-3 border-b border-black/20 shadow-sm shrink-0 space-x-1">
         {onOpenNav && (
@@ -143,7 +143,7 @@ export function FriendsPane({ onOpenNav }: { onOpenNav?: () => void }) {
 
       <div
         ref={listViewportRef}
-        className="flex-1 overflow-y-auto p-4"
+        className="flex-1 min-h-0 overflow-y-auto p-4"
         onScroll={(e) => setScrollTop((e.currentTarget as HTMLDivElement).scrollTop)}
       >
         {tab === 'add' ? (

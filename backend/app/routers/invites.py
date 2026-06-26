@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status
@@ -21,10 +21,9 @@ router = APIRouter(tags=["invites"])
 def _is_expired(expires_at: datetime | None) -> bool:
     if expires_at is None:
         return False
-    # SQLite returns naive datetimes; strip tzinfo from comparison target
-    naive_now = datetime.utcnow()
-    naive_exp = expires_at.replace(tzinfo=None) if expires_at.tzinfo else expires_at
-    return naive_exp < naive_now
+    now = datetime.now(timezone.utc)
+    exp = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+    return exp < now
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
@@ -82,7 +81,7 @@ async def create_invite(
 
     expires_at = None
     if body.expires_hours is not None:
-        expires_at = datetime.utcnow() + timedelta(hours=body.expires_hours)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=body.expires_hours)
 
     invite = ServerInvite(
         server_id=server_id,

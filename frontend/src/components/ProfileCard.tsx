@@ -83,13 +83,17 @@ export function ProfileCard({ userId, onClose, position }: Props) {
   
   // Removed early return here that caused hook mismatch
 
-  // Adjust position to stay in viewport
-  // Simple clamping for now or just absolute positioning
-  // Ideally use floating-ui but that's a dependency. We'll simulate.
+  const cardW = 320
+  const cardH = 400
+  const pad = 8
+  const left = position.x
+  const top = position.y
+  const overflowRight = left + cardW + pad > window.innerWidth
+  const overflowBottom = top + cardH + pad > window.innerHeight
   const style: React.CSSProperties = {
      position: 'fixed' as const,
-     left: Math.min(window.innerWidth - 320, Math.max(10, position.x)),
-     top: Math.min(window.innerHeight - 400, Math.max(10, position.y)),
+     left: overflowRight ? Math.max(pad, window.innerWidth - cardW - pad) : Math.max(pad, left),
+     top: overflowBottom ? Math.max(pad, window.innerHeight - cardH - pad) : Math.max(pad, top),
      zIndex: 100,
   }
 

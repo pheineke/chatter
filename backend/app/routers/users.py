@@ -35,7 +35,7 @@ def _mask_user_read(user: "User", viewer_id: uuid.UUID) -> "UserPublicRead":
 
 
 async def _broadcast_user_updated(user: "User", db: DB) -> None:
-    payload = UserPublicRead.model_validate(user).model_dump(mode="json")
+    payload = UserRead.model_validate(user).model_dump(mode="json")
     event = {"type": "user.updated", "data": payload}
 
     # User's own room
@@ -113,7 +113,9 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
     if body.theme_colors is not None:
         # If null string was passed from front-end it still matches but as a string "null" maybe we should check
         current_user.theme_colors = body.theme_colors if body.theme_colors != "null" else None
-        
+    if body.backup_downloaded is not None:
+        current_user.backup_downloaded = body.backup_downloaded
+
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)

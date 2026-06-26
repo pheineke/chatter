@@ -83,3 +83,10 @@ ehthumbs.db
 # ── Uploaded media (keep folder structure, ignore contents) ──────────────────
 backend/static/*
 !backend/static/.gitkeep
+
+# ── Build artifacts ──────────────────────────────────────────────────────────
+frontend/out.txt
+frontend/output.css
+
+# ── Backend development data ─────────────────────────────────────────────────
+backend_data/

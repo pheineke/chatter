@@ -6,7 +6,7 @@ import { UserAvatar } from '../components/UserAvatar'
 import { updateMe, uploadAvatar, uploadBanner, changePassword } from '../api/users'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { User, UserStatus, DMPermission } from '../api/types'
-import { COLOR_SWATCHES, loadColorOverrides, applyColorOverrides } from '../utils/colorOverrides'
+import { COLOR_SWATCHES, loadColorOverrides, applyColorOverrides, DEFAULT_DARK_OVERRIDES } from '../utils/colorOverrides'
 import { useSoundManager } from '../hooks/useSoundManager'
 import { useBlocks } from '../hooks/useBlocks'
 import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
@@ -609,14 +609,14 @@ function AppearanceTab() {
   }
 
   function resetColors() {
-    setSaved({})
+    setSaved(DEFAULT_DARK_OVERRIDES)
     setSavedPreset('default')
-    setPending({})
+    setPending(DEFAULT_DARK_OVERRIDES)
     setPendingPreset('default')
     localStorage.removeItem('colorOverrides')
     localStorage.setItem('appPreset', 'default')
-    applyColorOverrides({})
-    updateMut.mutate({ theme_preset: 'default', theme_colors: null })
+    applyColorOverrides(DEFAULT_DARK_OVERRIDES)
+    updateMut.mutate({ theme_preset: 'default', theme_colors: JSON.stringify(DEFAULT_DARK_OVERRIDES) })
   }
 
   function applyStyleTag(css: string) {

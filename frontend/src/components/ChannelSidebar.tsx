@@ -8,13 +8,14 @@ import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
 import { useServerWS } from '../hooks/useServerWS'
 import { Portal } from './Portal'
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
+import { DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { updateMe } from '../api/users'
 import { Fragment } from 'react'
 import { ContextMenu } from './ContextMenu'
+import { BottomSheet } from './BottomSheet'
 import type { ContextMenuItem } from './ContextMenu'
 import { InviteModal } from './InviteModal'
 
@@ -29,9 +30,11 @@ interface Props {
   voiceSession: VoiceSession | null
   onJoinVoice: (session: VoiceSession) => void
   onLeaveVoice: () => void
+  /** Close the mobile nav drawer after selecting a channel */
+  onCloseNav?: () => void
 }
 
-export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Props) {
+export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice, onCloseNav }: Props) {
   const { serverId } = useParams<{ serverId: string }>()
   const channelMatch = useMatch('/channels/:serverId/:channelId')
   const channelId = channelMatch?.params.channelId
@@ -145,7 +148,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
     localStorage.setItem('hideMutedChannels', String(hideMuted))
   }, [hideMuted])
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  )
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -572,6 +578,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                     onLeaveVoice={onLeaveVoice}
                     navigate={navigate}
                     onContextMenu={e => openChannelContextMenu(e, ch)}
+                    onCloseNav={onCloseNav}
                   />
                 </SortableChannelItem>
               ))}
@@ -618,6 +625,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                                   onLeaveVoice={onLeaveVoice}
                                   navigate={navigate}
                                   onContextMenu={e => openChannelContextMenu(e, ch)}
+                                  onCloseNav={onCloseNav}
                                 />
                               </div>
                             </SortableChannelItem>
@@ -676,6 +684,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                 onLeaveVoice={onLeaveVoice}
                 navigate={navigate}
                 onContextMenu={e => openChannelContextMenu(e, ch)}
+                onCloseNav={onCloseNav}
               />
             ))}
             {sortedCats.map(cat => {
@@ -710,6 +719,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                           onLeaveVoice={onLeaveVoice}
                           navigate={navigate}
                           onContextMenu={e => openChannelContextMenu(e, ch)}
+                          onCloseNav={onCloseNav}
                         />
                       ))}
                     </div>
@@ -725,10 +735,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
 
       {/* User panel Moved to AppShell */}
       {/* Edit category modal */}
-      {editCategory && (
-        <Portal>
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setEditCategory(null)}>
-          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
+      {editCategory && (() => {
+        const close = () => setEditCategory(null)
+        const body = (
+          <>
             <h2 className="text-lg font-bold mb-4">Edit Category</h2>
             <label className="text-xs font-semibold uppercase text-sp-muted block mb-1">Category Name</label>
             <input
@@ -742,20 +752,29 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
               <button className="btn flex-1" onClick={handleSaveEditCategory} disabled={!editCategoryName.trim()}>
                 Save
               </button>
-              <button className="btn flex-1 bg-sp-input hover:bg-sp-input/70" onClick={() => setEditCategory(null)}>
+              <button className="btn flex-1 bg-sp-input hover:bg-sp-input/70" onClick={close}>
                 Cancel
               </button>
             </div>
-          </div>
-          </div>
-        </Portal>
-      )}
+          </>
+        )
+        if (window.innerWidth < 768) return <BottomSheet open onClose={close}><div className="p-4">{body}</div></BottomSheet>
+        return (
+          <Portal>
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={close}>
+            <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
+              {body}
+            </div>
+            </div>
+          </Portal>
+        )
+      })()}
 
       {/* Add category modal */}
-      {showAddCategory && (
-        <Portal>
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAddCategory(false); setCreateError(null) }}>
-          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
+      {showAddCategory && (() => {
+        const close = () => { setShowAddCategory(false); setCreateError(null) }
+        const body = (
+          <>
             <h2 className="text-lg font-bold mb-4">Create Category</h2>
             {createError && <div className="mb-2 text-sm text-red-400">{createError}</div>}
             <input
@@ -769,16 +788,25 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
             <button className="btn w-full" onClick={handleCreateCategory} disabled={!newCategoryName.trim()}>
               Create Category
             </button>
-          </div>
-          </div>
-        </Portal>
-      )}
+          </>
+        )
+        if (window.innerWidth < 768) return <BottomSheet open onClose={close}><div className="p-4">{body}</div></BottomSheet>
+        return (
+          <Portal>
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={close}>
+            <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
+              {body}
+            </div>
+            </div>
+          </Portal>
+        )
+      })()}
 
       {/* Add channel modal */}
-      {showAddChannel && (
-        <Portal>
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAddChannel(false); setCreateError(null) }}>
-          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
+      {showAddChannel && (() => {
+        const close = () => { setShowAddChannel(false); setCreateError(null) }
+        const body = (
+          <>
             <h2 className="text-lg font-bold mb-4">Add Channel</h2>
             {createError && <div className="mb-2 text-sm text-red-400">{createError}</div>}
             <div className="flex gap-2 mb-3">
@@ -805,10 +833,19 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
             <button className="btn w-full" onClick={handleCreateChannel} disabled={!newChannelName.trim()}>
               Create Channel
             </button>
-          </div>
-          </div>
-        </Portal>
-      )}
+          </>
+        )
+        if (window.innerWidth < 768) return <BottomSheet open onClose={close}><div className="p-4">{body}</div></BottomSheet>
+        return (
+          <Portal>
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={close}>
+            <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-80 shadow-sp-3" onClick={(e) => e.stopPropagation()}>
+              {body}
+            </div>
+            </div>
+          </Portal>
+        )
+      })()}
 
       {/* Context menu */}
       {contextMenu && (
@@ -833,10 +870,10 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
         </Portal>
       )}
       {/* Delete confirmation modal */}
-      {confirmDelete && (
-        <Portal>
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setConfirmDelete(null)}>
-          <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-96 shadow-sp-3" onClick={e => e.stopPropagation()}>
+      {confirmDelete && (() => {
+        const close = () => setConfirmDelete(null)
+        const body = (
+          <>
             <h2 className="text-lg font-bold mb-2">
               Delete {confirmDelete.kind === 'channel' ? 'Channel' : 'Category'}
             </h2>
@@ -857,7 +894,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
             <div className="flex gap-2 justify-end">
               <button
                 className="px-4 py-2 rounded-full text-sm text-sp-muted hover:text-sp-text bg-sp-input hover:bg-sp-hover transition-colors"
-                onClick={() => setConfirmDelete(null)}
+                onClick={close}
               >
                 Cancel
               </button>
@@ -881,10 +918,19 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice }: Prop
                 Delete
               </button>
             </div>
-          </div>
-          </div>
-        </Portal>
-      )}
+          </>
+        )
+        if (window.innerWidth < 768) return <BottomSheet open onClose={close}><div className="p-4">{body}</div></BottomSheet>
+        return (
+          <Portal>
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={close}>
+            <div className="bg-sp-popup border border-sp-divider/50 rounded-sp-xl p-6 w-96 shadow-sp-3" onClick={e => e.stopPropagation()}>
+              {body}
+            </div>
+            </div>
+          </Portal>
+        )
+      })()}
 
     </div>
   )
@@ -905,9 +951,10 @@ interface RowProps {
   onLeaveVoice: () => void
   navigate: ReturnType<typeof useNavigate>
   onContextMenu?: (e: React.MouseEvent) => void
+  onCloseNav?: () => void
 }
 
-function ChannelRow({ channel, active, hasUnread = false, serverId, textChannelIcon, voiceChannelIcon, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu }: RowProps) {
+function ChannelRow({ channel, active, hasUnread = false, serverId, textChannelIcon, voiceChannelIcon, voiceSession, channelPresence, members, localUser, onJoinVoice, onLeaveVoice, navigate, onContextMenu, onCloseNav }: RowProps) {
   const isVoice = channel.type === 'voice'
   const inThisVoice = voiceSession?.channelId === channel.id
   const { channelLevel } = useNotificationSettings()
@@ -917,17 +964,10 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, textChannelI
   function handleClick() {
     setLastChannel(serverId, channel.id)
     if (isVoice) {
-      if (inThisVoice) {
-        // Already connected → just navigate to the voice grid
-        navigate(`/channels/${serverId}/${channel.id}`)
-      } else {
-        // Not connected → join and navigate to the voice grid
-        onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId })
-        navigate(`/channels/${serverId}/${channel.id}`)
-      }
-    } else {
-      navigate(`/channels/${serverId}/${channel.id}`)
+      onJoinVoice({ channelId: channel.id, channelName: channel.title, serverId })
     }
+    onCloseNav?.()
+    navigate(`/channels/${serverId}/${channel.id}`)
   }
 
   function handleUserClick(e: React.MouseEvent, userId: string) {

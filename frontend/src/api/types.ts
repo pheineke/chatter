@@ -19,6 +19,7 @@ export interface User {
   hide_status: boolean
   theme_preset?: string | null
   theme_colors?: string | null
+  backup_downloaded?: boolean
   created_at: string
 }
 

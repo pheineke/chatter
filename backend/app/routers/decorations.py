@@ -7,7 +7,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.config import settings
 from app.dependencies import CurrentUser, DB
+from app.utils.rate_limiter import image_limiter
 from models.decoration_code import DecorationCode
 
 router = APIRouter(prefix="/decorations", tags=["decorations"])
@@ -88,9 +90,16 @@ async def redeem_code(body: RedeemBody, current_user: CurrentUser, db: DB):
 async def generate_codes(body: GenerateBody, current_user: CurrentUser, db: DB):
     """Generate decoration codes. Limited to 50 per call.
 
-    NOTE: In production this should be admin-only. For now any authenticated
-    user can generate codes (useful during development).
+    Restricted to admin users (configurable via DECORATION_ADMIN_IDS env var).
+    Rate-limited to 1 generation batch per 10 seconds per user.
     """
+    if not settings.is_decoration_admin(current_user.id):
+        raise HTTPException(status_code=403, detail="Admin permission required")
+
+    allowed, _ = image_limiter.check(f"deco_gen:{current_user.id}")
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
+
     if body.count < 1 or body.count > 50:
         raise HTTPException(status_code=422, detail="Count must be between 1 and 50")
 

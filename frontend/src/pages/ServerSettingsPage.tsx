@@ -14,6 +14,7 @@ import { listInvites, revokeInvite } from '../api/invites'
 import { UserAvatar } from '../components/UserAvatar'
 import { Icon } from '../components/Icon'
 import { InviteModal } from '../components/InviteModal'
+import { BottomSheet } from '../components/BottomSheet'
 import { ServerAuditLog } from '../components/ServerAuditLog'
 import { useAuth } from '../contexts/AuthContext'
 import type { Member, Role } from '../api/types'
@@ -478,18 +479,27 @@ function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
       </div>
 
       {/* Kick confirm */}
-      {confirmKick && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-lg p-6 w-80" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
+      {confirmKick && (() => {
+        const close = () => setConfirmKick(null)
+        const body = (
+          <>
             <h3 className="font-bold text-lg mb-2">Kick {confirmKick.user.username}?</h3>
             <p className="text-sp-muted text-sm mb-4">They will be removed from the server but can rejoin via invite.</p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setConfirmKick(null)} className="px-4 py-2 rounded bg-sp-input text-sm font-semibold">Cancel</button>
+              <button onClick={close} className="px-4 py-2 rounded bg-sp-input text-sm font-semibold">Cancel</button>
               <button onClick={() => handleKick(confirmKick)} className="px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white text-sm font-semibold">Kick</button>
             </div>
+          </>
+        )
+        if (window.innerWidth < 768) return <BottomSheet open onClose={close}><div className="p-4">{body}</div></BottomSheet>
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-lg p-6 w-80" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
+              {body}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -680,9 +690,10 @@ function RolesTab({ serverId }: { serverId: string }) {
       </div>
 
       {/* Create role modal */}
-      {creating && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-lg p-6 w-72" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
+      {creating && (() => {
+        const close = () => setCreating(false)
+        const body = (
+          <>
             <h3 className="font-bold text-lg mb-3">Create Role</h3>
             <input
               className="input w-full mb-3"
@@ -693,12 +704,20 @@ function RolesTab({ serverId }: { serverId: string }) {
               autoFocus
             />
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setCreating(false)} className="px-4 py-2 rounded bg-sp-input text-sm font-semibold">Cancel</button>
+              <button onClick={close} className="px-4 py-2 rounded bg-sp-input text-sm font-semibold">Cancel</button>
               <button onClick={handleCreateRole} className="btn text-sm" disabled={!newName.trim()}>Create</button>
             </div>
+          </>
+        )
+        if (window.innerWidth < 768) return <BottomSheet open onClose={close}><div className="p-4">{body}</div></BottomSheet>
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-sp-popup border border-sp-divider/60 rounded-m3-lg p-6 w-72" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
+              {body}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

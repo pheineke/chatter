@@ -78,7 +78,7 @@ export default function AppShell() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-sp-bg text-sp-text overflow-hidden">
+    <div className="flex flex-col h-dvh bg-sp-bg text-sp-text overflow-hidden">
       <DesktopNotificationBanner />
       <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Global overlays */}
@@ -125,6 +125,7 @@ export default function AppShell() {
                           voiceSession={voiceSession}
                           onJoinVoice={setVoiceSession}
                           onLeaveVoice={handleLeaveVoice}
+                          onCloseNav={() => setShowLeftDrawer(false)}
                         />
                       }
                     />
