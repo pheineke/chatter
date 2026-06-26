@@ -47,33 +47,35 @@ export function SettingsLayout({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 w-full bg-sp-bg">
-      {/* Tab bar */}
-      <div className="shrink-0 flex items-center gap-1 px-4 py-2 border-b border-sp-divider/20 overflow-x-auto bg-sp-bg">
+      {/* Tab bar — close button fixed, tabs scroll */}
+      <div className="shrink-0 flex items-center gap-1 px-4 py-2 border-b border-sp-divider/20 bg-sp-bg">
         <button onClick={onClose}
           className="p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0"
           aria-label="Close settings"
         >
           <Icon name="close" size={20} />
         </button>
-        {flat.map(tab => {
-          const isActive = activeTab === tab.id
-          return (
-            <button key={tab.id} onClick={() => onTabChange(tab.id)}
-              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors whitespace-nowrap
-                ${isActive
-                  ? 'bg-sp-input text-sp-text'
-                  : tab.danger
-                    ? 'text-red-400 hover:bg-red-500/10'
-                    : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
-            >
-              <Icon name={tab.icon} size={16} />
-              {tab.label}
-            </button>
-          )
-        })}
+        <div className="flex-1 overflow-x-auto flex items-center gap-1">
+          {flat.map(tab => {
+            const isActive = activeTab === tab.id
+            return (
+              <button key={tab.id} onClick={() => onTabChange(tab.id)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors whitespace-nowrap
+                  ${isActive
+                    ? 'bg-sp-input text-sp-text'
+                    : tab.danger
+                      ? 'text-red-400 hover:bg-red-500/10'
+                      : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
+              >
+                <Icon name={tab.icon} size={16} />
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Content */}
+      {/* Content — scrolls independently */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-4xl mx-auto p-4 md:p-8 min-h-full flex flex-col">
           {children}
