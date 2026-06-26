@@ -15,9 +15,11 @@ import type { ContextMenuItem } from './ContextMenu'
 import type { DMConversation } from '../api/types'
 import { cacheConversations, getCachedConversations } from '../db/dmCache'
 
-interface DMSidebarProps {}
+interface DMSidebarProps {
+  onCloseNav?: () => void
+}
 
-export function DMSidebar() {
+export function DMSidebar({ onCloseNav }: DMSidebarProps) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { user, refreshUser } = useAuth()
@@ -96,7 +98,7 @@ export function DMSidebar() {
     <div className="flex flex-col h-full">
       <div className="px-2 pt-2">
         <button
-          onClick={() => navigate('/channels/@me')}
+          onClick={() => { navigate('/channels/@me'); onCloseNav?.() }}
           className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors mb-2
             ${isFriendsActive
               ? 'bg-sp-surface-variant text-sp-text'
@@ -186,7 +188,7 @@ export function DMSidebar() {
           return (
             <button
               key={conv.channel_id}
-              onClick={() => navigate(`/channels/@me/${conv.other_user.id}`)}
+              onClick={() => { navigate(`/channels/@me/${conv.other_user.id}`); onCloseNav?.() }}
               onContextMenu={openConvContextMenu}
               data-avatar-ring
               style={{ '--avatar-ring': isActive ? 'transparent' : 'transparent', '--avatar-ring-hover': 'transparent' } as React.CSSProperties}

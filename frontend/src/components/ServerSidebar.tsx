@@ -50,10 +50,10 @@ function DMTab({ active, unreadCount = 0, onClick, onContextMenu }: { active: bo
               ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
                 ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
-                : 'bg-sp-user/90 text-sp-muted rounded-l-lg'}`}
-        >
-          <Icon name="message-circle" size={24} />
-        </button>
+                : 'bg-sp-user text-sp-muted rounded-l-lg'}`}
+          >
+            <Icon name="message-circle" size={24} />
+          </button>
       </div>
       {/* Unread badge removed as requested — individual DMs now show as separate tabs */}
     </div>
@@ -107,7 +107,7 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
               ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
                 ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
-                : 'bg-sp-user/90 text-sp-on-surface rounded-l-lg'}`}
+                : 'bg-sp-user text-sp-muted rounded-l-lg'}`}
         >
           {server.image ? (
             <>
@@ -175,7 +175,7 @@ function UnreadDMItem({ conversation, onContextMenu }: { conversation: DMConvers
           className={`absolute inset-0 w-full h-full flex items-center justify-center select-none font-bold text-sm
             ${hovered
                 ? 'bg-sp-primary/15 text-sp-primary'
-                : 'bg-sp-user/90 text-sp-on-surface'}`}
+                : 'bg-sp-user text-sp-muted'}`}
         >
           {user.avatar ? (
              <img
@@ -201,9 +201,10 @@ function UnreadDMItem({ conversation, onContextMenu }: { conversation: DMConvers
 interface ServerSidebarProps {
   unreadDMsCount?: number
   activeServerId: string | null
+  onCloseNav?: () => void
 }
 
-export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSidebarProps) {
+export function ServerSidebar({ unreadDMsCount = 0, activeServerId, onCloseNav }: ServerSidebarProps) {
   const { user } = useAuth()
   const { serverId } = useParams<{ serverId: string }>()
   const effectiveServerId = activeServerId ?? serverId
@@ -215,6 +216,7 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSide
   const [showJoin, setShowJoin] = useState(false)
   const [name, setName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [addHovered, setAddHovered] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; serverId: string } | null>(null)
   const [inviteModalServerId, setInviteModalServerId] = useState<string | null>(null)
   const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null)
@@ -312,7 +314,7 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSide
       <DMTab
         active={isDMActive}
         unreadCount={unreadDMsCount}
-        onClick={() => navigate('/channels/@me')}
+        onClick={() => { navigate('/channels/@me'); onCloseNav?.() }}
         onContextMenu={(e) => { e.preventDefault(); setDmContextMenu({ x: e.clientX, y: e.clientY }) }}
       />
 
@@ -348,13 +350,22 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId }: ServerSide
       <div className="w-8 h-px bg-sp-divider/60" />
 
       {/* Add / Join server */}
-      <button
-        title="Create or Join Server"
-        onClick={() => setShowCreate(true)}
-        className="w-12 h-12 rounded-full bg-sp-input hover:bg-sp-hover transition-all shadow-sp-1 hover:shadow-sp-2 hover:scale-105 flex items-center justify-center text-sp-mention"
-      >
-        <Icon name="plus" size={24} />
-      </button>
+      <div className="relative w-full py-0.5">
+        <div className="h-12 overflow-hidden relative" style={{ width: '52px', marginLeft: 'auto', borderRadius: '8px 0px 0px 8px' }}>
+          <button
+            title="Create or Join Server"
+            onClick={() => setShowCreate(true)}
+            onMouseEnter={() => setAddHovered(true)}
+            onMouseLeave={() => setAddHovered(false)}
+            className={`absolute inset-0 w-full h-full flex items-center justify-center select-none transition-colors
+              ${addHovered
+                ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
+                : 'bg-sp-user text-sp-muted rounded-l-lg'}`}
+          >
+            <Icon name="plus" size={24} />
+          </button>
+        </div>
+      </div>
 
       {/* Context Menu */}
       {contextMenu && (

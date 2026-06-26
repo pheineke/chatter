@@ -80,6 +80,11 @@ ehthumbs.db
 *.sw?
 *.swp
 
+# ── Debug / session artifacts ──────────────────────────────────────────────
+/*.txt
+/*.png
+.playwright-mcp/
+
 # ── Uploaded media (keep folder structure, ignore contents) ──────────────────
 backend/static/*
 !backend/static/.gitkeep
