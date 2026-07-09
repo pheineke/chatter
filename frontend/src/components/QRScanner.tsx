@@ -1,20 +1,3 @@
-/**
- * QRScanner
- *
- * Scans a QR code and approves the QR login session for the new device.
- *
- * Flow (TRUSTED / phone side):
- *  1. Request camera permission and start the video stream.
- *  2. Decode QR frames using jsQR.
- *  3. Parse the payload { type, session_id, device_ephemeral_pk }.
- *  4. Import the new device's ephemeral public key.
- *  5. Load own E2EE private key from context.
- *  6. Encrypt own E2EE private key with:
- *       AES-GCM( ECDH( my_private, device_ephemeral_pub ) )
- *  7. POST /auth/qr/{id}/approve with the encrypted key + own public key.
- *  8. Show success / error.
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import jsQR from 'jsqr'
 import {
@@ -50,8 +33,6 @@ export function QRScanner({ onClose }: Props) {
   const [scannedPayload, setScannedPayload] = useState<QRPayload | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // ── Camera setup ────────────────────────────────────────────────────────
-
   useEffect(() => {
     let cancelled = false
 
@@ -81,8 +62,6 @@ export function QRScanner({ onClose }: Props) {
     }
   }, [])
 
-  // ── Frame scanning ──────────────────────────────────────────────────────
-
   const tick = useCallback(() => {
     const video = videoRef.current
     const canvas = canvasRef.current
@@ -109,7 +88,6 @@ export function QRScanner({ onClose }: Props) {
           return
         }
       } catch {
-        // not a valid payload — keep scanning
       }
     }
 
@@ -131,8 +109,6 @@ export function QRScanner({ onClose }: Props) {
       cancelAnimationFrame(rafRef.current)
     }
   }, [phase, tick])
-
-  // ── Approve ────────────────────────────────────────────────────────────
 
   const handleApprove = useCallback(async () => {
     if (!scannedPayload || !user) return
@@ -168,67 +144,59 @@ export function QRScanner({ onClose }: Props) {
     }
   }, [scannedPayload, user])
 
-  // ── Render ─────────────────────────────────────────────────────────────
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="relative w-full max-w-md rounded-2xl bg-sp-sidebar p-6 shadow-2xl">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 text-sp-muted hover:text-white"
-        >
-          <Icon name="x" size={20} />
+    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 shrink-0 bg-black/80 z-10">
+        <button onClick={onClose} className="text-white/70 hover:text-white">
+          <Icon name="arrow-back" size={24} />
         </button>
+        <span className="text-white font-semibold text-base">Scan QR Code</span>
+      </div>
 
-        <h2 className="mb-4 text-center text-xl font-bold text-white">Scan QR Code</h2>
-
+      {/* Camera / content fills remaining */}
+      <div className="flex-1 relative flex items-center justify-center">
         {phase === 'scanning' && (
-          <div className="space-y-4">
-            <div className="relative overflow-hidden rounded-xl bg-black aspect-[4/3]">
-              <video
-                ref={videoRef}
-                playsInline
-                muted
-                autoPlay
-                className="h-full w-full object-cover"
-              />
-              {/* Viewfinder overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="h-48 w-48 rounded-lg border-2 border-sp-mention/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]" />
-              </div>
+          <>
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="h-48 w-48 rounded-lg border-2 border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]" />
             </div>
             <canvas ref={canvasRef} className="hidden" />
-            <p className="text-center text-sm text-sp-muted">
+            <p className="absolute bottom-8 text-sm text-white/60 text-center px-4">
               Point at the QR code shown on the new device
             </p>
-          </div>
+          </>
         )}
 
         {phase === 'confirming' && scannedPayload && (
-          <div className="space-y-5 text-center">
-            <div className="flex items-center justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sp-mention/20">
-                <Icon name="monitor" size={32} className="text-sp-mention" />
-              </div>
+          <div className="flex flex-col items-center gap-6 px-6 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sp-mention/20">
+              <Icon name="monitor" size={32} className="text-sp-mention" />
             </div>
             <div>
-              <p className="font-semibold text-white">New device wants to log in</p>
-              <p className="mt-1 text-sm text-sp-muted">
+              <p className="font-semibold text-white text-lg">New device wants to log in</p>
+              <p className="mt-2 text-sm text-white/60 max-w-xs">
                 This will transfer your E2EE key to the new device.
                 Only approve if you initiated this login.
               </p>
             </div>
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-4">
               <button
                 onClick={() => { setPhase('scanning'); setScannedPayload(null) }}
-                className="rounded px-4 py-2 text-sm text-sp-muted hover:bg-sp-input transition"
+                className="px-6 py-2 rounded text-sm text-white/70 border border-white/20 hover:bg-white/10 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApprove}
-                className="rounded-m3-sm bg-sp-mention px-6 py-2 text-sm font-semibold text-white hover:bg-sp-mention/85 transition"
+                className="px-6 py-2 rounded bg-sp-mention text-sm font-semibold text-white hover:bg-sp-mention/85 transition"
               >
                 Approve
               </button>
@@ -237,22 +205,22 @@ export function QRScanner({ onClose }: Props) {
         )}
 
         {phase === 'approving' && (
-          <div className="flex flex-col items-center gap-4 py-6">
+          <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-sp-mention border-t-transparent" />
-            <p className="text-sp-muted text-sm">Transferring keys…</p>
+            <p className="text-white/60 text-sm">Transferring keys…</p>
           </div>
         )}
 
         {phase === 'done' && (
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <Icon name="check-circle" size={40} className="text-sp-online" />
-            <p className="text-white font-semibold">New device approved!</p>
-            <p className="text-sm text-sp-muted">
+          <div className="flex flex-col items-center gap-4 px-6 text-center">
+            <Icon name="check-circle" size={48} className="text-sp-online" />
+            <p className="text-white font-semibold text-lg">New device approved!</p>
+            <p className="text-sm text-white/60">
               The new device can now use Chatter and has your E2EE key.
             </p>
             <button
               onClick={onClose}
-              className="rounded-m3-sm bg-sp-mention px-6 py-2 text-sm font-semibold text-white hover:bg-sp-mention/85 transition"
+              className="mt-2 px-6 py-2 rounded bg-sp-mention text-sm font-semibold text-white hover:bg-sp-mention/85 transition"
             >
               Done
             </button>
@@ -260,8 +228,8 @@ export function QRScanner({ onClose }: Props) {
         )}
 
         {(phase === 'error' || phase === 'no-camera' || phase === 'no-key') && (
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <Icon name="alert-circle" size={40} className="text-red-400" />
+          <div className="flex flex-col items-center gap-4 px-6 text-center">
+            <Icon name="alert-circle" size={48} className="text-red-400" />
             <p className="text-red-400 text-sm max-w-xs">
               {phase === 'no-camera'
                 ? 'Camera access was denied. Please allow camera access and try again.'
@@ -269,7 +237,7 @@ export function QRScanner({ onClose }: Props) {
             </p>
             <button
               onClick={onClose}
-              className="rounded bg-sp-input px-6 py-2 text-sm font-semibold text-sp-muted hover:text-white transition"
+              className="mt-2 px-6 py-2 rounded bg-white/10 text-sm text-white/60 hover:text-white transition"
             >
               Close
             </button>

@@ -19,10 +19,10 @@ import { QRScanner } from '../components/QRScanner'
 import { clearDMCache } from '../db/dmCache'
 import { SettingsLayout, type SettingsGroup } from '../components/SettingsLayout'
 
-type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'notifications' | 'tokens'
+type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'tokens' | 'notifications'
 
 function isTab(value: string | null): value is Tab {
-  return value === 'account' || value === 'appearance' || value === 'voice' || value === 'privacy' || value === 'notifications' || value === 'tokens'
+  return value === 'account' || value === 'appearance' || value === 'voice' || value === 'privacy' || value === 'tokens' || value === 'notifications'
 }
 
 // ─── Sidebar nav ─────────────────────────────────────────────────────────────
@@ -33,6 +33,12 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
     label: 'User Settings',
     items: [
       { id: 'account', label: 'My Account', icon: 'person' },
+    ],
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    items: [
       { id: 'privacy', label: 'Privacy & Safety', icon: 'lock' },
       { id: 'tokens', label: 'API Tokens', icon: 'keypad' },
     ],
@@ -66,32 +72,32 @@ export function SettingsPage() {
     <SettingsLayout
       groups={SETTINGS_GROUPS}
       activeTab={tab}
-      onTabChange={(tabId) => {
-        if (isTab(tabId)) setTab(tabId)
-      }}
-      onClose={() => navigate(-1)}
-      sidebarFooter={(
-        <button
-          className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
-          onClick={() => {
-            if (confirm('Are you sure you want to log out?')) {
-              logout()
-              navigate('/login')
-            }
-          }}
-        >
-          <Icon name="log-out" size={16} className="shrink-0" />
-          Log Out
-        </button>
-      )}
-    >
-      {tab === 'account' && <AccountTab />}
-      {tab === 'privacy' && <PrivacyTab />}
-      {tab === 'tokens' && <TokensTab />}
-      {tab === 'appearance' && <AppearanceTab />}
-      {tab === 'voice' && <VoiceTab />}
-      {tab === 'notifications' && <NotificationsTab />}
-    </SettingsLayout>
+        onTabChange={(tabId) => {
+          if (isTab(tabId)) setTab(tabId)
+        }}
+        onClose={() => navigate(-1)}
+        sidebarFooter={(
+          <button
+            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+            onClick={() => {
+              if (confirm('Are you sure you want to log out?')) {
+                logout()
+                navigate('/login')
+              }
+            }}
+          >
+            <Icon name="log-out" size={16} className="shrink-0" />
+            Log Out
+          </button>
+        )}
+      >
+        {tab === 'account' && <AccountTab />}
+        {tab === 'privacy' && <PrivacyTab />}
+        {tab === 'tokens' && <TokensTab />}
+        {tab === 'appearance' && <AppearanceTab />}
+        {tab === 'voice' && <VoiceTab />}
+        {tab === 'notifications' && <NotificationsTab />}
+      </SettingsLayout>
   )
 }
 
@@ -697,7 +703,7 @@ function AppearanceTab() {
                   <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-opacity">
                     <div className="bg-white text-sp-mention rounded-full p-1 shadow-lg transform scale-125">
                       <Icon name="check" size={24} className="stroke-[3]" />
-                    </div>
+    </div>
                   </div>
                 )}
               </div>
@@ -991,12 +997,13 @@ const DM_PERM_OPTIONS: { value: DMPermission; label: string; desc: string }[] = 
   { value: 'server_members_only', label: 'Server members only', desc: 'Only people sharing a server can send you direct messages' },
 ]
 
+// ─── Security tab ─────────────────────────────────────────────────────────────
+
 function PrivacyTab() {
   const { user, refreshUser } = useAuth()
   const qc = useQueryClient()
   const { blockedUsers, unblock } = useBlocks()
   const e2ee = useE2EE()
-  const [showQRScanner, setShowQRScanner] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [rotateConfirm, setRotateConfirm] = useState(false)
   const [rotateLoading, setRotateLoading] = useState(false)
@@ -1161,15 +1168,6 @@ function PrivacyTab() {
                 }}
               />
 
-              {/* Scan QR (trust transfer) */}
-              <button
-                onClick={() => setShowQRScanner(true)}
-                className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-sp-muted/20 transition-colors text-sm"
-              >
-                <Icon name="qr-code" size={16} />
-                Approve QR login
-              </button>
-
               {/* Rotate key */}
               {!rotateConfirm ? (
                 <button
@@ -1226,8 +1224,7 @@ function PrivacyTab() {
         {cacheCleared && <p className="text-xs text-green-400 mt-2">Cache cleared.</p>}
       </div>
 
-      {/* QR Scanner modal */}
-      {showQRScanner && <QRScanner onClose={() => setShowQRScanner(false)} />}
+      
     </div>
   )
 }
@@ -1527,9 +1524,5 @@ function TokensTab() {
     </div>
   )
 }
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-// Old SettingsPage implementation removed
 
 // End of file
