@@ -766,7 +766,7 @@ export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
   return (
     <div className="flex flex-col h-full bg-sp-bg select-none">
       {/* Header */}
-      <div className="h-12 flex items-center gap-2 px-4 border-b border-black/20 shrink-0">
+      <div className="h-12 flex items-center gap-2 md:px-4 px-5 border-b border-black/20 shrink-0">
         {onOpenNav && (
           <button
             className="md:hidden p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5"
@@ -776,9 +776,9 @@ export function VoiceGridPane({ session, onLeave, onOpenNav }: Props) {
             <Icon name="menu" size={22} />
           </button>
         )}
-        <Icon name="headphones" size={16} className="text-sp-online shrink-0" />
-        <span className="font-semibold truncate">{session.channelName}</span>
-        <span className="text-sp-muted text-xs ml-1 shrink-0">
+        <Icon name="headphones" size={18} className="text-sp-online shrink-0" />
+        <span className="font-semibold truncate md:text-sm text-[15px]">{session.channelName}</span>
+        <span className="text-sp-muted md:text-xs text-[13px] ml-1 shrink-0">
           {participantCount} participant{participantCount !== 1 ? 's' : ''}
         </span>
         {theaterTile && (

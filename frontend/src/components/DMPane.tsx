@@ -144,7 +144,7 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-black/20 shadow-sm shrink-0">
+      <div className="flex items-center gap-3 md:px-4 px-5 md:py-3 py-3.5 border-b border-black/20 shadow-sm shrink-0">
         {onOpenNav && (
           <button
             className="md:hidden p-1 -ml-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5"
@@ -162,10 +162,10 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
           }}
           aria-label={otherUser ? `Open ${otherUser.username} profile` : 'Open profile'}
         >
-          <AvatarWithStatus user={otherUser ?? null} size={32} ringColor="#1a1a1e" />
+          <AvatarWithStatus user={otherUser ?? null} size={36} ringColor="#1a1a1e" />
         </button>
         <button
-          className="font-bold hover:underline"
+          className="font-bold md:text-sm text-[15px] hover:underline"
           onClick={(e) => {
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
             setProfilePos({ x: rect.right + 12, y: rect.top })
@@ -176,10 +176,10 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
         </button>
         {partnerFingerprint && (
           <span
-            className="ml-1 flex items-center gap-1 text-xs text-green-400 font-mono bg-green-400/10 px-2 py-0.5 rounded cursor-help shrink-0"
+            className="ml-1 flex items-center gap-1 md:text-xs text-[13px] text-green-400 font-mono bg-green-400/10 md:px-2 md:py-0.5 px-2.5 py-1 rounded cursor-help shrink-0"
             title={`E2EE fingerprint: ${partnerFingerprint}`}
           >
-            <Icon name="lock-closed" size={11} />
+            <Icon name="lock-closed" size={13} />
             {partnerFingerprint.split(' ').slice(0, 4).join(' ')}…
           </span>
         )}
@@ -193,26 +193,26 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
       ) : isOffline ? (
         /* ── Offline view: cached messages + queued outbox ── */
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-center gap-2 bg-orange-500/10 border-b border-orange-500/20 px-4 py-2 text-xs text-orange-300 shrink-0">
+          <div className="flex items-center gap-2 bg-orange-500/10 border-b border-orange-500/20 md:px-4 px-5 md:py-2 py-2.5 md:text-xs text-[13px] text-orange-300 shrink-0">
             <Icon name="cloud-offline" size={13} className="shrink-0" />
             You're offline — showing {cachedMsgs.length} cached message{cachedMsgs.length !== 1 ? 's' : ''}
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
+          <div className="flex-1 overflow-y-auto md:px-4 px-5 md:py-3 py-4 space-y-0.5">
             {cachedMsgs.length === 0 ? (
-              <p className="text-center text-sp-muted text-sm mt-8">No cached messages for this conversation.</p>
+              <p className="text-center text-sp-muted md:text-sm text-[15px] mt-8">No cached messages for this conversation.</p>
             ) : (
               cachedMsgs.map((msg) => (
-                <div key={msg.id} className="text-sm py-0.5">
+                <div key={msg.id} className="md:text-sm text-[15px] py-0.5">
                   <span className="font-semibold text-sp-text mr-2">{msg.author.username}</span>
-                  <span className="text-sp-muted text-xs mr-2">
+                  <span className="text-sp-muted md:text-xs text-[13px] mr-2">
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span>{msg.content}</span>
                 </div>
               ))
             )}
-            {outboxMsgs.map((item) => (
-              <div key={item.localId} className="text-sm py-0.5 opacity-50 flex items-center gap-2">
+              {outboxMsgs.map((item) => (
+              <div key={item.localId} className="md:text-sm text-[15px] py-0.5 opacity-50 flex items-center gap-2">
                 <span className="font-semibold text-sp-text mr-2">{user?.username}</span>
                 <span className="italic">{item.content}</span>
                 <span className="text-xs text-orange-400 ml-auto shrink-0">queued</span>
@@ -240,11 +240,11 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
 
           {/* Typing indicator */}
           {typingUsers.length > 0 && (
-            <div className="px-4 py-1 text-xs text-sp-muted flex items-center gap-1 select-none shrink-0">
+            <div className="md:px-4 px-5 md:py-1 py-1.5 md:text-xs text-[13px] text-sp-muted flex items-center gap-1 select-none shrink-0">
               <span className="flex gap-0.5 items-center">
-                <span className="w-1 h-1 bg-sp-muted rounded-full animate-bounce [animation-delay:0ms]" />
-                <span className="w-1 h-1 bg-sp-muted rounded-full animate-bounce [animation-delay:150ms]" />
-                <span className="w-1 h-1 bg-sp-muted rounded-full animate-bounce [animation-delay:300ms]" />
+                <span className="md:w-1 md:h-1 w-1.5 h-1.5 bg-sp-muted rounded-full animate-bounce [animation-delay:0ms]" />
+                <span className="md:w-1 md:h-1 w-1.5 h-1.5 bg-sp-muted rounded-full animate-bounce [animation-delay:150ms]" />
+                <span className="md:w-1 md:h-1 w-1.5 h-1.5 bg-sp-muted rounded-full animate-bounce [animation-delay:300ms]" />
               </span>
               <span>
                 {typingUsers.length === 1

@@ -42,31 +42,31 @@ export function KeyboardShortcutsDialog({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-sp-divider/50">
-          <h2 className="font-bold text-lg flex items-center gap-2">
-            <Icon name="command" size={18} className="text-sp-muted" />
+          <div className="flex items-center justify-between md:px-6 px-5 md:py-4 py-4 border-b border-sp-divider/50">
+          <h2 className="font-bold md:text-lg text-xl flex items-center gap-2">
+            <Icon name="command" size={20} className="text-sp-muted" />
             Keyboard Shortcuts
           </h2>
           <button onClick={onClose} className="text-sp-muted hover:text-sp-text transition-colors">
-            <Icon name="x" size={18} />
+            <Icon name="x" size={20} />
           </button>
         </div>
 
         {/* Shortcuts list */}
-        <div className="px-6 py-4 space-y-5 max-h-[60vh] overflow-y-auto">
+        <div className="md:px-6 px-5 md:py-4 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
           {SHORTCUTS.map((group) => (
             <div key={group.category}>
-              <div className="text-xs font-bold uppercase text-sp-muted tracking-wider mb-2">
+              <div className="md:text-xs text-[13px] font-bold uppercase text-sp-muted tracking-wider mb-2">
                 {group.category}
               </div>
               <div className="space-y-1.5">
                 {group.items.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between">
-                    <span className="text-sm text-sp-muted">{item.description}</span>
+                    <span className="md:text-sm text-[15px] text-sp-muted">{item.description}</span>
                     <div className="flex items-center gap-1">
                       {item.keys.map((key, ki) => (
                         <span key={ki} className="flex items-center gap-1">
-                          <kbd className="bg-sp-input text-sp-text text-xs px-2 py-0.5 rounded-sp-xs border border-sp-divider/60">
+                          <kbd className="bg-sp-input text-sp-text md:text-xs text-[13px] md:px-2 px-2.5 md:py-0.5 py-1 rounded-sp-xs border border-sp-divider/60">
                             {key}
                           </kbd>
                           {ki < item.keys.length - 1 && (

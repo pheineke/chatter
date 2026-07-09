@@ -49,9 +49,9 @@ export default function AppShell() {
   const serverOnlyMatch = useMatch('/channels/:serverId')
   const dmMatch = useMatch('/channels/@me/:dmId')
 
-  // Auto-close the mobile left-panel drawer when navigating to a channel, DM, or friends
+  // Auto-close the mobile left-panel drawer when navigating into a specific channel or DM
   useEffect(() => { 
-    if (channelMatch || dmMatch || location.pathname === '/channels/@me') setShowLeftDrawer(false)
+    if (channelMatch || dmMatch) setShowLeftDrawer(false)
   }, [location.pathname])
   const currentServerId = channelMatch?.params.serverId ?? serverOnlyMatch?.params.serverId
   

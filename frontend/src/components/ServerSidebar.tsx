@@ -17,20 +17,20 @@ function DMTab({ active, unreadCount = 0, onClick, onContextMenu }: { active: bo
   const [hovered, setHovered] = useState(false)
   const [pressing, setPressing] = useState(false)
 
-  const containerWidth = active ? '72px' : '52px'
+  const containerWidth = active ? '80px' : '56px'
 
   return (
     <div
-      className="relative w-full py-0.5"
+      className="relative w-full py-1"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setPressing(false) }}
     >
       <div
-        className="h-12 overflow-hidden relative"
+        className="h-14 overflow-hidden relative"
         style={{
           width: containerWidth,
           marginLeft: 'auto',
-          borderRadius: active ? '12px 0px 0px 12px' : '8px 0px 0px 8px',
+          borderRadius: active ? '16px 0px 0px 16px' : '12px 0px 0px 12px',
           transition: 'width 120ms ease-out, border-radius 120ms ease-out',
         }}
       >
@@ -47,12 +47,12 @@ function DMTab({ active, unreadCount = 0, onClick, onContextMenu }: { active: bo
           }}
           className={`absolute inset-0 w-full h-full flex items-center justify-center select-none
             ${active
-              ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
+              ? 'bg-sp-bg border-[3px] border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
                 ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
                 : 'bg-sp-user text-sp-muted rounded-l-lg'}`}
           >
-            <Icon name="message-circle" size={24} />
+            <Icon name="message-circle" size={28} />
           </button>
       </div>
       {/* Unread badge removed as requested — individual DMs now show as separate tabs */}
@@ -66,7 +66,7 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
   const [pressing, setPressing] = useState(false)
 
   // Bookmark tab anchored to right wall: grows leftward on active
-  const containerWidth = active ? '72px' : '52px'
+  const containerWidth = active ? '80px' : '56px'
 
   const initials = server.title
     .split(/\s+/)
@@ -77,17 +77,17 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
 
   return (
     <div
-      className="relative w-full py-0.5"
+      className="relative w-full py-1"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setPressing(false) }}
     >
       {/* Tab container — right-aligned, grows left */}
       <div
-        className="h-12 overflow-hidden relative"
+        className="h-14 overflow-hidden relative"
         style={{
           width: containerWidth,
           marginLeft: 'auto',
-          borderRadius: active ? '12px 0px 0px 12px' : '8px 0px 0px 8px',
+          borderRadius: active ? '16px 0px 0px 16px' : '12px 0px 0px 12px',
           transition: 'width 120ms ease-out, border-radius 120ms ease-out',
         }}
       >
@@ -102,9 +102,9 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
             transformOrigin: 'right center',
             transition: 'color 150ms ease-out, background-color 150ms ease-out, transform 80ms ease-out',
           }}
-          className={`absolute inset-0 w-full h-full flex items-center justify-center text-sm font-bold select-none relative overflow-hidden
+          className={`absolute inset-0 w-full h-full flex items-center justify-center md:text-sm text-base font-bold select-none relative overflow-hidden
             ${active
-              ? 'bg-sp-bg border-2 border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
+              ? 'bg-sp-bg border-[3px] border-r-0 border-sp-primary text-sp-primary rounded-l-xl'
               : hovered
                 ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
                 : 'bg-sp-user text-sp-muted rounded-l-lg'}`}
@@ -125,11 +125,11 @@ function ServerIcon({ server, active, hasUnread, isMuted, onContextMenu }: { ser
       </div>
 
       {hasUnread && !active && (
-        <span className="absolute bottom-1 right-0.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-sp-servers pointer-events-none" />
+        <span className="absolute bottom-1.5 right-1 w-3 h-3 rounded-full bg-white border-[3px] border-sp-servers pointer-events-none" />
       )}
       {isMuted && (
-        <span className="absolute top-1 right-0.5 w-4 h-4 rounded-full bg-sp-bg flex items-center justify-center pointer-events-none">
-          <Icon name="bell-off" size={10} className="text-sp-muted" />
+        <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-sp-bg flex items-center justify-center pointer-events-none">
+          <Icon name="bell-off" size={12} className="text-sp-muted" />
         </span>
       )}
     </div>
@@ -148,16 +148,16 @@ function UnreadDMItem({ conversation, onContextMenu }: { conversation: DMConvers
 
   return (
     <div
-      className="relative w-full py-0.5"
+      className="relative w-full py-1"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); setPressing(false) }}
     >
       <div
-        className="h-12 overflow-hidden relative"
+        className="h-14 overflow-hidden relative"
         style={{
-          width: '52px',
+          width: '56px',
           marginLeft: 'auto',
-          borderRadius: '8px 0px 0px 8px',
+          borderRadius: '12px 0px 0px 12px',
           transition: 'width 120ms ease-out, border-radius 120ms ease-out',
         }}
       >
@@ -172,7 +172,7 @@ function UnreadDMItem({ conversation, onContextMenu }: { conversation: DMConvers
             transformOrigin: 'right center',
             transition: 'color 150ms ease-out, background-color 150ms ease-out, transform 80ms ease-out',
           }}
-          className={`absolute inset-0 w-full h-full flex items-center justify-center select-none font-bold text-sm
+          className={`absolute inset-0 w-full h-full flex items-center justify-center select-none font-bold md:text-sm text-base
             ${hovered
                 ? 'bg-sp-primary/15 text-sp-primary'
                 : 'bg-sp-user text-sp-muted'}`}
@@ -190,7 +190,7 @@ function UnreadDMItem({ conversation, onContextMenu }: { conversation: DMConvers
         </button>
       </div>
       {count > 0 && (
-        <span className="absolute bottom-0 right-0 transform translate-x-1/4 translate-y-1/4 z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 rounded-full bg-red-500 border-2 border-sp-bg text-[10px] font-bold text-white shadow-sm pointer-events-none">
+        <span className="absolute bottom-0 right-0 transform translate-x-1/4 translate-y-1/4 z-10 flex items-center justify-center min-w-[24px] h-[24px] px-1.5 rounded-full bg-red-500 border-[3px] border-sp-bg text-xs font-bold text-white shadow-sm pointer-events-none">
           {count > 99 ? '99+' : count}
         </span>
       )}
@@ -309,12 +309,12 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId, onCloseNav }
   })
 
   return (
-    <div className="flex flex-col items-center gap-2 py-3 w-[72px] overflow-y-auto scrollbar-none">
+    <div className="flex flex-col items-center gap-2 py-3 w-[80px] overflow-y-auto scrollbar-none">
       {/* DMs — bookmark tab style */}
       <DMTab
         active={isDMActive}
         unreadCount={unreadDMsCount}
-        onClick={() => { navigate('/channels/@me'); onCloseNav?.() }}
+        onClick={() => navigate('/channels/@me')}
         onContextMenu={(e) => { e.preventDefault(); setDmContextMenu({ x: e.clientX, y: e.clientY }) }}
       />
 
@@ -331,7 +331,7 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId, onCloseNav }
         />
       ))}
 
-      <div className="w-8 h-px bg-sp-divider/60" />
+      <div className="w-10 h-px bg-sp-divider/60" />
 
       {servers.map((s) => (
         <ServerIcon
@@ -347,11 +347,11 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId, onCloseNav }
         />
       ))}
 
-      <div className="w-8 h-px bg-sp-divider/60" />
+      <div className="w-10 h-px bg-sp-divider/60" />
 
       {/* Add / Join server */}
-      <div className="relative w-full py-0.5">
-        <div className="h-12 overflow-hidden relative" style={{ width: '52px', marginLeft: 'auto', borderRadius: '8px 0px 0px 8px' }}>
+      <div className="relative w-full py-1">
+        <div className="h-14 overflow-hidden relative" style={{ width: '56px', marginLeft: 'auto', borderRadius: '12px 0px 0px 12px' }}>
           <button
             title="Create or Join Server"
             onClick={() => setShowCreate(true)}
@@ -362,7 +362,7 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId, onCloseNav }
                 ? 'bg-sp-primary/15 text-sp-primary rounded-l-lg'
                 : 'bg-sp-user text-sp-muted rounded-l-lg'}`}
           >
-            <Icon name="plus" size={24} />
+            <Icon name="plus" size={28} />
           </button>
         </div>
       </div>

@@ -61,14 +61,15 @@ export function SettingsLayout({
         <button
           key={tab.id}
           onClick={() => (rowClick || onTabChange)(tab.id)}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left
+          className={`w-full flex items-center gap-3 md:gap-2.5 px-4 md:px-3 py-3 md:py-2 rounded-lg md:text-sm text-[15px] font-medium transition-colors text-left
             ${isActive
               ? 'bg-sp-input text-sp-text'
               : tab.danger
                 ? 'text-red-400 hover:bg-red-500/10'
                 : 'text-sp-muted hover:bg-sp-input/50 hover:text-sp-text'}`}
         >
-          <Icon name={tab.icon} size={16} className="shrink-0" />
+          <Icon name={tab.icon} size={20} className="md:hidden shrink-0" />
+          <Icon name={tab.icon} size={16} className="hidden md:block shrink-0" />
           <span className="truncate">{tab.label}</span>
         </button>
       )
@@ -79,7 +80,7 @@ export function SettingsLayout({
     return all.map(group => (
       <div key={group.id} className="px-3 py-4">
         {group.label && (
-          <div className="text-xs font-bold text-sp-muted uppercase tracking-wider px-3 mb-2">{group.label}</div>
+          <div className="md:text-xs text-[13px] font-bold text-sp-muted uppercase tracking-wider px-3 mb-2">{group.label}</div>
         )}
         {group.items.length > 0 && renderGroupItems(group.items, mobile ? (id) => { onTabChange(id); setShowList(false) } : undefined)}
       </div>
@@ -140,7 +141,7 @@ export function SettingsLayout({
             </div>
           )}
           {renderGroups(true)}
-          {sidebarFooter && <div className="px-3 pb-4">{sidebarFooter}</div>}
+          {sidebarFooter && <div className="px-3 pb-6">{sidebarFooter}</div>}
         </div>
 
         {/* Desktop: sidebar */}

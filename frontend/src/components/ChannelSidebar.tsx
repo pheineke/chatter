@@ -539,12 +539,12 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice, onClos
     <div className="server-font-scope flex flex-col h-full overflow-hidden bg-sp-channels">
       {/* Server name header */}
       <div
-        className="px-4 font-bold border-b border-sp-divider/50 flex items-center justify-between cursor-pointer hover:bg-sp-hover/60 transition-colors select-none h-12 shrink-0"
+        className="md:px-4 px-3 md:font-bold font-semibold border-b border-sp-divider/50 flex items-center justify-between cursor-pointer hover:bg-sp-hover/60 transition-colors select-none md:h-12 h-14"
         onMouseDown={e => { if (e.button === 0) handleHeaderClick(e) }}
         onContextMenu={handleHeaderContextMenu}
       >
-        <span className="truncate">{server?.title ?? 'Server'}</span>
-        <Icon name="chevron-down" size={16} className="text-sp-muted shrink-0" />
+        <span className="truncate md:text-sm text-base">{server?.title ?? 'Server'}</span>
+        <Icon name="chevron-down" size={18} className="text-sp-muted shrink-0" />
       </div>
 
       {/* Channel list */}
@@ -645,7 +645,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice, onClos
                   const ch = channels.find(c => c.id === dragId.replace('ch:', ''))
                   if (!ch) return null
                   return (
-                    <div className="bg-sp-input/90 rounded px-2 py-1 mx-1 flex items-center gap-1.5 text-sm text-sp-text shadow-xl cursor-grabbing">
+                    <div className="bg-sp-input/90 rounded md:px-2 md:py-1 px-3 py-1.5 mx-1 flex items-center gap-2 md:text-sm text-[15px] text-sp-text shadow-xl cursor-grabbing">
                       <Icon name={ch.type === 'voice' ? voiceChannelIcon : textChannelIcon} size={16} className="opacity-60 shrink-0" />
                       <span className="truncate">{ch.title}</span>
                     </div>
@@ -695,9 +695,9 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice, onClos
                   <button
                     onClick={() => toggleCat(cat.id)}
                     onContextMenu={e => openCategoryContextMenu(e, cat)}
-                    className="w-full flex items-center gap-1 px-3 py-2 text-xs font-semibold uppercase text-sp-muted tracking-wider hover:text-sp-text transition-colors select-none"
+                    className="w-full flex items-center gap-1.5 md:px-3 px-4 md:py-2 py-2.5 md:text-xs text-[13px] font-semibold uppercase text-sp-muted tracking-wider hover:text-sp-text transition-colors select-none"
                   >
-                    <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
+                    <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={14} className="shrink-0" />
                     {cat.title}
                   </button>
                   {!collapsed && catChannels.length > 0 && (
@@ -814,11 +814,11 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice, onClos
                 <button
                   key={t}
                   onClick={() => setNewChannelType(t)}
-                  className={`flex-1 py-1 rounded text-sm flex items-center justify-center gap-1 ${newChannelType === t ? 'bg-sp-mention text-white' : 'bg-sp-input text-sp-text'}`}
+                  className={`flex-1 md:py-1 py-2 md:text-sm text-[15px] flex items-center justify-center gap-1.5 ${newChannelType === t ? 'bg-sp-mention text-white' : 'bg-sp-input text-sp-text'}`}
                 >
                   {t === 'text'
-                    ? <><Icon name={textChannelIcon} size={14} /> Text</>
-                    : <><Icon name={voiceChannelIcon} size={14} /> Voice</>}
+                    ? <><Icon name={textChannelIcon} size={16} /> Text</>
+                    : <><Icon name={voiceChannelIcon} size={16} /> Voice</>}
                 </button>
               ))}
             </div>
@@ -1009,22 +1009,22 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, textChannelI
       <button
         onClick={handleClick}
         onContextMenu={onContextMenu}
-        className={`w-full flex items-center gap-2 px-3 py-1.5 mx-1 rounded-lg text-sm transition-all duration-200 ease-out select-none
+        className={`w-full flex items-center gap-2.5 md:px-3 px-4 md:py-1.5 py-2.5 mx-1 rounded-lg md:text-sm text-[15px] transition-all duration-200 ease-out select-none
           ${active 
             ? 'bg-sp-hover font-bold text-sp-text shadow-sm' 
             : hasUnread
               ? 'text-sp-text font-semibold hover:bg-sp-hover/60 hover:-translate-x-1'
               : 'text-sp-muted hover:bg-sp-hover/60 hover:text-sp-text hover:-translate-x-1'}`}
       >
-        <Icon name={isVoice ? voiceChannelIcon : textChannelIcon} size={18} className={`shrink-0 transition-colors ${active ? 'text-sp-primary' : 'opacity-70'}`} />
+        <Icon name={isVoice ? voiceChannelIcon : textChannelIcon} size={20} className={`shrink-0 transition-colors ${active ? 'text-sp-primary' : 'opacity-70'}`} />
         <span className="truncate">{channel.title}</span>
         {isMuted && (
-          <span className="ml-1 inline-flex items-center justify-center leading-none text-sp-muted shrink-0" title="Notifications muted">
-            <Icon name="bell-off" size={14} className="align-middle" />
+          <span className="ml-1.5 inline-flex items-center justify-center leading-none text-sp-muted shrink-0" title="Notifications muted">
+            <Icon name="bell-off" size={16} className="align-middle" />
           </span>
         )}
         {hasUnread && !active && (
-          <span className="ml-auto w-2 h-2 rounded-full bg-sp-mention shrink-0" aria-label="Unread messages" />
+          <span className="ml-auto w-2.5 h-2.5 rounded-full bg-sp-mention shrink-0" aria-label="Unread messages" />
         )}
       </button>
 
@@ -1034,19 +1034,19 @@ function ChannelRow({ channel, active, hasUnread = false, serverId, textChannelI
           {participantUsers.map(({ user: u, isSelf, isSpeaking, isMuted, isDeafened, isSharingScreen }) => (
             <div 
               key={u.id} 
-              className="flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs text-sp-muted hover:bg-sp-channel-hover cursor-pointer"
+              className="flex items-center gap-2 md:px-3 px-3.5 md:py-0.5 py-1.5 rounded-full md:text-xs text-[13px] text-sp-muted hover:bg-sp-channel-hover cursor-pointer"
               onClick={(e) => handleUserClick(e, u.id)}
             >
               <AvatarWithStatus
                 user={u}
-                size={20}
+                size={24}
                 className={`rounded-full transition-all ${isSpeaking ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-sp-sidebar' : ''}`}
               />
-              <span className={`truncate flex-1 transition-colors ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>
+              <span className={`truncate flex-1 transition-colors md:text-sm text-[15px] ${isSpeaking ? 'text-white' : ''}`}>{u.username}{isSelf ? ' (you)' : ''}</span>
               {/* Right-side status indicators */}
-              <div className="flex items-center gap-0.5 ml-auto shrink-0">
+              <div className="flex items-center gap-1 ml-auto shrink-0">
                 {isSharingScreen && (
-                  <span className="text-[9px] font-bold leading-none px-1 py-0.5 rounded bg-red-500 text-white">LIVE</span>
+                  <span className="text-[10px] font-bold leading-none md:px-1 md:py-0.5 px-1.5 py-1 rounded bg-red-500 text-white">LIVE</span>
                 )}
                 {isMuted && (
                   <Icon name="mic-off" size={11} className="text-red-400" />
@@ -1079,12 +1079,12 @@ function SortableCatHeader({ id, title, collapsed, onToggle, onContextMenu }: { 
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`group flex items-center gap-1 px-3 py-2 text-xs font-semibold uppercase text-sp-muted tracking-wider select-none cursor-pointer hover:text-sp-text transition-colors ${isDragging ? 'opacity-0' : ''}`}
+      className={`group flex items-center gap-1.5 md:px-3 px-4 md:py-2 py-2.5 md:text-xs text-[13px] font-semibold uppercase text-sp-muted tracking-wider select-none cursor-pointer hover:text-sp-text transition-colors ${isDragging ? 'opacity-0' : ''}`}
       onClick={onToggle}
       onContextMenu={onContextMenu}
       {...attributes}
     >
-      <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={12} className="shrink-0" />
+      <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} size={14} className="shrink-0" />
       <span>{title}</span>
       {/* Drag handle — only this initiates reordering */}
       <span

@@ -24,7 +24,7 @@ function VoiceBtn({
       title={title}
       onClick={onClick}
       onContextMenu={onContextMenu}
-      className={`w-full h-8 flex items-center justify-center text-lg transition-colors rounded
+      className={`w-full h-10 flex items-center justify-center md:text-lg text-xl transition-colors rounded
         ${danger ? 'hover:bg-red-500 text-sp-muted hover:text-white'
           : active ? 'bg-white/10 text-sp-text'
           : 'text-sp-muted hover:bg-white/5 hover:text-sp-text'}`}
@@ -134,13 +134,13 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
   return (
     <div className="flex flex-col shrink-0 gap-0 border-b border-sp-divider/20">
       {/* Connection status bar */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-sp-user">
+      <div className="flex items-center justify-between md:px-2 px-3 md:py-1.5 py-2.5 bg-sp-user">
         <div className="flex flex-col min-w-0 pointer-events-none select-none">
-          <div className="flex items-center gap-1.5 font-bold text-sp-online text-xs uppercase tracking-wide">
-            <span className="w-1.5 h-1.5 rounded-full bg-sp-online" />
+          <div className="flex items-center gap-1.5 font-bold text-sp-online md:text-xs text-sm uppercase tracking-wide">
+            <span className="w-2 h-2 rounded-full bg-sp-online" />
             Voice Connected
           </div>
-          <span className="text-sp-muted text-xs truncate">
+          <span className="text-sp-muted md:text-xs text-sm truncate">
             {session.channelName} / {session.serverId ? 'Server' : 'DM'}
           </span>
         </div>
@@ -148,9 +148,9 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
         <button 
           title="Disconnect" 
           onClick={onLeave}
-          className="w-7 h-7 rounded flex items-center justify-center text-sp-muted hover:text-white hover:bg-sp-danger transition-colors"
+          className="md:w-7 md:h-7 w-10 h-10 rounded flex items-center justify-center text-sp-muted hover:text-white hover:bg-sp-danger transition-colors"
         >
-          <Icon name="phone-off" size={16} />
+          <Icon name="phone-off" size={18} />
         </button>
       </div>
 

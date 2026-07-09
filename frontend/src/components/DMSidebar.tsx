@@ -96,33 +96,33 @@ export function DMSidebar({ onCloseNav }: DMSidebarProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-2 pt-2">
+      <div className="px-2 md:pt-2 pt-3">
         <button
           onClick={() => { navigate('/channels/@me'); onCloseNav?.() }}
-          className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors mb-2
+          className={`w-full flex items-center gap-2.5 md:px-3 px-4 md:py-1.5 py-3 rounded-md md:text-sm text-[15px] font-medium transition-colors mb-2
             ${isFriendsActive
               ? 'bg-sp-surface-variant text-sp-text'
               : 'text-sp-muted hover:bg-sp-surface-variant/50 hover:text-sp-text'}`}
         >
-          <div className="w-7 h-7 rounded-full bg-sp-primary/10 flex items-center justify-center">
-            <Icon name="people" size={16} className="text-sp-primary" />
+          <div className="md:w-7 md:h-7 w-9 h-9 rounded-full bg-sp-primary/10 flex items-center justify-center">
+            <Icon name="people" size={18} className="text-sp-primary" />
           </div>
           <span>Friends</span>
         </button>
       </div>
 
-      <div className="flex items-center justify-between px-4 pb-1 pt-2 text-xs font-bold text-sp-muted uppercase tracking-wider group">
+      <div className="flex items-center justify-between md:px-4 px-5 md:pb-1 pb-1 md:pt-2 pt-1 md:text-xs text-[13px] font-bold text-sp-muted uppercase tracking-wider group">
         <span>Direct Messages</span>
         <button
           className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-sp-text"
           title="Create DM"
           onClick={() => navigate('/channels/@me')}
         >
-          <Icon name="plus" size={12} />
+          <Icon name="plus" size={14} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 space-y-0.5 mt-1">
+      <div className="flex-1 overflow-y-auto md:px-2 px-2 space-y-0.5 mt-1">
         {conversations.map(conv => {
           const isActive = conv.other_user.id === activeDmUserId
           const lr = conv.last_read_at
@@ -192,28 +192,28 @@ export function DMSidebar({ onCloseNav }: DMSidebarProps) {
               onContextMenu={openConvContextMenu}
               data-avatar-ring
               style={{ '--avatar-ring': isActive ? 'transparent' : 'transparent', '--avatar-ring-hover': 'transparent' } as React.CSSProperties}
-              className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-full text-sm transition-all select-none
+              className={`w-full flex items-center gap-2.5 md:px-3 px-4 md:py-1.5 py-2.5 rounded-full md:text-sm text-[15px] transition-all select-none
                 ${isActive
                   ? 'bg-sp-mention/15 text-sp-mention font-semibold'
                   : 'text-sp-muted hover:bg-sp-channel-hover hover:text-sp-text'}`}
             >
-              <AvatarWithStatus user={conv.other_user} size={32} />
+              <AvatarWithStatus user={conv.other_user} size={34} />
               <span className={`flex-1 text-left truncate ${hasUnread ? 'text-sp-text font-semibold' : ''}`}>
                 {conv.other_user.username}
               </span>
               {isMuted && (
                 <span className="text-sp-muted" title="Notifications muted">
-                  <Icon name="bell-off" size={14} />
+                  <Icon name="bell-off" size={16} />
                 </span>
               )}
               {hasUnread && !isMuted && (
-                <span className="w-2 h-2 rounded-full bg-sp-mention shrink-0" aria-label="Unread messages" />
+                <span className="md:w-2 md:h-2 w-3 h-3 rounded-full bg-sp-mention shrink-0" aria-label="Unread messages" />
               )}
             </button>
           )
         })}
         {conversations.length === 0 && (
-          <p className="text-xs text-sp-muted px-2 py-1">No conversations yet.</p>
+          <p className="md:text-xs text-[13px] text-sp-muted md:px-2 px-3 md:py-1 py-2">No conversations yet.</p>
         )}
       </div>
 

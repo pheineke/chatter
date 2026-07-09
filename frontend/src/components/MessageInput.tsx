@@ -68,6 +68,36 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     }
   }, [text])
 
+  // Prevent the page from scrolling when the keyboard opens on mobile.
+  // Fix the root element in place so the browser can't scroll the viewport.
+  useEffect(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    const root = document.getElementById('root')
+    if (!root) return
+    const onFocus = () => {
+      root.style.position = 'fixed'
+      root.style.top = '0'
+      root.style.left = '0'
+      root.style.width = '100%'
+      root.style.height = '100%'
+    }
+    const onBlur = () => {
+      root.style.position = ''
+      root.style.top = ''
+      root.style.left = ''
+      root.style.width = ''
+      root.style.height = ''
+    }
+    ta.addEventListener('focus', onFocus)
+    ta.addEventListener('blur', onBlur)
+    return () => {
+      ta.removeEventListener('focus', onFocus)
+      ta.removeEventListener('blur', onBlur)
+      onBlur()
+    }
+  }, [])
+
   // Tick the countdown every second
   useEffect(() => {
     if (!cooldownUntil) return
@@ -572,8 +602,8 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
       <div className="rounded-2xl border border-sp-divider/60 overflow-hidden bg-sp-input shadow-sp-1">
       {/* Reply banner */}
       {replyTo && (
-        <div className="flex items-center gap-2 bg-sp-hover/50 rounded-t-2xl px-3 py-1.5 text-xs text-sp-muted border-b border-sp-divider/40">
-          <Icon name="corner-up-left" size={13} className="text-sp-mention shrink-0" />
+        <div className="flex items-center gap-2 bg-sp-hover/50 rounded-t-2xl md:px-3 md:py-1.5 px-3.5 py-2 md:text-xs text-[13px] text-sp-muted border-b border-sp-divider/40">
+          <Icon name="corner-up-left" size={14} className="text-sp-mention shrink-0" />
           <span>
             Replying to{' '}
             <span className="font-semibold text-sp-text">{replyTo.author.username}</span>
@@ -587,26 +617,26 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
             className="ml-auto text-sp-muted hover:text-red-400 transition-colors shrink-0"
             title="Cancel reply"
           >
-            <Icon name="x" size={14} />
+            <Icon name="x" size={16} />
           </button>
         </div>
       )}
 
-      <div className="flex items-center min-h-[52px] px-3 py-2.5">
+      <div className="flex items-center min-h-[56px] md:px-3 px-4 md:py-2.5 py-3">
         {/* Attachment button */}
         <button
           title="Attach File"
           onClick={() => fileRef.current?.click()}
           className="text-sp-muted hover:text-sp-text transition-colors shrink-0 mt-[2px]"
         >
-          <Icon name="attach-2" size={20} />
+          <Icon name="attach-2" size={22} />
         </button>
         <input ref={fileRef} type="file" className="hidden" onChange={handleFile} />
 
         {/* Text area */}
         <textarea
           ref={textareaRef}
-          className={`flex-1 bg-transparent resize-none outline-none text-sm text-sp-text placeholder:text-sp-muted max-h-36 leading-6 py-0 mx-2 ${inCooldown ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`flex-1 bg-transparent resize-none outline-none md:text-sm text-[15px] text-sp-text placeholder:text-sp-muted max-h-36 leading-6 md:py-0 py-1.5 md:mx-2 mx-3 ${inCooldown ? 'opacity-50 cursor-not-allowed' : ''}`}
           rows={1}
           value={text}
           maxLength={MAX_MESSAGE_LEN}
@@ -621,15 +651,15 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
           ref={emojiButtonRef}
           title="Emoji"
           onClick={toggleEmojiPicker}
-          className="text-sp-muted hover:text-sp-text transition-colors shrink-0 mt-[2px] mx-1"
+          className="text-sp-muted hover:text-sp-text transition-colors shrink-0 mt-[2px] md:mx-1 mx-1.5"
         >
-          <Icon name="smiling-face" size={20} />
+          <Icon name="smiling-face" size={22} />
         </button>
 
         <button
           onClick={handleSend}
           disabled={!text.trim() || sendMut.isPending || inCooldown || overLimit}
-          className={`shrink-0 mt-[2px] w-8 h-8 rounded-full flex items-center justify-center transition-all
+          className={`shrink-0 md:mt-[2px] w-10 h-10 rounded-full flex items-center justify-center transition-all
             ${text.trim() && !inCooldown && !overLimit
               ? 'bg-sp-mention text-white hover:bg-sp-mention/85 active:scale-90 shadow-sp-1'
               : 'text-sp-muted opacity-40 cursor-not-allowed'}`}
@@ -639,8 +669,8 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
         </button>
       </div>
 
-      <div className="px-3 pb-2 text-right">
-        <span className={`text-[11px] ${textLen > 1800 ? 'text-red-400' : 'text-sp-muted'}`}>
+      <div className="md:px-3 px-4 md:pb-2 pb-2.5 text-right">
+        <span className={`md:text-[11px] text-xs ${textLen > 1800 ? 'text-red-400' : 'text-sp-muted'}`}>
           {textLen}/{MAX_MESSAGE_LEN}
         </span>
       </div>

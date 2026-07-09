@@ -65,8 +65,8 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
   return (
     <div className="w-72 flex flex-col bg-sp-sidebar border-l border-sp-divider/50 h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 h-12 border-b border-sp-divider/20 shrink-0">
-        <span className="text-sp-muted text-xs font-semibold uppercase tracking-wide">
+      <div className="flex items-center gap-2 md:px-3 px-4 md:h-12 h-14 border-b border-sp-divider/20 shrink-0">
+        <span className="text-sp-muted md:text-xs text-[13px] font-semibold uppercase tracking-wide">
           {results.length > 0 ? `${results.length} result${results.length !== 1 ? 's' : ''}` : 'Search Results'}
         </span>
         <button
@@ -74,7 +74,7 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
           className="ml-auto text-sp-muted hover:text-sp-text transition-colors shrink-0"
           title="Close search"
         >
-          <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <svg className="md:w-4 md:h-4 w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
           </svg>
         </button>
@@ -83,19 +83,19 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
       {/* Results */}
       <div className="flex-1 overflow-y-auto">
         {loading && (
-          <p className="text-sp-muted text-xs text-center py-6">Searching…</p>
+          <p className="text-sp-muted md:text-xs text-[13px] text-center md:py-6 py-8">Searching…</p>
         )}
         {error && (
-          <p className="text-red-400 text-xs text-center py-6">{error}</p>
+          <p className="text-red-400 md:text-xs text-[13px] text-center md:py-6 py-8">{error}</p>
         )}
         {!loading && !error && query.trim() && results.length === 0 && (
-          <p className="text-sp-muted text-xs text-center py-6">No results found.</p>
+          <p className="text-sp-muted md:text-xs text-[13px] text-center md:py-6 py-8">No results found.</p>
         )}
         {!loading && results.map(msg => (
           <button
             key={msg.id}
             onClick={() => { onJump(msg.id); onClose() }}
-            className="w-full text-left px-3 py-2 hover:bg-sp-hover transition-colors border-b border-sp-divider/40"
+            className="w-full text-left md:px-3 px-4 md:py-2 py-2.5 hover:bg-sp-hover transition-colors border-b border-sp-divider/40"
           >
             <div className="flex items-center gap-2 mb-0.5">
               {/* Avatar */}
@@ -103,23 +103,23 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
                 <img
                   src={`/static/avatars/${msg.author.avatar}`}
                   alt={msg.author.username}
-                  className="w-5 h-5 rounded-full object-cover shrink-0"
+                  className="md:w-5 md:h-5 w-7 h-7 rounded-full object-cover shrink-0"
                 />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-sp-primary flex items-center justify-center shrink-0">
-                  <span className="text-white text-[10px] font-bold">
+                <div className="md:w-5 md:h-5 w-7 h-7 rounded-full bg-sp-primary flex items-center justify-center shrink-0">
+                  <span className="text-white md:text-[10px] text-xs font-bold">
                     {msg.author.username[0]?.toUpperCase()}
                   </span>
                 </div>
               )}
-              <span className="text-xs font-semibold text-sp-text truncate">
+              <span className="md:text-xs text-[13px] font-semibold text-sp-text truncate">
                 {msg.author.username}
               </span>
-              <span className="text-[10px] text-sp-muted ml-auto shrink-0">
+              <span className="md:text-[10px] text-xs text-sp-muted ml-auto shrink-0">
                 {formatDate(msg.created_at)}
               </span>
             </div>
-            <p className="text-xs text-sp-muted leading-snug line-clamp-2 pl-7">
+            <p className="md:text-xs text-[13px] text-sp-muted leading-snug line-clamp-2 md:pl-7 pl-8">
               {msg.content ?? <em>No text content</em>}
             </p>
           </button>

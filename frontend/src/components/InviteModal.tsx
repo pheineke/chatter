@@ -63,22 +63,22 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-sp-popup border border-sp-divider/50 w-full max-w-md rounded-sp-xl shadow-sp-3 p-6 flex flex-col gap-5">
+      <div className="bg-sp-popup border border-sp-divider/50 w-full max-w-md rounded-sp-xl shadow-sp-3 md:p-6 p-5 flex flex-col md:gap-5 gap-6">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-sp-text">Invite to <span className="text-sp-mention">{serverName}</span></h2>
-            <p className="text-xs text-sp-muted mt-0.5">Share a link so friends can join this server</p>
+            <h2 className="md:text-lg text-xl font-bold text-sp-text">Invite to <span className="text-sp-mention">{serverName}</span></h2>
+            <p className="md:text-xs text-[13px] text-sp-muted mt-0.5">Share a link so friends can join this server</p>
           </div>
           <button onClick={onClose} className="text-sp-muted hover:text-sp-text transition-colors mt-0.5">
-            <Icon name="x" size={18} />
+            <Icon name="x" size={20} />
           </button>
         </div>
 
         {/* Options */}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-sp-muted">Expire after</label>
+            <label className="md:text-xs text-[13px] font-semibold uppercase tracking-wider text-sp-muted">Expire after</label>
             <select
               value={expiresHours ?? 'null'}
               onChange={(e) => {
@@ -86,7 +86,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
                 setExpiresHours(v === 'null' ? null : Number(v))
                 setInvite(null)
               }}
-              className="bg-sp-input text-sp-text text-sm rounded-full px-4 py-2 border border-sp-divider/60 outline-none focus:border-sp-mention transition"
+              className="bg-sp-input text-sp-text md:text-sm text-[15px] rounded-full md:px-4 px-5 md:py-2 py-2.5 border border-sp-divider/60 outline-none focus:border-sp-mention transition"
             >
               {EXPIRY_OPTIONS.map((o) => (
                 <option key={String(o.value)} value={o.value ?? 'null'}>{o.label}</option>
@@ -95,7 +95,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-sp-muted">Max uses</label>
+            <label className="md:text-xs text-[13px] font-semibold uppercase tracking-wider text-sp-muted">Max uses</label>
             <select
               value={maxUses ?? 'null'}
               onChange={(e) => {
@@ -103,7 +103,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
                 setMaxUses(v === 'null' ? null : Number(v))
                 setInvite(null)
               }}
-              className="bg-sp-input text-sp-text text-sm rounded-full px-4 py-2 border border-sp-divider/60 outline-none focus:border-sp-mention transition"
+              className="bg-sp-input text-sp-text md:text-sm text-[15px] rounded-full md:px-4 px-5 md:py-2 py-2.5 border border-sp-divider/60 outline-none focus:border-sp-mention transition"
             >
               {MAX_USES_OPTIONS.map((o) => (
                 <option key={String(o.value)} value={o.value ?? 'null'}>{o.label}</option>
@@ -117,7 +117,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
           <button
             onClick={() => generateMut.mutate()}
             disabled={generateMut.isPending}
-            className="bg-sp-mention text-white font-semibold rounded-lg py-2.5 text-sm hover:bg-sp-mention/80 disabled:opacity-50 transition-colors"
+            className="bg-sp-mention text-white font-semibold rounded-lg md:py-2.5 py-3 md:text-sm text-[15px] hover:bg-sp-mention/80 disabled:opacity-50 transition-colors"
           >
             {generateMut.isPending ? 'Generating…' : 'Generate Invite Link'}
           </button>
@@ -126,20 +126,20 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
         {/* Generated link */}
         {invite && (
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 bg-sp-input rounded-lg px-3 py-2.5">
-              <span className="flex-1 text-sm text-sp-text truncate font-mono select-all">
+            <div className="flex items-center gap-2 bg-sp-input rounded-lg md:px-3 px-4 md:py-2.5 py-3">
+              <span className="flex-1 md:text-sm text-[15px] text-sp-text truncate font-mono select-all">
                 {inviteLink(invite.code)}
               </span>
               <button
                 onClick={handleCopy}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors shrink-0
+                className={`md:text-xs text-[13px] font-semibold md:px-3 px-4 md:py-1.5 py-2 rounded-md transition-colors shrink-0
                   ${copied ? 'bg-green-600 text-white' : 'bg-sp-mention text-white hover:bg-sp-mention/80'}`}
               >
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
 
-            <div className="flex gap-4 text-xs text-sp-muted">
+            <div className="flex gap-4 md:text-xs text-[13px] text-sp-muted">
               <span>
                 <span className="font-semibold text-sp-text">{invite.uses}</span> uses
                 {invite.max_uses != null && <> / {invite.max_uses}</>}
@@ -159,7 +159,7 @@ export function InviteModal({ serverId, serverName, onClose }: Props) {
         )}
 
         {generateMut.isError && (
-          <p className="text-xs text-red-400">Failed to generate invite. Please try again.</p>
+          <p className="md:text-xs text-[13px] text-red-400">Failed to generate invite. Please try again.</p>
         )}
       </div>
     </div>

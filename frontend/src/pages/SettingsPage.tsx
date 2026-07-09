@@ -78,7 +78,7 @@ export function SettingsPage() {
         onClose={() => navigate(-1)}
         sidebarFooter={(
           <button
-            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+            className="w-full flex items-center gap-2.5 md:px-2 md:py-1.5 px-4 py-3 rounded md:text-sm text-[15px] font-medium text-red-400 hover:bg-red-500/10 transition-colors"
             onClick={() => {
               if (confirm('Are you sure you want to log out?')) {
                 logout()
@@ -86,7 +86,8 @@ export function SettingsPage() {
               }
             }}
           >
-            <Icon name="log-out" size={16} className="shrink-0" />
+            <Icon name="log-out" size={20} className="md:hidden" />
+            <Icon name="log-out" size={16} className="hidden md:block" />
             Log Out
           </button>
         )}
@@ -326,7 +327,7 @@ function ChangePasswordSection() {
         {pwError && <p className="text-red-400 text-sm">{pwError}</p>}
         {pwSuccess && <p className="text-green-400 text-sm">Password updated successfully!</p>}
         <div className="flex justify-end pt-1">
-          <button onClick={handleChangePassword} disabled={pwLoading} className="btn py-1.5">
+          <button onClick={handleChangePassword} disabled={pwLoading} className="btn md:py-1.5 py-2">
             {pwLoading ? 'Saving…' : 'Update Password'}
           </button>
         </div>
@@ -495,7 +496,7 @@ function SessionsSection() {
           <button
             onClick={() => revokeAllMut.mutate()}
             disabled={revokeAllMut.isPending}
-            className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+            className="md:text-xs text-sm text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
           >
             {revokeAllMut.isPending ? 'Logging out…' : 'Log out all other sessions'}
           </button>
@@ -533,7 +534,7 @@ function SessionsSection() {
                   <button
                     onClick={() => revokeMut.mutate(s.id)}
                     disabled={revokeMut.isPending}
-                    className="shrink-0 text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 px-2 py-1 rounded hover:bg-red-500/10"
+                    className="shrink-0 md:text-xs text-sm text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 md:px-2 px-3 md:py-1 py-1.5 rounded hover:bg-red-500/10"
                     title="Revoke this session"
                   >
                     Revoke
@@ -769,8 +770,8 @@ function AppearanceTab() {
           spellCheck={false}
         />
         <div className="flex gap-2 mt-3">
-          <button className="btn" onClick={applyCSS}>{cssApplied ? '✓ Applied' : 'Apply'}</button>
-          <button className="px-4 py-2 rounded bg-sp-input hover:bg-sp-input/70 text-sp-text text-sm font-semibold transition-colors" onClick={resetCSS}>Reset</button>
+          <button className="btn md:text-sm text-[15px] md:py-2 py-2.5 md:px-4 px-5" onClick={applyCSS}>{cssApplied ? '✓ Applied' : 'Apply'}</button>
+          <button className="md:px-4 md:py-2 px-5 py-2.5 rounded bg-sp-input hover:bg-sp-input/70 text-sp-text md:text-sm text-[15px] font-semibold transition-colors" onClick={resetCSS}>Reset</button>
         </div>
       </div>
 
@@ -781,11 +782,11 @@ function AppearanceTab() {
           <div className="flex gap-2">
             <button
               onClick={handleDiscard}
-              className="px-4 py-1.5 rounded bg-sp-input hover:bg-sp-input/70 text-sp-text text-sm font-semibold transition-colors"
+              className="md:px-4 md:py-1.5 px-5 py-2.5 rounded bg-sp-input hover:bg-sp-input/70 text-sp-text md:text-sm text-[15px] font-semibold transition-colors"
             >Discard</button>
             <button
               onClick={handleSave}
-              className="btn"
+              className="btn md:text-sm text-[15px] md:py-1.5 py-2.5 md:px-4 px-5"
             >Save Changes</button>
           </div>
         </div>
@@ -897,7 +898,7 @@ function VoiceTab() {
         <div>
           <div className="text-xs text-sp-muted mb-2">Mic Test</div>
           <div className="flex items-center gap-3">
-            <button className="btn py-1 px-3 text-xs shrink-0" onClick={testing ? stopTestRef.current : startMicTest}>
+            <button className="btn md:py-1 md:px-3 py-2 px-4 text-sm shrink-0" onClick={testing ? stopTestRef.current : startMicTest}>
               {testing ? 'Stop' : "Let's Check"}
             </button>
             <div className="flex-1 h-3 bg-sp-bg rounded-full overflow-hidden">
@@ -934,11 +935,11 @@ function VoiceTab() {
           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
           {!cameraOn && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <button className="btn text-xs py-1 px-3" onClick={startCamera}>Preview Camera</button>
+              <button className="btn md:text-xs text-sm md:py-1 md:px-3 py-2 px-4" onClick={startCamera}>Preview Camera</button>
             </div>
           )}
           {cameraOn && (
-            <button className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white text-xs py-0.5 px-2 rounded transition-colors" onClick={() => stopCameraRef.current()}>Stop</button>
+            <button className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white md:text-xs text-sm md:py-0.5 py-1.5 md:px-2 px-3 rounded transition-colors" onClick={() => stopCameraRef.current()}>Stop</button>
           )}
         </div>
       </div>
@@ -966,7 +967,7 @@ function VoiceTab() {
             />
             <Icon name="volume-up" size={14} className="text-sp-muted shrink-0" />
             <button
-              className="shrink-0 text-xs px-2 py-1 rounded bg-sp-bg hover:bg-sp-input transition-colors"
+              className="shrink-0 md:text-xs text-sm md:px-2 md:py-1 px-3 py-1.5 rounded bg-sp-bg hover:bg-sp-input transition-colors"
               onClick={() => playSound('notificationSound')}
             >
               Preview
@@ -1102,7 +1103,7 @@ function PrivacyTab() {
                 </div>
                 <button
                   onClick={() => unblock(u.id)}
-                  className="text-xs px-3 py-1 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                  className="md:text-xs text-sm px-4 md:px-3 py-2 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors"
                 >
                   Unblock
                 </button>
@@ -1134,18 +1135,18 @@ function PrivacyTab() {
               {/* Download backup */}
               <button
                 onClick={() => e2ee.downloadBackup(user?.username ?? 'chatter')}
-                className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-sp-muted/20 transition-colors text-sm"
+                className="flex items-center justify-center gap-2 md:px-3 md:py-2 px-4 py-3 rounded bg-sp-input hover:bg-sp-muted/20 transition-colors md:text-sm text-[15px]"
               >
-                <Icon name="download" size={16} />
+                <Icon name="download" size={18} />
                 Download key backup
               </button>
 
               {/* Import backup */}
               <button
                 onClick={() => { setImportError(null); backupImportRef.current?.click() }}
-                className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-sp-muted/20 transition-colors text-sm"
+                className="flex items-center justify-center gap-2 md:px-3 md:py-2 px-4 py-3 rounded bg-sp-input hover:bg-sp-muted/20 transition-colors md:text-sm text-[15px]"
               >
-                <Icon name="cloud-upload" size={16} />
+                <Icon name="cloud-upload" size={18} />
                 Import key backup
               </button>
               <input
@@ -1172,13 +1173,13 @@ function PrivacyTab() {
               {!rotateConfirm ? (
                 <button
                   onClick={() => setRotateConfirm(true)}
-                  className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors text-sm"
+                  className="flex items-center justify-center gap-2 md:px-3 md:py-2 px-4 py-3 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors md:text-sm text-[15px]"
                 >
                   <Icon name="refresh" size={16} />
                   Rotate key pair
                 </button>
               ) : (
-                <div className="col-span-full flex items-center gap-2 p-3 rounded bg-red-500/10 border border-red-500/30">
+                <div className="col-span-full flex items-center gap-3 md:p-3 p-4 rounded bg-red-500/10 border border-red-500/30">
                   <p className="text-sm text-red-400 flex-1">This will break decryption of old messages. Continue?</p>
                   <button
                     disabled={rotateLoading}
@@ -1188,11 +1189,11 @@ function PrivacyTab() {
                       setRotateLoading(false)
                       setRotateConfirm(false)
                     }}
-                    className="px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+                    className="px-4 md:px-3 py-2 rounded bg-red-500 hover:bg-red-600 text-white md:text-xs text-sm font-semibold transition-colors disabled:opacity-60"
                   >
                     {rotateLoading ? 'Rotating…' : 'Confirm'}
                   </button>
-                  <button onClick={() => setRotateConfirm(false)} className="px-3 py-1 rounded bg-sp-input hover:bg-sp-muted/20 text-xs transition-colors">
+                  <button onClick={() => setRotateConfirm(false)} className="px-4 md:px-3 py-2 rounded bg-sp-input hover:bg-sp-muted/20 md:text-xs text-sm transition-colors">
                     Cancel
                   </button>
                 </div>
@@ -1216,9 +1217,9 @@ function PrivacyTab() {
             setCacheCleared(true)
             setTimeout(() => setCacheCleared(false), 3000)
           }}
-          className="flex items-center gap-2 px-3 py-2 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors text-sm"
+          className="flex items-center gap-2 md:px-3 md:py-2 px-4 py-3 rounded bg-sp-input hover:bg-red-500/20 hover:text-red-400 transition-colors md:text-sm text-[15px]"
         >
-          <Icon name="trash" size={15} />
+          <Icon name="trash" size={16} />
           Clear DM cache
         </button>
         {cacheCleared && <p className="text-xs text-green-400 mt-2">Cache cleared.</p>}
@@ -1286,7 +1287,7 @@ function NotificationsTab() {
       {permission === 'default' && isEnabled && (
         <div className="rounded-lg bg-sp-sidebar border border-white/10 px-4 py-3 text-sm text-sp-muted">
           <p className="mb-2">Browser permission is required before notifications can be shown.</p>
-          <button onClick={enable} className="btn py-1 px-4 text-sm">
+          <button onClick={enable} className="btn md:py-1 md:px-4 py-2 px-5 md:text-sm text-[15px]">
             Request Permission
           </button>
         </div>
@@ -1419,16 +1420,16 @@ function TokensTab() {
               </div>
             </div>
             {revokeId === t.id ? (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 md:text-sm text-[15px]">
                 <span className="text-sp-muted">Revoke?</span>
                 <button
                   onClick={() => revokeMut.mutate(t.id)}
                   disabled={revokeMut.isPending}
-                  className="px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-xs"
+                  className="px-3 md:px-2 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white text-sm"
                 >
                   Yes
                 </button>
-                <button onClick={() => setRevokeId(null)} className="px-2 py-0.5 rounded bg-sp-muted/20 hover:bg-sp-muted/30 text-sp-text text-xs">
+                <button onClick={() => setRevokeId(null)} className="px-3 md:px-2 py-1.5 rounded bg-sp-muted/20 hover:bg-sp-muted/30 text-sp-text text-sm">
                   Cancel
                 </button>
               </div>
@@ -1436,9 +1437,9 @@ function TokensTab() {
               <button
                 onClick={() => setRevokeId(t.id)}
                 title="Revoke token"
-                className="p-1.5 rounded hover:bg-red-500/20 text-sp-muted hover:text-red-400 transition-colors"
+                className="p-2.5 rounded hover:bg-red-500/20 text-sp-muted hover:text-red-400 transition-colors"
               >
-                <Icon name="trash" size={15} />
+                <Icon name="trash" size={16} />
               </button>
             )}
           </div>
@@ -1449,7 +1450,7 @@ function TokensTab() {
       <button
         onClick={() => { setShowCreate(true); setNewName('') }}
         disabled={atCap}
-        className="px-4 py-2 rounded-m3-sm bg-sp-mention hover:bg-sp-mention/85 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+        className="md:px-4 md:py-2 px-5 py-3 rounded-m3-sm bg-sp-mention hover:bg-sp-mention/85 disabled:opacity-50 disabled:cursor-not-allowed text-white md:text-sm text-[15px] font-medium transition-colors"
         title={atCap ? `Maximum of ${MAX_TOKENS} active tokens` : undefined}
       >
         Create Token ({activeCount}/{MAX_TOKENS})
@@ -1504,9 +1505,9 @@ function TokensTab() {
               <button
                 onClick={handleCopy}
                 title="Copy to clipboard"
-                className="p-2 rounded bg-sp-input hover:bg-sp-muted/30 text-sp-muted hover:text-sp-text transition-colors"
+                className="p-2.5 rounded bg-sp-input hover:bg-sp-muted/30 text-sp-muted hover:text-sp-text transition-colors"
               >
-                <Icon name={copied ? 'checkmark' : 'copy'} size={16} />
+                <Icon name={copied ? 'checkmark' : 'copy'} size={18} />
               </button>
             </div>
             {copied && <p className="text-xs text-green-400">Copied to clipboard!</p>}

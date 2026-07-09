@@ -123,7 +123,7 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
       >
         {/* Banner */}
         <div
-          className="h-24 relative shrink-0"
+          className="md:h-24 h-28 relative shrink-0"
           style={{
             backgroundColor: user.banner ? undefined : '#3F51B5',
             backgroundImage: user.banner ? `url(/api/static/${user.banner})` : undefined,
@@ -133,29 +133,29 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
         >
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-black/40 text-white/80 hover:text-white hover:bg-black/60 transition-colors"
+            className="absolute top-3 right-3 md:w-8 md:h-8 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 text-white/80 hover:text-white hover:bg-black/60 transition-colors"
           >
-            <Icon name="close" size={16} />
+            <Icon name="close" size={18} />
           </button>
         </div>
 
-        <div className="px-5 pb-5 relative">
+        <div className="md:px-5 px-6 md:pb-5 pb-6 relative">
           {/* Avatar */}
-          <div className="absolute -top-10 left-5 rounded-full p-1 bg-sp-sidebar">
+          <div className="absolute -top-10 md:left-5 left-6 rounded-full md:p-1 p-1.5 bg-sp-sidebar">
             <AvatarWithStatus user={user} size={72} ringColor="#1e1f22" />
           </div>
 
           <div className="mt-14">
-            <div className="text-xl font-bold leading-tight">{user.username}</div>
-            <div className="text-xs text-sp-muted mt-0.5 font-mono">{user.id}</div>
-            <div className="text-xs text-sp-muted mt-0.5">Account created: {new Date(user.created_at).toLocaleDateString()}</div>
+            <div className="md:text-xl text-2xl font-bold leading-tight">{user.username}</div>
+            <div className="md:text-xs text-[13px] text-sp-muted mt-0.5 font-mono">{user.id}</div>
+            <div className="md:text-xs text-[13px] text-sp-muted mt-0.5">Account created: {new Date(user.created_at).toLocaleDateString()}</div>
             {user.pronouns && (
-              <div className="text-xs text-sp-muted mt-0.5">{user.pronouns}</div>
+              <div className="md:text-xs text-[13px] text-sp-muted mt-0.5">{user.pronouns}</div>
             )}
 
             <div className="mt-3 border-t border-sp-input pt-3">
-              <div className="text-xs font-bold text-sp-muted uppercase mb-1 tracking-wider">About Me</div>
-              <div className="text-sm text-sp-text/90 whitespace-pre-wrap break-words leading-relaxed">
+              <div className="md:text-xs text-[13px] font-bold text-sp-muted uppercase mb-1 tracking-wider">About Me</div>
+              <div className="md:text-sm text-[15px] text-sp-text/90 whitespace-pre-wrap break-words leading-relaxed">
                 {user.description
                   ? <Linkified text={user.description} noMentions />
                   : <span className="italic text-sp-muted">No bio yet.</span>}
@@ -164,8 +164,8 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
 
             <div className="mt-3 border-t border-sp-input pt-3 flex items-center gap-3">
               <div className="flex flex-col gap-0.5">
-                <div className="text-xs font-bold text-sp-muted uppercase tracking-wider">Status</div>
-                <div className="text-sm capitalize text-sp-text">
+                <div className="md:text-xs text-[13px] font-bold text-sp-muted uppercase tracking-wider">Status</div>
+                <div className="md:text-sm text-[15px] capitalize text-sp-text">
                   {user.status === 'dnd' ? 'Do Not Disturb' : user.status}
                 </div>
               </div>
@@ -174,17 +174,17 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
             {!isSelf && (
               <div className="mt-3 border-t border-sp-input pt-3">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="text-xs font-bold text-sp-muted uppercase tracking-wider">Note</div>
-                  {noteSaving && <span className="text-[10px] text-sp-muted">Saving…</span>}
+                  <div className="md:text-xs text-[13px] font-bold text-sp-muted uppercase tracking-wider">Note</div>
+                  {noteSaving && <span className="md:text-[10px] text-xs text-sp-muted">Saving…</span>}
                 </div>
                 {noteDecryptError && (
-                  <div className="mb-2 text-[11px] text-amber-400">
+                  <div className="mb-2 md:text-[11px] text-xs text-amber-400">
                     Could not decrypt this note on this device.
                   </div>
                 )}
                 <textarea
                   ref={noteRef}
-                  className="input w-full text-sm bg-black/20 border-0 px-3 py-2 placeholder:text-sp-muted resize-none rounded-md"
+                  className="input w-full md:text-sm text-[15px] bg-black/20 border-0 md:px-3 px-4 md:py-2 py-2.5 placeholder:text-sp-muted resize-none rounded-md"
                   rows={3}
                   value={noteText}
                   onChange={handleNoteChange}

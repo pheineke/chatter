@@ -130,98 +130,98 @@ export function ProfileCard({ userId, onClose, position }: Props) {
     <Portal>
     <div ref={ref} style={{ ...style, boxShadow: 'var(--m3-shadow-4)' }} className="group/card w-80 bg-sp-popup border border-sp-divider/60 rounded-m3-lg overflow-visible flex flex-col text-sp-text animate-fade-in-up">
        {/* Banner */}
-       <div 
-         className="h-24 bg-sp-mention relative rounded-t-m3-lg"
+        <div 
+          className="h-28 bg-sp-mention relative rounded-t-m3-lg"
          style={{ backgroundColor: user?.banner ? undefined : '#3F51B5', backgroundImage: user?.banner ? `url(/api/static/${user.banner})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}
        >
          {/* More options button */}
          <div className="absolute top-2 right-2" ref={menuRef}>
            <button
-             onClick={() => { setMenuOpen(v => !v); setShowInviteSubmenu(false) }}
-             className="w-7 h-7 flex items-center justify-center rounded-full bg-black/40 text-white/80 hover:text-white hover:bg-black/60 transition-colors"
-             title="More options"
-           >
-             <Icon name="more-horizontal" size={18} />
-           </button>
+            onClick={() => { setMenuOpen(v => !v); setShowInviteSubmenu(false) }}
+              className="md:w-7 md:h-7 w-9 h-9 flex items-center justify-center rounded-full bg-black/40 text-white/80 hover:text-white hover:bg-black/60 transition-colors"
+              title="More options"
+            >
+              <Icon name="more-horizontal" size={20} />
+            </button>
 
-           {menuOpen && (
-             <div className="absolute right-0 top-full mt-1 w-52 bg-sp-popup border border-sp-divider/60 rounded-m3-md z-[110] overflow-visible py-1.5 text-sm" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
-               {/* View Full Profile */}
-               <button
-                 onClick={() => { setShowFullProfile(true); setMenuOpen(false) }}
-                 className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text transition-colors"
-               >View Full Profile</button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-52 bg-sp-popup border border-sp-divider/60 rounded-m3-md z-[110] overflow-visible md:py-1.5 py-2 md:text-sm text-[15px]" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
+                {/* View Full Profile */}
+                <button
+                  onClick={() => { setShowFullProfile(true); setMenuOpen(false) }}
+                  className="w-full text-left md:px-3 px-4 md:py-2 py-2.5 hover:bg-white/10 text-sp-text transition-colors"
+                >View Full Profile</button>
 
-               {isSelf ? (
-                 <>
-                   {/* Edit Profile — self only */}
-                   <button
-                     onClick={() => { navigate('/channels/settings?tab=profile'); setMenuOpen(false); onClose() }}
-                     className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text transition-colors"
-                   >Edit Profile</button>
-                 </>
-               ) : (
-                 <>
-                   {/* Invite to Server submenu */}
-                   <div
-                     className="relative"
-                     onMouseEnter={() => setShowInviteSubmenu(true)}
-                     onMouseLeave={() => setShowInviteSubmenu(false)}
-                   >
-                     <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text transition-colors flex items-center justify-between">
-                       <span>Invite to Server</span>
-                       <Icon name="chevron-right" size={14} className="text-sp-muted" />
-                     </button>
-                     {showInviteSubmenu && (
-                       <div className="absolute left-full top-0 ml-1 w-48 bg-sp-popup border border-sp-divider/60 rounded-m3-md py-1.5" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
-                         {!myServers && <div className="px-3 py-2 text-xs text-sp-muted">Loading…</div>}
-                         {myServers && myServers.length === 0 && <div className="px-3 py-2 text-xs text-sp-muted">No servers</div>}
-                         {myServers?.map(s => (
-                           <button
-                             key={s.id}
-                             onClick={() => handleInviteToServer(s.id)}
-                             className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text text-sm transition-colors truncate"
-                           >{s.title}</button>
-                         ))}
-                       </div>
-                     )}
-                   </div>
+                {isSelf ? (
+                  <>
+                    {/* Edit Profile — self only */}
+                    <button
+                      onClick={() => { navigate('/channels/settings?tab=profile'); setMenuOpen(false); onClose() }}
+                      className="w-full text-left md:px-3 px-4 md:py-2 py-2.5 hover:bg-white/10 text-sp-text transition-colors"
+                    >Edit Profile</button>
+                  </>
+                ) : (
+                  <>
+                    {/* Invite to Server submenu */}
+                    <div
+                      className="relative"
+                      onMouseEnter={() => setShowInviteSubmenu(true)}
+                      onMouseLeave={() => setShowInviteSubmenu(false)}
+                    >
+                      <button className="w-full text-left md:px-3 px-4 md:py-2 py-2.5 hover:bg-white/10 text-sp-text transition-colors flex items-center justify-between">
+                        <span>Invite to Server</span>
+                        <Icon name="chevron-right" size={16} className="text-sp-muted" />
+                      </button>
+                      {showInviteSubmenu && (
+                        <div className="absolute left-full top-0 ml-1 w-48 bg-sp-popup border border-sp-divider/60 rounded-m3-md md:py-1.5 py-2" style={{ boxShadow: 'var(--m3-shadow-3)' }}>
+                          {!myServers && <div className="md:px-3 px-4 md:py-2 py-2.5 md:text-xs text-[13px] text-sp-muted">Loading…</div>}
+                          {myServers && myServers.length === 0 && <div className="md:px-3 px-4 md:py-2 py-2.5 md:text-xs text-[13px] text-sp-muted">No servers</div>}
+                          {myServers?.map(s => (
+                            <button
+                              key={s.id}
+                              onClick={() => handleInviteToServer(s.id)}
+                              className="w-full text-left md:px-3 px-4 md:py-2 py-2.5 hover:bg-white/10 text-sp-text md:text-sm text-[15px] transition-colors truncate"
+                            >{s.title}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-                   {/* Separator */}
-                   <div className="my-1 border-t border-white/[0.08]" />
+                    {/* Separator */}
+                    <div className="my-1 border-t border-white/[0.08]" />
 
-                   {/* Ignore */}
-                   <button className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-text transition-colors"
-                     onClick={() => setMenuOpen(false)}
-                   >Ignore</button>
+                    {/* Ignore */}
+                    <button className="w-full text-left md:px-3 px-4 md:py-2 py-2.5 hover:bg-white/10 text-sp-text transition-colors"
+                      onClick={() => setMenuOpen(false)}
+                    >Ignore</button>
 
-                   {/* Block */}
-                   <button
-                     onClick={() => { isBlocked ? unblock(userId) : block(userId); setMenuOpen(false) }}
-                     disabled={blockPending}
-                     className="w-full text-left px-3 py-2 hover:bg-red-500/20 text-red-400 transition-colors"
-                   >{isBlocked ? 'Unblock' : 'Block'}</button>
-                 </>
-               )}
+                    {/* Block */}
+                    <button
+                      onClick={() => { isBlocked ? unblock(userId) : block(userId); setMenuOpen(false) }}
+                      disabled={blockPending}
+                      className="w-full text-left md:px-3 px-4 md:py-2 py-2.5 hover:bg-red-500/20 text-red-400 transition-colors"
+                    >{isBlocked ? 'Unblock' : 'Block'}</button>
+                  </>
+                )}
 
-               {/* Separator + Copy User ID (dev mode only) */}
-               {devMode && (
-                 <>
-                   <div className="my-1 border-t border-white/[0.08]" />
-                   <button
-                     onClick={() => { navigator.clipboard.writeText(userId); setMenuOpen(false) }}
-                     className="w-full text-left px-3 py-2 hover:bg-white/10 text-sp-muted hover:text-sp-text transition-colors"
-                   >Copy User ID</button>
-                 </>
-               )}
-             </div>
-           )}
-         </div>
-       </div>
+                {/* Separator + Copy User ID (dev mode only) */}
+                {devMode && (
+                  <>
+                    <div className="my-1 border-t border-white/[0.08]" />
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(userId); setMenuOpen(false) }}
+                      className="w-full text-left md:px-3 px-4 md:py-2 py-2.5 hover:bg-white/10 text-sp-muted hover:text-sp-text transition-colors"
+                    >Copy User ID</button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-       <div className="px-4 pb-4 relative">
+        <div className="px-4 pb-4 relative">
           {/* Avatar */}
-          <div className="absolute -top-10 left-4 rounded-full p-1.5 bg-sp-sidebar group hover:bg-sp-sidebar/80 transition-colors cursor-pointer" onClick={() => setShowFullProfile(true)}>
+          <div className="absolute -top-12 left-4 rounded-full p-1.5 bg-sp-sidebar group hover:bg-sp-sidebar/80 transition-colors cursor-pointer" onClick={() => setShowFullProfile(true)}>
              <AvatarWithStatus user={user} size={80} ringColor="#121214" />
              <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 <span className="text-white text-xs font-bold uppercase tracking-wider">View</span>
@@ -229,8 +229,8 @@ export function ProfileCard({ userId, onClose, position }: Props) {
           </div>
           
           <div className="mt-12">
-             <div className="flex items-center gap-2">
-               <div className="text-xl font-bold leading-tight">{user.username}</div>
+           <div className="flex items-center gap-2">
+                <div className="md:text-xl text-2xl font-bold leading-tight">{user.username}</div>
                {!isSelf && (
                  <span
                    title="Add Note"
@@ -245,9 +245,9 @@ export function ProfileCard({ userId, onClose, position }: Props) {
              <div className="text-sm text-sp-muted">{user.pronouns}</div>
              <div className="text-xs text-sp-muted mt-1">Account created: {new Date(user.created_at).toLocaleDateString()}</div>
              
-             <div className="mt-4 border-t border-sp-input pt-2">
-                 <div className="text-xs font-bold text-sp-muted uppercase mb-1">About Me</div>
-                 <div className="text-sm text-sp-text/90 whitespace-pre-wrap break-words leading-relaxed">
+              <div className="mt-4 border-t border-sp-input pt-2">
+                  <div className="text-xs font-bold text-sp-muted uppercase mb-1">About Me</div>
+                  <div className="md:text-sm text-[15px] text-sp-text/90 whitespace-pre-wrap break-words leading-relaxed">
                     {user.description
                       ? <Linkified text={user.description} noMentions />
                       : <span className="italic text-sp-muted">No bio yet.</span>}
@@ -256,8 +256,8 @@ export function ProfileCard({ userId, onClose, position }: Props) {
 
              <form onSubmit={handleMessage} className="mt-4">
                  {!isSelf && (
-                   <input 
-                      className="input w-full bg-sp-bg" 
+                    <input 
+                       className="input w-full bg-sp-bg md:text-sm text-[15px]" 
                       placeholder={`Message @${user.username}`}
                       value={msg}
                       onChange={e => setMsg(e.target.value)}

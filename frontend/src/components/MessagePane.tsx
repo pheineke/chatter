@@ -202,18 +202,18 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
     return (
       <div className="flex flex-col h-full">
         {/* Channel header */}
-        <div className="flex items-center gap-2 px-4 border-b border-sp-divider/60 shrink-0 h-12 min-w-0">
+        <div className="flex items-center gap-3 px-4 border-b border-sp-divider/60 shrink-0 md:h-12 h-14 min-w-0">
           {onOpenNav && (
             <button
-              className="md:hidden p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5"
+              className="md:hidden p-1.5 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center"
               onClick={onOpenNav}
               aria-label="Open navigation"
             >
-              <Icon name="menu" size={22} />
+              <Icon name="menu" size={24} />
             </button>
           )}
-          <Icon name="headphones" size={16} className="text-sp-muted shrink-0" />
-          <span className="font-bold truncate select-none">{channel.title}</span>
+          <Icon name="headphones" size={18} className="text-sp-muted shrink-0" />
+          <span className="font-bold truncate select-none md:text-sm text-base">{channel.title}</span>
         </div>
         {/* Join Voice content */}
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-sp-muted">
@@ -234,19 +234,19 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
   return (
     <div className="server-font-scope flex flex-col h-full">
       {/* Channel header */}
-      <div className="flex items-center gap-2 px-4 border-b border-sp-divider/60 shrink-0 h-12 min-w-0">
+      <div className="flex items-center gap-3 px-4 border-b border-sp-divider/60 shrink-0 md:h-12 h-14 min-w-0">
         {/* Mobile: open left-panel drawer */}
         {onOpenNav && (
           <button
-            className="md:hidden p-1 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center pt-1.5"
+            className="md:hidden p-1.5 -ml-1 mr-1 text-sp-muted hover:text-sp-text shrink-0 flex items-center justify-center"
             onClick={onOpenNav}
             aria-label="Open navigation"
           >
-            <Icon name="menu" size={22} />
+            <Icon name="menu" size={24} />
           </button>
         )}
-        <Icon name={textChannelIcon} size={16} className="text-sp-muted shrink-0" />
-        <span className="font-bold truncate select-none">{channel?.title ?? channelId}</span>
+        <Icon name={textChannelIcon} size={18} className="text-sp-muted shrink-0" />
+        <span className="font-bold truncate select-none md:text-sm text-base">{channel?.title ?? channelId}</span>
         {channel?.description && (
           <>
             <div className="w-px h-5 bg-sp-divider/80 shrink-0 mx-1 hidden md:block" />
@@ -265,7 +265,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
             ref={notifBtnRef}
             onClick={() => setShowNotifMenu(v => !v)}
             title="Notification settings"
-            className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center ${showNotifMenu ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
+            className={`p-2 rounded transition-colors shrink-0 flex items-center justify-center ${showNotifMenu ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
           >
             <Icon name={notifLevel === 'nothing' ? 'bell-off' : 'bell'} size={20} />
           </button>
@@ -305,7 +305,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
         <button
           onClick={() => setShowPins(v => !v)}
           title={showPins ? 'Close pins' : 'Pinned messages'}
-          className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center gap-1 ${showPins ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
+          className={`p-2 rounded transition-colors shrink-0 flex items-center justify-center gap-1.5 ${showPins ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
         >
           <Icon name="pin" size={20} />
           {pinnedIds.size > 0 && (
@@ -316,7 +316,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
         <button
           onClick={() => setShowMembers(v => !v)}
           title="Toggle member list"
-          className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center ${showMembers ? 'text-sp-text bg-sp-input/60' : 'text-sp-muted hover:text-sp-text hover:bg-sp-input/40'}`}
+          className={`p-2 rounded transition-colors shrink-0 flex items-center justify-center ${showMembers ? 'text-sp-text bg-sp-input/60' : 'text-sp-muted hover:text-sp-text hover:bg-sp-input/40'}`}
         >
           <Icon name="people" size={20} />
         </button>
@@ -335,13 +335,13 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
               }}
               onKeyDown={e => { if (e.key === 'Escape') { closeSearch() } }}
               placeholder={`Search ${channel?.title ?? ''}…`}
-              className="bg-sp-input border border-sp-divider/60 rounded px-2.5 h-7 text-sm text-sp-text placeholder:text-sp-muted outline-none mr-1 w-[30vw] max-w-[220px] min-w-[80px]"
+              className="bg-sp-input border border-sp-divider/60 rounded px-3 md:h-7 h-9 md:text-sm text-[15px] text-sp-text placeholder:text-sp-muted outline-none mr-2 w-[40vw] max-w-[260px] min-w-[100px]"
             />
           )}
           <button
             onClick={() => { if (searchFocused) { closeSearch() } else { setSearchFocused(true) } }}
             title={searchFocused ? 'Close search (Esc)' : 'Search messages'}
-            className={`p-1.5 rounded transition-colors shrink-0 flex items-center justify-center ${searchFocused ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
+            className={`p-2 rounded transition-colors shrink-0 flex items-center justify-center ${searchFocused ? 'text-sp-text' : 'text-sp-muted hover:text-sp-text'}`}
           >
             <Icon name="search" size={20} />
           </button>
@@ -408,19 +408,21 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
 
       {/* Body: messages + optional sidebars */}
       <div className="flex flex-1 min-h-0">
-        <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          {/* Messages */}
-          <MessageList
-            channelId={channelId}
-            serverId={serverId}
-            onReply={handleReply}
-            onRegisterScrollTo={handleRegisterScrollTo}
-            pinnedIds={pinnedIds}
-          />
+        <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-y-auto">
+          {/* Messages — fills remaining space via flex-1 wrapper */}
+          <div className="flex-1 min-h-0 relative">
+            <MessageList
+              channelId={channelId}
+              serverId={serverId}
+              onReply={handleReply}
+              onRegisterScrollTo={handleRegisterScrollTo}
+              pinnedIds={pinnedIds}
+            />
+          </div>
 
           {/* Typing indicator */}
           {typingUsers.length > 0 && (
-            <div className="px-4 py-1 text-xs text-sp-muted flex items-center gap-1 select-none shrink-0">
+            <div className="sticky bottom-0 z-10 bg-sp-bg px-4 py-1 text-xs text-sp-muted flex items-center gap-1 select-none shrink-0">
               <span className="flex gap-0.5 items-center">
                 <span className="w-1 h-1 bg-sp-muted rounded-full animate-bounce [animation-delay:0ms]" />
                 <span className="w-1 h-1 bg-sp-muted rounded-full animate-bounce [animation-delay:150ms]" />
@@ -438,15 +440,17 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
           )}
 
           {/* Input */}
-          <MessageInput
-            channelId={channelId}
-            serverId={serverId}
-            placeholder={`Message #${channel?.title ?? channelId}`}
-            replyTo={replyTo}
-            onCancelReply={handleCancelReply}
-            onTyping={sendTyping}
-            slowmodeDelay={channel?.slowmode_delay ?? 0}
-          />
+          <div className="sticky bottom-0 z-10 bg-sp-bg">
+            <MessageInput
+              channelId={channelId}
+              serverId={serverId}
+              placeholder={`Message #${channel?.title ?? channelId}`}
+              replyTo={replyTo}
+              onCancelReply={handleCancelReply}
+              onTyping={sendTyping}
+              slowmodeDelay={channel?.slowmode_delay ?? 0}
+            />
+          </div>
         </div>
 
         {/* Pinned messages panel */}

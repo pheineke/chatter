@@ -135,7 +135,7 @@ export function MemberSidebar({ serverId, onClose }: Props) {
         onClick={onClose} 
       />
 <div className="fixed inset-y-0 right-0 z-40 md:static flex flex-col w-80 max-w-[85vw] md:w-60 shrink-0 bg-sp-bg h-full overflow-y-auto border-l border-sp-divider/50 shadow-sp-3 md:shadow-none transition-transform duration-200 translate-x-0 md:translate-x-0">
-        <div className="px-3 flex items-center gap-2 h-12 shrink-0 border-b border-sp-divider/50 shadow-sm">
+        <div className="md:px-3 px-4 flex items-center gap-2 md:h-12 h-14 shrink-0 border-b border-sp-divider/50 shadow-sm">
           {/* Mobile close button */}
           {onClose && (
             <button
@@ -146,7 +146,7 @@ export function MemberSidebar({ serverId, onClose }: Props) {
               <Icon name="arrow-ios-back" size={24} />
             </button>
           )}
-        <span className="text-xs font-bold uppercase text-sp-muted tracking-wider">
+        <span className="md:text-xs text-[13px] font-bold uppercase text-sp-muted tracking-wider">
           Members — {members.length}
         </span>
       </div>
@@ -269,9 +269,9 @@ function Section({ label, color, members, onClickMember, onContextMenu }: {
 }) {
   return (
     <div className="mb-2">
-      <div className="px-3 py-1 flex items-center gap-1.5 text-[11px] font-bold uppercase text-sp-muted tracking-wider">
+      <div className="md:px-3 px-4 md:py-1 py-1.5 flex items-center gap-1.5 md:text-[11px] text-[13px] font-bold uppercase text-sp-muted tracking-wider">
         {color && (
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+          <span className="md:w-2 md:h-2 w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
         )}
         {label} — {members.length}
       </div>
@@ -300,13 +300,13 @@ function MemberRow({ member, onClick, onContextMenu }: { member: Member; onClick
       onClick={onClick}
       onContextMenu={onContextMenu}
       data-avatar-ring
-      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded mx-1 hover:bg-sp-input/60 transition-colors text-left group select-none"
+      className="w-full flex items-center gap-2.5 md:px-3 px-4 md:py-1.5 py-2.5 rounded mx-1 hover:bg-sp-input/60 transition-colors text-left group select-none"
       style={{ width: 'calc(100% - 8px)', '--avatar-ring': '#1a1a1e', '--avatar-ring-hover': '#2c2d32' } as React.CSSProperties}
     >
-      <AvatarWithStatus user={member.user} size={32} />
+      <AvatarWithStatus user={member.user} size={34} />
       <span className="flex-1 min-w-0 flex flex-col leading-tight">
         <span
-          className={`text-sm font-medium truncate transition-colors ${
+          className={`md:text-sm text-[15px] font-medium truncate transition-colors ${
             member.user.status === 'offline' ? 'text-sp-muted' : 'text-sp-text'
           } group-hover:text-sp-text`}
           style={nameColor && member.user.status !== 'offline' ? { color: nameColor } : undefined}
@@ -314,7 +314,7 @@ function MemberRow({ member, onClick, onContextMenu }: { member: Member; onClick
           {member.nickname ?? member.user.username}
         </span>
         {member.user.custom_status && (
-          <span className="text-xs text-sp-muted truncate">
+          <span className="md:text-xs text-[13px] text-sp-muted truncate">
             {member.user.custom_status}
           </span>
         )}
