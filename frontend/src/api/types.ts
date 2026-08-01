@@ -239,10 +239,12 @@ export interface Message {
   attachments: Attachment[]
   reactions: Reaction[]
   mentions: MentionInfo[]
-  /** True when content is AES-GCM ciphertext (base64) encrypted with the DM shared key */
+  /** True when content is ciphertext (base64) — either legacy AES-GCM (DMs, pre-MLS) or an MLS PrivateMessage */
   is_encrypted: boolean
-  /** AES-GCM nonce (base64); required when is_encrypted is true */
+  /** AES-GCM nonce (base64); only set for legacy (pre-MLS) encrypted DMs */
   nonce: string | null
+  /** MLS group epoch `content` was encrypted under; set for MLS-encrypted channels/DMs */
+  mls_epoch: number | null
   /** Optional flag for messages only visible to the local user (Slash command responses) */
   is_ephemeral?: boolean
 }

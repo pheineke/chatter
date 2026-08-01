@@ -8,7 +8,7 @@ import { useSoundManager } from './useSoundManager'
 import { activeServerIds } from './serverRegistry'
 import { useNotificationSettings } from './useNotificationSettings'
 import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
-import { useE2EE } from '../contexts/E2EEContext'
+import { useMLS } from '../contexts/MLSContext'
 import { getConversations } from '../api/dms'
 import type { Channel, DMConversation, Friend, Message, UserStatus } from '../api/types'
 
@@ -21,7 +21,7 @@ import type { Channel, DMConversation, Friend, Message, UserStatus } from '../ap
 export function useUnreadDMs(): number {
   const qc = useQueryClient()
   const { user, updateUser } = useAuth()
-  const e2ee = useE2EE()
+  const mls = useMLS()
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
   const { channelLevel, serverLevel } = useNotificationSettings()
@@ -165,9 +165,9 @@ export function useUnreadDMs(): number {
         ;(async () => {
           let body = data.content
           // Attempt decryption if encrypted and we have the tools
-          if (data.is_encrypted && data.content && data.nonce && e2ee.isEnabled) {
+          if (data.is_encrypted && data.content && data.mls_epoch != null) {
             try {
-              const plain = await e2ee.decryptFromUser(data.author.id, data.content, data.nonce)
+              const plain = await mls.decryptForChannel(data.channel_id, data.content, data.mls_epoch)
               body = plain ?? 'Encrypted Message'
             } catch {
               body = 'Encrypted Message'

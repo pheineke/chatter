@@ -1,0 +1,165 @@
+"""
+Tests for the MLS (RFC 9420) delivery-service endpoints (app/routers/mls.py).
+
+These exercise the server's role as a pure, untrusted relay: it never sees
+plaintext or private key material, only opaque bytes we hand it directly (no
+real ts-mls objects needed here — the actual cryptographic round-trip is
+validated separately, client-side, against the real ts-mls library). What
+matters for these tests is the delivery-service *protocol*: epoch bookkeeping,
+optimistic-concurrency conflict handling, single-use KeyPackages, and that
+welcomes/events are only visible to their intended recipients.
+
+Uses the shared `client`/`db` fixtures from conftest.py (Depends(get_db)
+throughout app/routers/mls.py, no AsyncSessionLocal bypass), so — unlike some
+of the older WS/message tests — these don't hit the pre-existing
+fixture/AsyncSessionLocal DB-mismatch issue described in the repo's test
+notes.
+"""
+import base64
+
+import pytest
+from httpx import AsyncClient
+
+from tests.conftest import register_and_login, create_server, create_channel
+
+pytestmark = pytest.mark.asyncio
+
+
+def _b64(raw: bytes) -> str:
+    return base64.b64encode(raw).decode()
+
+
+async def _channel_for(client: AsyncClient, headers: dict) -> str:
+    server = await create_server(client, headers, "MLS Test Server")
+    channel = await create_channel(client, headers, server["id"], "general")
+    return channel["id"]
+
+
+async def test_key_package_publish_and_single_use(client: AsyncClient):
+    alice = await register_and_login(client, "mls_alice", "pass1234")
+    bob = await register_and_login(client, "mls_bob", "pass1234")
+    bob_me = (await client.get("/users/me", headers=bob)).json()
+
+    r = await client.post("/mls/key-packages", json={"key_package": _b64(b"bob-kp-bytes")}, headers=bob)
+    assert r.status_code == 201, r.text
+
+    r = await client.get(f"/mls/key-packages/{bob_me['id']}", headers=alice)
+    assert r.status_code == 200, r.text
+    assert base64.b64decode(r.json()["key_package"]) == b"bob-kp-bytes"
+
+    # Single-use: a second claim finds nothing left.
+    r = await client.get(f"/mls/key-packages/{bob_me['id']}", headers=alice)
+    assert r.status_code == 404, r.text
+
+
+async def test_key_package_missing_returns_404(client: AsyncClient):
+    alice = await register_and_login(client, "mls_alice2", "pass1234")
+    bob = await register_and_login(client, "mls_bob2", "pass1234")
+    bob_id = (await client.get("/users/me", headers=bob)).json()["id"]
+
+    r = await client.get(f"/mls/key-packages/{bob_id}", headers=alice)
+    assert r.status_code == 404
+
+
+async def test_group_init_is_idempotent(client: AsyncClient):
+    alice = await register_and_login(client, "mls_alice3", "pass1234")
+    channel_id = await _channel_for(client, alice)
+
+    r1 = await client.post(f"/mls/groups/{channel_id}", json={"ciphersuite": "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"}, headers=alice)
+    assert r1.status_code == 200
+    assert r1.json()["current_epoch"] == 0  # matches ts-mls createGroup()'s initial epoch
+
+    r2 = await client.post(f"/mls/groups/{channel_id}", json={"ciphersuite": "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"}, headers=alice)
+    assert r2.status_code == 200
+    assert r2.json() == r1.json()  # second call returns the same row, doesn't create a new one
+
+
+async def test_get_group_404_before_init(client: AsyncClient):
+    alice = await register_and_login(client, "mls_alice4", "pass1234")
+    channel_id = await _channel_for(client, alice)
+    r = await client.get(f"/mls/groups/{channel_id}", headers=alice)
+    assert r.status_code == 404
+
+
+async def test_commit_advances_epoch_and_delivers_scoped_welcome(client: AsyncClient):
+    alice = await register_and_login(client, "mls_alice5", "pass1234")
+    channel_id = await _channel_for(client, alice)
+    bob = await register_and_login(client, "mls_bob5", "pass1234")
+    bob_id = (await client.get("/users/me", headers=bob)).json()["id"]
+    carol = await register_and_login(client, "mls_carol5", "pass1234")
+
+    await client.post(f"/mls/groups/{channel_id}", json={"ciphersuite": "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"}, headers=alice)
+
+    r = await client.post(
+        f"/mls/groups/{channel_id}/commit",
+        json={
+            "parent_epoch": 0,
+            "commit": _b64(b"commit-bytes"),
+            "welcomes": [{"recipient_user_id": bob_id, "welcome": _b64(b"welcome-for-bob")}],
+        },
+        headers=alice,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json() == {"epoch": 1, "seq": 1}
+
+    group = (await client.get(f"/mls/groups/{channel_id}", headers=alice)).json()
+    assert group["current_epoch"] == 1
+
+    # Bob (the Welcome recipient) sees both the commit and his welcome.
+    events = (await client.get(f"/mls/groups/{channel_id}/events?since_seq=0", headers=bob)).json()
+    assert [e["event_type"] for e in events] == ["commit", "welcome"]
+    assert events[1]["recipient_user_id"] == bob_id
+    assert base64.b64decode(events[1]["payload"]) == b"welcome-for-bob"
+
+    # Carol has no server/channel access at all -> 403, not just an empty/filtered list.
+    r = await client.get(f"/mls/groups/{channel_id}/events?since_seq=0", headers=carol)
+    assert r.status_code == 403
+
+
+async def test_stale_commit_rejected_with_current_epoch(client: AsyncClient):
+    alice = await register_and_login(client, "mls_alice6", "pass1234")
+    channel_id = await _channel_for(client, alice)
+    await client.post(f"/mls/groups/{channel_id}", json={"ciphersuite": "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"}, headers=alice)
+
+    ok = await client.post(
+        f"/mls/groups/{channel_id}/commit",
+        json={"parent_epoch": 0, "commit": _b64(b"first"), "welcomes": []},
+        headers=alice,
+    )
+    assert ok.status_code == 200
+    assert ok.json()["epoch"] == 1
+
+    # Retrying against the now-stale epoch 0 must fail with the CURRENT epoch
+    # reported back, not the stale one the client sent.
+    stale = await client.post(
+        f"/mls/groups/{channel_id}/commit",
+        json={"parent_epoch": 0, "commit": _b64(b"second"), "welcomes": []},
+        headers=alice,
+    )
+    assert stale.status_code == 409
+    assert "epoch is 1" in stale.json()["detail"]
+
+
+async def test_commit_requires_existing_group(client: AsyncClient):
+    alice = await register_and_login(client, "mls_alice7", "pass1234")
+    channel_id = await _channel_for(client, alice)
+    r = await client.post(
+        f"/mls/groups/{channel_id}/commit",
+        json={"parent_epoch": 0, "commit": _b64(b"x"), "welcomes": []},
+        headers=alice,
+    )
+    assert r.status_code == 404
+
+
+async def test_application_message_carries_mls_epoch(client: AsyncClient):
+    alice = await register_and_login(client, "mls_alice8", "pass1234")
+    channel_id = await _channel_for(client, alice)
+    r = await client.post(
+        f"/channels/{channel_id}/messages",
+        json={"content": _b64(b"ciphertext"), "is_encrypted": True, "mls_epoch": 3},
+        headers=alice,
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["is_encrypted"] is True
+    assert body["mls_epoch"] == 3

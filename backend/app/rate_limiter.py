@@ -276,3 +276,29 @@ async def rate_limit_decoration_generate(current_user: CurrentUser) -> None:
         window_seconds=600.0,
         detail="Too many requests. Please slow down.",
     )
+
+
+# ---------------------------------------------------------------------------
+# MLS (RFC 9420) delivery-service limits
+# ---------------------------------------------------------------------------
+
+async def rate_limit_mls_key_package_publish(current_user: CurrentUser) -> None:
+    """Publishing KeyPackages: max 30 per 10 minutes per user (clients keep a
+    small pool topped up; this generously covers normal churn while blocking
+    a runaway/misbehaving client from flooding storage)."""
+    await _enforce_limit(
+        key=f"mls-kp-publish:{current_user.id}",
+        limit=30,
+        window_seconds=600.0,
+        detail="Publishing key packages too quickly. Please wait {retry_after} seconds.",
+    )
+
+
+async def rate_limit_mls_commit(current_user: CurrentUser) -> None:
+    """Submitting commits: max 20 per minute per user across all their groups."""
+    await _enforce_limit(
+        key=f"mls-commit:{current_user.id}",
+        limit=20,
+        window_seconds=60.0,
+        detail="Too many group updates too quickly. Please wait {retry_after} seconds.",
+    )

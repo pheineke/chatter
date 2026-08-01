@@ -13,7 +13,7 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { Icon } from './Icon'
 import type { Message } from '../api/types'
-import { useE2EE } from '../contexts/E2EEContext'
+import { useMLS } from '../contexts/MLSContext'
 import {
   getCachedMessages,
   cachePutMessages,
@@ -29,9 +29,8 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
   const { dmUserId } = useParams<{ dmUserId: string }>()
   const { user } = useAuth()
   const qc = useQueryClient()
-  const e2ee = useE2EE()
+  const mls = useMLS()
   const [replyTo, setReplyTo] = useState<Message | null>(null)
-  const [partnerFingerprint, setPartnerFingerprint] = useState<string | null>(null)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [cachedMsgs, setCachedMsgs] = useState<Message[]>([])
   const [outboxMsgs, setOutboxMsgs] = useState<OutboxMessage[]>([])
@@ -43,14 +42,6 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
     scrollToMessageRef.current = fn
   }, [])
   const isSelf = !!user && user.id === dmUserId
-
-  // Fetch partner's E2EE fingerprint for display in header
-  useEffect(() => {
-    if (!dmUserId || isSelf || !e2ee.isEnabled) { setPartnerFingerprint(null); return }
-    let cancelled = false
-    e2ee.getPartnerFingerprint(dmUserId).then(fp => { if (!cancelled) setPartnerFingerprint(fp) })
-    return () => { cancelled = true }
-  }, [dmUserId, isSelf, e2ee.isEnabled])
 
   // Track online / offline transitions
   useEffect(() => {
@@ -76,6 +67,15 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
     enabled: !!dmUserId && !isSelf,
     staleTime: Infinity, // channel ID never changes for a pair
   })
+
+  // Bootstrap (or catch up) the MLS group for this DM as soon as we know
+  // the channel id — founds it if nobody has yet, Adding both participants.
+  useEffect(() => {
+    if (!dmChannel || !user || isSelf || !dmUserId) return
+    mls.ensureChannelReady(dmChannel.channel_id, [user.id, dmUserId]).catch((err) =>
+      console.error('[MLS] Failed to ready DM group:', err),
+    )
+  }, [dmChannel?.channel_id, user?.id, dmUserId, isSelf])
 
   // When going offline, load cached messages + pending outbox for this channel
   useEffect(() => {
@@ -174,15 +174,6 @@ export function DMPane({ onOpenNav }: { onOpenNav?: () => void }) {
         >
           {otherUser?.username ?? '…'}
         </button>
-        {partnerFingerprint && (
-          <span
-            className="ml-1 flex items-center gap-1 md:text-xs text-[13px] text-green-400 font-mono bg-green-400/10 md:px-2 md:py-0.5 px-2.5 py-1 rounded cursor-help shrink-0"
-            title={`E2EE fingerprint: ${partnerFingerprint}`}
-          >
-            <Icon name="lock-closed" size={13} />
-            {partnerFingerprint.split(' ').slice(0, 4).join(' ')}…
-          </span>
-        )}
       </div>
 
       {/* Messages */}

@@ -17,13 +17,13 @@ export async function sendMessage(
   channelId: string,
   content: string | null,
   replyToId?: string,
-  encrypted?: { ciphertext: string; nonce: string },
+  mls?: { ciphertext: string; epoch: number },
 ): Promise<Message> {
   const { data } = await client.post<Message>(`/channels/${channelId}/messages`, {
-    content: encrypted ? encrypted.ciphertext : content || null,
+    content: mls ? mls.ciphertext : content || null,
     reply_to_id: replyToId ?? null,
-    is_encrypted: !!encrypted,
-    nonce: encrypted?.nonce ?? null,
+    is_encrypted: !!mls,
+    mls_epoch: mls?.epoch ?? null,
   })
   return data
 }

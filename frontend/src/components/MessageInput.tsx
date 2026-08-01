@@ -7,7 +7,8 @@ import { getCommands, createInteraction } from '../api/interactions'
 import { Icon } from './Icon'
 import { EmojiPicker } from './EmojiPicker'
 import { UserAvatar } from './UserAvatar'
-import { useE2EE } from '../contexts/E2EEContext'
+import { useMLS } from '../contexts/MLSContext'
+import { useAuth } from '../contexts/AuthContext'
 import type { Message, Member, ApplicationCommandRead } from '../api/types'
 
 const TYPING_THROTTLE_MS = 8_000  // retransmit at most every 8s while typing (Discord-style)
@@ -53,7 +54,8 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
   const [emojiPickerPos, setEmojiPickerPos] = useState<{ x: number; y: number } | null>(null)
   const qc = useQueryClient()
   const lastTypingSent = useRef(0)
-  const e2ee = useE2EE()
+  const mls = useMLS()
+  const { user } = useAuth()
 
   // Cooldown state: timestamp (ms) when the user is allowed to send again
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
@@ -138,6 +140,27 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
     staleTime: Infinity,
   })
 
+  // Safety net: make sure this channel's MLS group is founded/synced before
+  // the user tries to send. For server channels, the channel-creation flow
+  // (task: server channel MLS bootstrap) already founds the group and Adds
+  // every member up front — this just covers channels that predate that, or
+  // a crashed founder. For DMs, DMPane already triggers this too; calling it
+  // again here is a cheap no-op (ensureChannelReady short-circuits once
+  // local state exists).
+  useEffect(() => {
+    if (!user) return
+    if (serverId) {
+      if (members.length === 0) return
+      mls.ensureChannelReady(channelId, members.map((m) => m.user_id)).catch((err) =>
+        console.error('[MLS] Failed to ready channel group:', err),
+      )
+    } else if (partnerId) {
+      mls.ensureChannelReady(channelId, [user.id, partnerId]).catch((err) =>
+        console.error('[MLS] Failed to ready DM group:', err),
+      )
+    }
+  }, [channelId, serverId, partnerId, user?.id, members.length])
+
   const { data: customEmojis = [] } = useQuery({
     queryKey: ['server-emojis', serverId],
     queryFn: () => getCustomEmojis(serverId || ''),
@@ -189,14 +212,14 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
 
   const sendMut = useMutation({
     mutationFn: async (content: string) => {
-      // Encrypt DM messages if E2EE is ready and a partnerId is supplied
-      if (partnerId && e2ee.isEnabled) {
-        const encrypted = await e2ee.encryptForUser(partnerId, content)
-        if (encrypted) {
-          return sendMessage(channelId, null, replyTo?.id, encrypted)
-        }
-        // Fall through to plaintext if partner has no public key
+      // Encrypt via MLS if this channel's group is ready (works for both
+      // server channels and DMs — one MLS group per channel_id).
+      const encrypted = await mls.encryptForChannel(channelId, content)
+      if (encrypted) {
+        return sendMessage(channelId, null, replyTo?.id, encrypted)
       }
+      // Group not ready yet (e.g. still founding/syncing) — fall through to
+      // plaintext rather than block the send.
       return sendMessage(channelId, content, replyTo?.id)
     },
     onSuccess: (_data, _variables) => {
@@ -225,10 +248,10 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
   const uploadMut = useMutation({
     mutationFn: async ({ file, content }: { file: File; content: string | null }) => {
       messageSentRef.current = false
-      // Encrypt the text portion for E2EE DM channels (same logic as sendMut)
-      let encrypted: { ciphertext: string; nonce: string } | undefined
-      if (partnerId && e2ee.isEnabled && content) {
-        const enc = await e2ee.encryptForUser(partnerId, content)
+      // Encrypt the text portion via MLS (same logic as sendMut) if present.
+      let encrypted: { ciphertext: string; epoch: number } | undefined
+      if (content) {
+        const enc = await mls.encryptForChannel(channelId, content)
         if (enc) encrypted = enc
       }
       const msg = await sendMessage(channelId, encrypted ? null : content, replyTo?.id, encrypted)

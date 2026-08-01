@@ -1113,9 +1113,11 @@ function PrivacyTab() {
         )}
       </div>
 
-      {/* E2EE section */}
+      {/* Personal notes encryption section. DMs and server channels are now
+          end-to-end encrypted separately via MLS (see MLSContext) — this key
+          only protects your private per-user notes (ProfileFullModal) at rest. */}
       <div className="bg-sp-sidebar rounded-lg p-4">
-        <div className="text-xs font-bold text-sp-muted uppercase mb-3">End-to-End Encryption</div>
+        <div className="text-xs font-bold text-sp-muted uppercase mb-3">Notes Encryption</div>
 
         {e2ee.initialising ? (
           <p className="text-sm text-sp-muted">Initialising encryption keys…</p>
@@ -1127,7 +1129,10 @@ function PrivacyTab() {
             <div className="rounded bg-sp-bg p-3">
               <div className="text-xs text-sp-muted mb-1">Your key fingerprint</div>
               <code className="text-xs font-mono text-green-400 break-all select-all">{e2ee.fingerprint ?? '—'}</code>
-              <p className="text-xs text-sp-muted mt-1">Compare this with the other person's view in a DM to verify your connection.</p>
+              <p className="text-xs text-sp-muted mt-1">
+                Encrypts your private notes about other users at rest. DMs and server channels use separate,
+                automatic end-to-end encryption (MLS) and aren't affected by this key.
+              </p>
             </div>
 
             {/* Actions */}
@@ -1180,7 +1185,7 @@ function PrivacyTab() {
                 </button>
               ) : (
                 <div className="col-span-full flex items-center gap-3 md:p-3 p-4 rounded bg-red-500/10 border border-red-500/30">
-                  <p className="text-sm text-red-400 flex-1">This will break decryption of old messages. Continue?</p>
+                  <p className="text-sm text-red-400 flex-1">This will break decryption of old notes. Continue?</p>
                   <button
                     disabled={rotateLoading}
                     onClick={async () => {

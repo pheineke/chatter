@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory, updateCategory, deleteCategory } from '../api/channels'
 import { getMembers, getServer, updateMySettings } from '../api/servers'
 import { useAuth } from '../contexts/AuthContext'
+import { useMLS } from '../contexts/MLSContext'
 import { AvatarWithStatus } from './AvatarWithStatus'
 import { Icon } from './Icon'
 import { useServerWS } from '../hooks/useServerWS'
@@ -40,6 +41,7 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice, onClos
   const channelId = channelMatch?.params.channelId
   const navigate = useNavigate()
   const { user, logout, refreshUser } = useAuth()
+  const mls = useMLS()
   const qc = useQueryClient()
 
   useServerWS(serverId ?? null, channelId)
@@ -267,11 +269,21 @@ export function ChannelSidebar({ voiceSession, onJoinVoice, onLeaveVoice, onClos
   async function handleCreateChannel() {
     if (!serverId || !newChannelName.trim()) return
     try {
-      await createChannel(serverId, { title: newChannelName, type: newChannelType })
+      const created = await createChannel(serverId, { title: newChannelName, type: newChannelType })
       qc.invalidateQueries({ queryKey: ['channels', serverId] })
       setShowAddChannel(false)
       setNewChannelName('')
       setCreateError(null)
+      if (created.type === 'text' && user) {
+        // We're the creator — found the channel's MLS group and batch-Add
+        // every current server member in one commit. Other already-online
+        // clients don't need to do anything: they'll receive a Welcome once
+        // this lands, or found it themselves if they somehow beat us here
+        // (ensureChannelReady's founder-race recovery handles that).
+        mls.ensureChannelReady(created.id, members.map((m) => m.user.id)).catch((err) =>
+          console.error('[MLS] Failed to found channel group:', err),
+        )
+      }
     } catch (err: any) {
       const detail = err?.response?.data?.detail ?? err?.message ?? 'Failed to create channel.'
       setCreateError(String(detail))

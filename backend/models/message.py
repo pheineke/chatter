@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Uuid, UniqueConstraint
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Uuid, UniqueConstraint, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -24,9 +24,15 @@ class Message(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     is_edited: Mapped[bool] = mapped_column(Boolean, default=False)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # E2EE: when True, `content` holds base64 AES-GCM ciphertext and `nonce` the IV
+    # E2EE: when True, `content` holds base64 ciphertext.
+    # - Legacy static-ECDH DMs (pre-MLS): `nonce` holds the AES-GCM IV.
+    # - MLS channels/DMs: `content` is base64 MLS PrivateMessage wire bytes,
+    #   `nonce` is unused (MLS's own AEAD framing carries its own nonce), and
+    #   `mls_epoch` records which group epoch this was encrypted under — a
+    #   client must have processed at least that epoch to be able to decrypt.
     is_encrypted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     nonce: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mls_epoch: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

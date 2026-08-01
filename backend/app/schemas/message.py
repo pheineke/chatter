@@ -54,7 +54,8 @@ class MessageBase(BaseModel):
 class MessageCreate(MessageBase):
     # Optional E2EE fields — clients set these instead of plain `content` when encrypting
     is_encrypted: bool = False
-    nonce: str | None = None
+    nonce: str | None = None  # legacy static-ECDH DMs only
+    mls_epoch: int | None = None  # MLS channels/DMs: epoch `content` was encrypted under
 
 
 class MessageUpdate(BaseModel):
@@ -80,9 +81,10 @@ class MessageRead(MessageBase):
     is_deleted: bool
     is_edited: bool
     edited_at: datetime | None
-    # E2EE fields — only present for DM messages that were encrypted client-side
+    # E2EE fields — only present for messages that were encrypted client-side
     is_encrypted: bool = False
     nonce: str | None = None
+    mls_epoch: int | None = None
     created_at: datetime
     attachments: list[AttachmentRead] = []
     reactions: list[ReactionRead] = []

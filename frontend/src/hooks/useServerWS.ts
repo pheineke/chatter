@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebSocket } from './useWebSocket'
@@ -7,6 +7,7 @@ import { useSoundManager } from './useSoundManager'
 import { activeServerIds } from './serverRegistry'
 import { useNotificationSettings } from './useNotificationSettings'
 import { useAuth } from '../contexts/AuthContext'
+import { useMLS } from '../contexts/MLSContext'
 import type { Channel, Category, Member, VoiceParticipant, User } from '../api/types'
 
 /** Voice presence query key for a given server. */
@@ -20,9 +21,33 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
   const qc = useQueryClient()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const mls = useMLS()
   const { notifyMessage, notifyServer } = useUnreadChannels()
   const { playSound } = useSoundManager()
   const { channelLevel, serverLevel } = useNotificationSettings()
+
+  // Keep every text channel's MLS group membership in sync with server
+  // membership. Scoped to server membership as a whole, not per-channel
+  // permission overrides — a defensible v1 boundary since the REST/WS layer
+  // (_require_channel_access) already independently gates who can actually
+  // fetch a channel's messages regardless of MLS group membership; this is
+  // defense-in-depth encryption, not the access-control mechanism itself.
+  // Best-effort: only succeeds on a client that already has local state for
+  // that channel's group (i.e. is already a member and currently online) —
+  // if no online member can commit right now, the affected channel just
+  // catches up (via syncGroup) next time someone who can commit is online.
+  const syncMembershipChange = useCallback(
+    (targetUserId: string, action: 'add' | 'remove') => {
+      if (!serverId) return
+      const channels = qc.getQueryData<Channel[]>(['channels', serverId]) ?? []
+      for (const ch of channels) {
+        if (ch.type !== 'text') continue
+        const op = action === 'add' ? mls.addMember(ch.id, targetUserId) : mls.removeMember(ch.id, targetUserId)
+        op.catch(() => { /* not our commit to make right now — fine, self-heals later */ })
+      }
+    },
+    [serverId, qc, mls],
+  )
 
   // Register/unregister so useUnreadDMs knows not to double-notify for this server.
   useEffect(() => {
@@ -183,6 +208,7 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           qc.invalidateQueries({ queryKey: ['members', serverId] })
           if (msg.type === 'server.member_kicked' || msg.type === 'server.member_banned') {
             const { user_id } = msg.data as { user_id: string }
+            syncMembershipChange(user_id, 'remove')
             if (user_id === user?.id) {
               // Current user was removed — evict from server list and navigate away
               qc.setQueryData<{ id: string }[]>(['servers'], (old = []) =>
@@ -191,7 +217,13 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
               navigate('/channels/@me', { replace: true })
             }
           }
+          if (msg.type === 'server.member_left') {
+            const { user_id } = msg.data as { user_id: string }
+            syncMembershipChange(user_id, 'remove')
+          }
           if (msg.type === 'server.member_joined') {
+            const { user_id } = msg.data as { user_id: string }
+            syncMembershipChange(user_id, 'add')
             // A join increments an invite's uses counter
             qc.invalidateQueries({ queryKey: ['invites', serverId] })
           }

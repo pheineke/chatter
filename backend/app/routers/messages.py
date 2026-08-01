@@ -363,6 +363,7 @@ async def send_message(
         reply_to_id=body.reply_to_id,
         is_encrypted=body.is_encrypted,
         nonce=body.nonce,
+        mls_epoch=body.mls_epoch,
     )
     db.add(msg)
     await db.flush()

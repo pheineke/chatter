@@ -18,7 +18,7 @@ import { useBlocks } from '../hooks/useBlocks'
 import { MarkdownContent } from './MarkdownContent'
 import { LinkEmbed } from './LinkEmbed'
 import { extractURLs, getDismissed } from '../utils/embeds'
-import { useE2EE } from '../contexts/E2EEContext'
+import { useMLS } from '../contexts/MLSContext'
 import { parseCustomEmojiToken, replaceCustomEmojiTokens } from '../utils/customEmojis'
 
 const RECENT_REACTIONS_KEY = 'recentReactions'
@@ -88,7 +88,7 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
   const { user } = useAuth()
   const { blockedIds, block, unblock } = useBlocks()
   const qc = useQueryClient()
-  const e2ee = useE2EE()
+  const mls = useMLS()
   const isOwn = user?.id === msg.author.id
   const [showBlocked, setShowBlocked] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -106,36 +106,29 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
   const [forwardQuery, setForwardQuery] = useState('')
   const [forwardBusyUserId, setForwardBusyUserId] = useState<string | null>(null)
 
-  // E2EE: decrypt the message content if it was sent encrypted
+  // MLS: decrypt the message content if it was sent encrypted
   const [decryptedContent, setDecryptedContent] = useState<string | null>(null)
   const [decryptFailed, setDecryptFailed] = useState(false)
 
   useEffect(() => {
-    if (!msg.is_encrypted || !msg.content || !msg.nonce) return
+    if (!msg.is_encrypted || !msg.content || msg.mls_epoch == null) return
 
-    // Wait for E2EE to finish initialising — avoid a permanent decryptFailed flag
-    // while keys are still loading on first mount.
-    if (e2ee.initialising) return
-
-    // Determine who the other party is: if I sent it, they are the DM partner; if they sent it, they are the author
-    const otherId = isOwn ? partnerId : msg.author.id
-    if (!otherId || !e2ee.isEnabled) {
-      setDecryptFailed(true)
-      return
-    }
+    // Wait for MLS identity/key-package bootstrap to finish — avoid a
+    // permanent decryptFailed flag while it's still loading on first mount.
+    if (!mls.ready) return
 
     // Reset on every retry so a previous false-fail doesn't persist
     setDecryptFailed(false)
     setDecryptedContent(null)
 
     let cancelled = false
-    e2ee.decryptFromUser(otherId, msg.content, msg.nonce).then(plain => {
+    mls.decryptForChannel(channelId, msg.content, msg.mls_epoch).then(plain => {
       if (cancelled) return
       if (plain === null) setDecryptFailed(true)
       else setDecryptedContent(plain)
     })
     return () => { cancelled = true }
-  }, [msg.id, msg.is_encrypted, msg.content, msg.nonce, isOwn, partnerId, e2ee])
+  }, [msg.id, msg.is_encrypted, msg.content, msg.mls_epoch, channelId, mls])
 
   // Effective display content: decrypted (if E2EE), otherwise raw
   const displayContent = msg.is_encrypted
@@ -262,7 +255,13 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
     try {
       const dm = await getDMChannel(userId)
       const payload = buildForwardText(msg, displayContent)
-      await sendMessage(dm.channel_id, payload)
+      await mls.ensureChannelReady(dm.channel_id, user ? [user.id, userId] : [])
+      const encrypted = await mls.encryptForChannel(dm.channel_id, payload)
+      if (encrypted) {
+        await sendMessage(dm.channel_id, null, undefined, encrypted)
+      } else {
+        await sendMessage(dm.channel_id, payload)
+      }
       setShowForwardModal(false)
       setForwardQuery('')
     } catch (err: any) {

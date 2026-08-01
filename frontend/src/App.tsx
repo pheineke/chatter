@@ -5,6 +5,7 @@ import { DesktopNotificationsProvider } from './contexts/DesktopNotificationsCon
 import { RequireAuth } from './components/RequireAuth'
 import { ReloadPrompt } from './components/ReloadPrompt'
 import { E2EEWrapper } from './components/E2EEWrapper'
+import { MLSWrapper } from './components/MLSWrapper'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import AppShell from './pages/AppShell'
@@ -27,7 +28,9 @@ export default function App() {
               element={
                 <RequireAuth>
                   <E2EEWrapper>
-                    <AppShell />
+                    <MLSWrapper>
+                      <AppShell />
+                    </MLSWrapper>
                   </E2EEWrapper>
                 </RequireAuth>
               }
