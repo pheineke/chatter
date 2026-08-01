@@ -1,8 +1,12 @@
 """
 WebSocket endpoints for real-time event streaming.
 
-Authentication uses a short-lived JWT passed as the `token` query parameter
-because browsers cannot set custom headers on WebSocket connections.
+Authentication: the connection is accepted immediately, then the client's
+first frame must be {"type": "auth", "token": "<jwt-or-api-token>"} (see
+app/ws_auth.py for why — the short version is that browsers give WebSocket
+connections no way to set an Authorization header, and a `?token=` query
+param ends up in every access log and history entry, so this project uses a
+post-connect auth message instead).
 
 Event envelope:
     {
@@ -21,14 +25,13 @@ import asyncio
 import json
 import uuid
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
-from app.auth import decode_access_token, hash_api_token
 from app.database import AsyncSessionLocal
 from app.presence import broadcast_presence
+from app.ws_auth import accept_and_authenticate
 from app.ws_manager import manager
-from models.api_token import ApiToken
 from models.channel import Channel, ChannelType
 from models.dm_channel import DMChannel
 from models.server import ServerMember
@@ -40,55 +43,6 @@ _HEARTBEAT_TIMEOUT = 90
 router = APIRouter(tags=["websocket"])
 
 
-from models.refresh_token import RefreshToken
-
-# ---------------------------------------------------------------------------
-# Auth helper
-# ---------------------------------------------------------------------------
-
-async def _authenticate_ws(ws: WebSocket, token: str) -> uuid.UUID:
-    """
-    Validate the token query param.  Accepts either a short-lived JWT or a
-    personal API token (``<prefix8>.<body>`` format).
-    Returns the user_id UUID or closes the websocket with 4001 if invalid.
-    """
-    # Try JWT first
-    payload = decode_access_token(token)
-    if payload is not None:
-        try:
-            user_id = uuid.UUID(payload["sub"])
-            sid = payload.get("sid")
-            if not sid:
-                # Force refresh of legacy tokens
-                raise ValueError("Missing session ID")
-
-            session_id = uuid.UUID(sid)
-            async with AsyncSessionLocal() as db:
-                rt = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
-                rt_row = rt.scalar_one_or_none()
-                if rt_row and not rt_row.revoked:
-                    return user_id
-        except ValueError:
-            pass
-
-    # Fall back to personal API token (contains a dot separator)
-    if "." in token:
-        token_hash = hash_api_token(token)
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(
-                select(ApiToken).where(
-                    ApiToken.token_hash == token_hash,
-                    ApiToken.revoked.is_(False),
-                )
-            )
-            api_token = result.scalar_one_or_none()
-        if api_token is not None:
-            return api_token.user_id
-
-    await ws.close(code=4001, reason="Invalid or expired token")
-    return None  # type: ignore[return-value]
-
-
 # ---------------------------------------------------------------------------
 # Channel events
 # ---------------------------------------------------------------------------
@@ -97,7 +51,6 @@ async def _authenticate_ws(ws: WebSocket, token: str) -> uuid.UUID:
 async def channel_ws(
     channel_id: uuid.UUID,
     ws: WebSocket,
-    token: str = Query(..., description="JWT access token"),
 ):
     """
     Subscribe to all events in a text channel:
@@ -107,7 +60,7 @@ async def channel_ws(
       - reaction.added
       - reaction.removed
     """
-    user_id = await _authenticate_ws(ws, token)
+    user_id = await accept_and_authenticate(ws)
     if user_id is None:
         return
 
@@ -178,7 +131,6 @@ async def channel_ws(
 async def server_ws(
     server_id: uuid.UUID,
     ws: WebSocket,
-    token: str = Query(..., description="JWT access token"),
 ):
     """
     Subscribe to server-level events:
@@ -193,7 +145,7 @@ async def server_ws(
       - voice.user_left
       - voice.state_changed
     """
-    user_id = await _authenticate_ws(ws, token)
+    user_id = await accept_and_authenticate(ws)
     if user_id is None:
         return
 
@@ -230,7 +182,6 @@ async def server_ws(
 @router.websocket("/ws/me")
 async def personal_ws(
     ws: WebSocket,
-    token: str = Query(..., description="JWT access token"),
 ):
     """
     Subscribe to personal events:
@@ -249,7 +200,7 @@ async def personal_ws(
     DB connections are opened only for the brief setup and teardown steps
     so the pool is not exhausted by long-lived WebSocket connections.
     """
-    user_id = await _authenticate_ws(ws, token)
+    user_id = await accept_and_authenticate(ws)
     if user_id is None:
         return
 
@@ -313,18 +264,21 @@ async def personal_ws(
 @router.websocket("/ws/bot")
 async def bot_gateway_ws(
     ws: WebSocket,
-    token: str = Query(..., description="Personal API token or JWT"),
 ):
     """
     Bot / automation gateway.  A single connection receives:
       - All personal events (dm.created, friend_request.*, user.status_changed)
       - Channel & server events for every server the token owner is a member of.
 
+    Connect, then send {"type": "auth", "token": "<personal API token or JWT>"}
+    as your first frame — see app/ws_auth.py. The server replies
+    {"type": "auth.ok", ...} once authenticated.
+
     Clients MUST send ``{"type": "ping"}`` at least every 60 s; the server
     replies with ``{"type": "pong"}``.  The connection is closed after
     ``_HEARTBEAT_TIMEOUT`` seconds of silence.
     """
-    user_id = await _authenticate_ws(ws, token)
+    user_id = await accept_and_authenticate(ws)
     if user_id is None:
         return
 

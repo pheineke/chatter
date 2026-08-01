@@ -143,10 +143,23 @@ Response: created message object (201).
 Bots may connect to the WS gateway to receive real-time events.
 
 ```
-ws://host/ws?token=<raw_token>
+ws://host/ws/me
 ```
 
-> ⚠ Token passed as query param over HTTPS/WSS only. Over plain HTTP this is insecure.
+No token in the URL — browsers can't attach custom headers to a WebSocket
+handshake, and a `?token=` query string ends up in proxy/access logs, so
+auth happens over the socket itself instead:
+
+1. Connect (no query string needed).
+2. Send `{"type": "auth", "token": "<raw_token>"}` as your first frame.
+3. Wait for `{"type": "auth.ok", "data": {"user_id": "..."}}` before treating
+   the connection as ready. An invalid or expired token gets the connection
+   closed with code `4001`; taking more than 10s to send the auth frame at
+   all closes it with `4008`.
+
+> ⚠ Use `wss://` in production. The auth frame moving off the URL avoids the
+> log-exposure problem, but the token is still sent in cleartext if the
+> transport itself isn't encrypted.
 
 ### 5.1 Supported incoming events (server → bot)
 

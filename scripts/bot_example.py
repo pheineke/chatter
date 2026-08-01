@@ -18,12 +18,21 @@ async def receive_events():
     """
     Connects to the WebSocket and listens for incoming real-time events.
     """
-    # The token can be passed as a query string since bot tokens are valid
-    ws_endpoint = f"{WS_URL}/ws/me?token={API_TOKEN}"
-    
+    # No token in the URL: browsers can't set custom headers on the WS
+    # handshake, and a query-string token ends up in every proxy access log,
+    # so the gateway authenticates over the socket itself instead. Connect,
+    # then send {"type": "auth", "token": ...} as the first frame and wait
+    # for {"type": "auth.ok", ...} before treating the connection as ready.
+    ws_endpoint = f"{WS_URL}/ws/me"
+
     print(f"[*] Connecting to {ws_endpoint}...")
     try:
         async with websockets.connect(ws_endpoint) as websocket:
+            await websocket.send(json.dumps({"type": "auth", "token": API_TOKEN}))
+            ack = json.loads(await websocket.recv())
+            if ack.get("type") != "auth.ok":
+                print(f"[!] Auth failed: {ack}")
+                return
             print("[*] Connected! Listening for real-time events...\n")
             while True:
                 message = await websocket.recv()

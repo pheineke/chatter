@@ -31,7 +31,13 @@ class ConnectionManager:
     # ------------------------------------------------------------------
 
     async def connect(self, room: str, ws: WebSocket) -> None:
-        await ws.accept()
+        """Register an already-accepted WebSocket in *room*.
+
+        Callers must call ``ws.accept()`` themselves before this — in
+        practice that happens as part of the auth handshake in
+        app/ws_auth.py, since the connection has to be accepted before the
+        client can send its {"type": "auth", ...} frame.
+        """
         async with self._lock:
             self._rooms[room].add(ws)
         logger.debug("WS connected room=%s total=%d", room, len(self._rooms[room]))

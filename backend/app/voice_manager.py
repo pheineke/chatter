@@ -87,7 +87,11 @@ class VoiceManager:
         username: str,
         avatar: str | None = None,
     ) -> None:
-        await ws.accept()
+        """Register an already-accepted WebSocket as a voice participant.
+
+        Callers must call ``ws.accept()`` themselves before this — it
+        happens as part of the auth handshake in app/ws_auth.py.
+        """
         async with self._lock:
             if channel_id not in self._rooms:
                 self._rooms[channel_id] = {}

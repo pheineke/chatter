@@ -1,7 +1,9 @@
 """
 Voice channel: WebSocket signaling relay + REST presence endpoint.
 
-WebSocket: /ws/voice/{channel_id}?token=<JWT>
+WebSocket: /ws/voice/{channel_id} — connect, then send
+           {"type": "auth", "token": "<jwt-or-api-token>"} as the first
+           frame (see app/ws_auth.py).
 REST:      GET /channels/{channel_id}/voice/members
 
 Signaling flow (all via the WebSocket):
@@ -30,19 +32,18 @@ import logging
 import uuid
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query, status
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.auth import decode_access_token
-from app.database import get_db, AsyncSessionLocal
+from app.database import get_db
 from app.schemas.voice import VoiceParticipantRead
 from app.voice_manager import voice_manager
+from app.ws_auth import accept_and_authenticate
 from app.ws_manager import manager as ws_manager
 from models.channel import Channel, ChannelType
 from models.server import ServerMember
-from models.refresh_token import RefreshToken
 
 logger = logging.getLogger(__name__)
 
@@ -74,33 +75,6 @@ async def _broadcast_state_change(
                 "data": participant_data,
             },
         )
-
-
-# ---------------------------------------------------------------------------
-# Auth helper (mirrors ws.py)
-# ---------------------------------------------------------------------------
-
-async def _authenticate_ws(ws: WebSocket, token: str) -> uuid.UUID | None:
-    payload = decode_access_token(token)
-    if payload is not None:
-        try:
-            user_id = uuid.UUID(payload["sub"])
-            sid = payload.get("sid")
-            if not sid:
-                # Force refresh of legacy tokens
-                raise ValueError("Missing session ID")
-
-            session_id = uuid.UUID(sid)
-            async with AsyncSessionLocal() as db:
-                rt = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
-                rt_row = rt.scalar_one_or_none()
-                if rt_row and not rt_row.revoked:
-                    return user_id
-        except ValueError:
-            pass
-            
-    await ws.close(code=4001, reason="Invalid or expired token")
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -150,12 +124,13 @@ async def get_server_voice_presence(
 async def voice_ws(
     channel_id: uuid.UUID,
     ws: WebSocket,
-    token: str = Query(..., description="JWT access token"),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Join a voice channel. Authentication and membership are verified before
-    the connection is accepted.
+    Join a voice channel. Connect, then send
+    {"type": "auth", "token": "<jwt-or-api-token>"} as your first frame
+    (see app/ws_auth.py). Membership is verified right after auth succeeds,
+    before the caller is added as a participant.
 
     On connect the server sends:
         {"type": "voice.members", "data": [<participant>, ...]}
@@ -167,7 +142,7 @@ async def voice_ws(
         {"type": "voice.user_left", "data": {"user_id": "..."}}
     """
     # --- Auth ---------------------------------------------------------------
-    user_id = await _authenticate_ws(ws, token)
+    user_id = await accept_and_authenticate(ws)
     if user_id is None:
         return
 

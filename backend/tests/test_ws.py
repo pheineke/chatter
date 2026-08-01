@@ -45,6 +45,9 @@ async def test_manager_connect_broadcast():
     ws = _MockWS()
     cid = uuid.uuid4()
     room = mgr.channel_room(cid)
+    # connect() no longer accepts the socket itself — that now happens as
+    # part of the auth handshake (app/ws_auth.py) before connect() is called.
+    await ws.accept()
     await mgr.connect(room, ws)
     assert ws.accepted
 
@@ -60,6 +63,7 @@ async def test_manager_disconnect_stops_delivery():
     ws = _MockWS()
     sid = uuid.uuid4()
     room = mgr.server_room(sid)
+    await ws.accept()
     await mgr.connect(room, ws)
     await mgr.disconnect(room, ws)
     await mgr.broadcast_server(sid, {"type": "test"})
@@ -73,6 +77,7 @@ async def test_manager_dead_socket_pruned():
     ws = _MockWS()
     uid = uuid.uuid4()
     room = mgr.user_room(uid)
+    await ws.accept()
     await mgr.connect(room, ws)
     ws.close()  # mark dead
     # broadcast should not raise and should remove the dead socket
@@ -88,6 +93,8 @@ async def test_manager_multiple_subscribers():
     ws1, ws2 = _MockWS(), _MockWS()
     cid = uuid.uuid4()
     room = mgr.channel_room(cid)
+    await ws1.accept()
+    await ws2.accept()
     await mgr.connect(room, ws1)
     await mgr.connect(room, ws2)
     await mgr.broadcast_channel(cid, {"type": "hello"})
@@ -154,18 +161,32 @@ def _get_token(ws_app: TestClient, username: str, password: str = "pass1234") ->
     return r.json()["access_token"]
 
 
+def _ws_authenticate(ws, token: str) -> dict:
+    """Send the post-connect auth frame and return the server's ack.
+
+    Every endpoint now accepts the connection first and expects
+    {"type": "auth", "token": ...} as the first client frame (see
+    app/ws_auth.py) instead of a `?token=` query param.
+    """
+    ws.send_json({"type": "auth", "token": token})
+    return ws.receive_json()
+
+
 def test_ws_me_invalid_token_rejected(ws_app):
-    """A bad token should cause the server to close the connection."""
+    """A bad token should cause the server to close the connection after
+    the auth frame is rejected (no auth.ok, and the next receive raises)."""
     with pytest.raises(Exception):
-        with ws_app.websocket_connect("/ws/me?token=this_is_wrong") as ws:
+        with ws_app.websocket_connect("/ws/me") as ws:
+            ws.send_json({"type": "auth", "token": "this_is_wrong"})
             ws.receive_json()
 
 
 def test_ws_me_valid_token_accepted(ws_app):
-    """A valid token should result in an accepted WebSocket connection."""
+    """A valid token should result in an auth.ok ack."""
     token = _get_token(ws_app, "ws_me_user")
-    with ws_app.websocket_connect(f"/ws/me?token={token}") as ws:
-        pass  # no exception == accepted
+    with ws_app.websocket_connect("/ws/me") as ws:
+        ack = _ws_authenticate(ws, token)
+        assert ack["type"] == "auth.ok"
 
 
 def test_ws_channel_valid_token(ws_app):
@@ -183,12 +204,15 @@ def test_ws_channel_valid_token(ws_app):
     )
     channel_id = r.json()["id"]
 
-    with ws_app.websocket_connect(f"/ws/channels/{channel_id}?token={token}") as ws:
-        pass  # accepted without error
+    with ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws:
+        ack = _ws_authenticate(ws, token)
+        assert ack["type"] == "auth.ok"
 
 
 def test_ws_server_non_member_rejected(ws_app):
-    """A user who is not a member of a server should be rejected (4003)."""
+    """A user who is not a member of a server should authenticate fine
+    (their token is valid) but then get rejected (4003) by the membership
+    check that runs right after."""
     owner_token = _get_token(ws_app, "ws_srv_owner")
     guest_token = _get_token(ws_app, "ws_srv_guest")
 
@@ -200,8 +224,10 @@ def test_ws_server_non_member_rejected(ws_app):
     server_id = r.json()["id"]
 
     with pytest.raises(Exception):
-        with ws_app.websocket_connect(f"/ws/servers/{server_id}?token={guest_token}") as ws:
-            ws.receive_json()
+        with ws_app.websocket_connect(f"/ws/servers/{server_id}") as ws:
+            ack = _ws_authenticate(ws, guest_token)
+            assert ack["type"] == "auth.ok"  # token itself is valid
+            ws.receive_json()  # membership check closes the connection here
 
 
 def test_ws_channel_receives_message_event(ws_app):
@@ -224,7 +250,14 @@ def test_ws_channel_receives_message_event(ws_app):
 
     event_holder: list[dict] = []
 
-    with ws_app.websocket_connect(f"/ws/channels/{channel_id}?token={token}") as ws:
+    with ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws:
+        _ws_authenticate(ws, token)
+        # Auth.ok confirms the client is authenticated, but the server still
+        # has one more await (membership check) before it registers this
+        # socket in the room via manager.connect(). Give it a beat before
+        # triggering the broadcast, so we don't race it (same pattern used
+        # in test_voice.py for the equivalent cross-WS timing).
+        import time; time.sleep(0.05)
         # Send the HTTP message from a background thread so we don't block
         def _post():
             ws_app.post(
@@ -259,7 +292,9 @@ def test_ws_me_receives_dm_read_updated_event(ws_app):
     event_holder: list[dict] = []
     read_at = "2026-03-12T00:00:00+00:00"
 
-    with ws_app.websocket_connect(f"/ws/me?token={alice_token}") as ws:
+    with ws_app.websocket_connect("/ws/me") as ws:
+        _ws_authenticate(ws, alice_token)
+        import time; time.sleep(0.05)   # let manager.connect() land before we trigger the broadcast
         def _mark_read():
             ws_app.put(
                 f"/dms/channels/{channel_id}/read",

@@ -45,12 +45,27 @@ async def test_voice_manager_connect_sends_member_list():
     mgr = VoiceManager()
     cid = uuid.uuid4()
     uid = uuid.uuid4()
-    ws = _MockWS()
-    await mgr.connect(cid, uid, ws)
+    # connect() no longer accepts the socket — that now happens as part of
+    # the auth handshake (app/ws_auth.py) before connect() is called. It has
+    # also always required `username` (this test never passed one before).
+    ws = await _connected_mock(mgr, cid, uid)
     assert ws.accepted
     # First message must be voice.members list
     assert ws.sent[0]["type"] == "voice.members"
     assert any(p["user_id"] == str(uid) for p in ws.sent[0]["data"])
+
+
+async def _connected_mock(mgr, cid, uid, ws=None, username: str = "testuser"):
+    """Accept a (fresh, if not given) _MockWS and register it with *mgr*.
+
+    connect() no longer accepts the socket itself (see ws_auth.py), and it
+    has always required a `username` — neither of these was reflected in
+    these unit tests before, so they never actually ran successfully.
+    """
+    ws = ws or _MockWS()
+    await ws.accept()
+    await mgr.connect(cid, uid, ws, username=username)
+    return ws
 
 
 async def test_voice_manager_connect_broadcasts_joined_to_others():
@@ -58,9 +73,8 @@ async def test_voice_manager_connect_broadcasts_joined_to_others():
     mgr = VoiceManager()
     cid = uuid.uuid4()
     uid_a, uid_b = uuid.uuid4(), uuid.uuid4()
-    ws_a, ws_b = _MockWS(), _MockWS()
-    await mgr.connect(cid, uid_a, ws_a)
-    await mgr.connect(cid, uid_b, ws_b)
+    ws_a = await _connected_mock(mgr, cid, uid_a, username="alice")
+    await _connected_mock(mgr, cid, uid_b, username="bob")
     # A should receive a voice.user_joined event about B
     joined_events = [m for m in ws_a.sent if m["type"] == "voice.user_joined"]
     assert len(joined_events) == 1
@@ -72,9 +86,8 @@ async def test_voice_manager_disconnect_broadcasts_left():
     mgr = VoiceManager()
     cid = uuid.uuid4()
     uid_a, uid_b = uuid.uuid4(), uuid.uuid4()
-    ws_a, ws_b = _MockWS(), _MockWS()
-    await mgr.connect(cid, uid_a, ws_a)
-    await mgr.connect(cid, uid_b, ws_b)
+    ws_a = await _connected_mock(mgr, cid, uid_a, username="alice")
+    await _connected_mock(mgr, cid, uid_b, username="bob")
     await mgr.disconnect(cid, uid_b)
     left_events = [m for m in ws_a.sent if m["type"] == "voice.user_left"]
     assert len(left_events) == 1
@@ -86,8 +99,7 @@ async def test_voice_manager_update_state_mute():
     mgr = VoiceManager()
     cid = uuid.uuid4()
     uid = uuid.uuid4()
-    ws = _MockWS()
-    await mgr.connect(cid, uid, ws)
+    ws = await _connected_mock(mgr, cid, uid)
     await mgr.update_state(cid, uid, is_muted=True)
     state_events = [m for m in ws.sent if m["type"] == "voice.state_changed"]
     assert state_events[-1]["data"]["is_muted"] is True
@@ -98,8 +110,7 @@ async def test_voice_manager_update_state_all_flags():
     mgr = VoiceManager()
     cid = uuid.uuid4()
     uid = uuid.uuid4()
-    ws = _MockWS()
-    await mgr.connect(cid, uid, ws)
+    ws = await _connected_mock(mgr, cid, uid)
     await mgr.update_state(
         cid, uid,
         is_muted=True, is_deafened=True,
@@ -117,9 +128,8 @@ async def test_voice_manager_relay_offer():
     mgr = VoiceManager()
     cid = uuid.uuid4()
     uid_a, uid_b = uuid.uuid4(), uuid.uuid4()
-    ws_a, ws_b = _MockWS(), _MockWS()
-    await mgr.connect(cid, uid_a, ws_a)
-    await mgr.connect(cid, uid_b, ws_b)
+    ws_a = await _connected_mock(mgr, cid, uid_a, username="alice")
+    ws_b = await _connected_mock(mgr, cid, uid_b, username="bob")
     payload = {"type": "offer", "to": str(uid_b), "sdp": "v=0..."}
     await mgr.relay(cid, uid_a, uid_b, payload)
     relayed = [m for m in ws_b.sent if m["type"] == "offer"]
@@ -136,8 +146,7 @@ async def test_voice_manager_relay_ignores_missing_target():
     cid = uuid.uuid4()
     uid_a = uuid.uuid4()
     uid_ghost = uuid.uuid4()
-    ws_a = _MockWS()
-    await mgr.connect(cid, uid_a, ws_a)
+    await _connected_mock(mgr, cid, uid_a, username="alice")
     # relay to a user not in the room — should not raise
     await mgr.relay(cid, uid_a, uid_ghost, {"type": "offer", "sdp": "..."})
 
@@ -148,8 +157,8 @@ async def test_voice_manager_get_participants():
     cid = uuid.uuid4()
     uid_a, uid_b = uuid.uuid4(), uuid.uuid4()
     assert mgr.get_participants(cid) == []
-    await mgr.connect(cid, uid_a, _MockWS())
-    await mgr.connect(cid, uid_b, _MockWS())
+    await _connected_mock(mgr, cid, uid_a, username="alice")
+    await _connected_mock(mgr, cid, uid_b, username="bob")
     parts = mgr.get_participants(cid)
     assert len(parts) == 2
     ids = {p["user_id"] for p in parts}
@@ -162,7 +171,7 @@ async def test_voice_manager_disconnect_cleans_empty_room():
     mgr = VoiceManager()
     cid = uuid.uuid4()
     uid = uuid.uuid4()
-    await mgr.connect(cid, uid, _MockWS())
+    await _connected_mock(mgr, cid, uid)
     await mgr.disconnect(cid, uid)
     assert cid not in mgr._rooms
 
@@ -219,6 +228,14 @@ def _token(tc: TestClient, user: str, pw: str = "pass1234") -> str:
     return r.json()["access_token"]
 
 
+def _ws_auth(ws, token: str) -> dict:
+    """Send the post-connect auth frame and return the server's ack.
+    See app/ws_auth.py — every WS endpoint accepts first, then expects
+    {"type": "auth", "token": ...} as the client's first frame."""
+    ws.send_json({"type": "auth", "token": token})
+    return ws.receive_json()
+
+
 def _setup_voice_channel(tc: TestClient, owner_token: str) -> tuple[str, str]:
     """Create a server + voice channel, return (server_id, channel_id)."""
     r = tc.post("/servers/", json={"title": "VoiceSrv"}, headers={"Authorization": f"Bearer {owner_token}"})
@@ -249,7 +266,8 @@ def test_voice_ws_invalid_token_rejected(voice_app):
     token = _token(voice_app, "vauth_user")
     _, channel_id = _setup_voice_channel(voice_app, token)
     with pytest.raises(Exception):
-        with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token=BAD") as ws:
+        with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+            ws.send_json({"type": "auth", "token": "BAD"})
             ws.receive_json()
 
 
@@ -267,8 +285,10 @@ def test_voice_ws_text_channel_rejected(voice_app):
     )
     channel_id = r.json()["id"]
     with pytest.raises(Exception):
-        with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token}") as ws:
-            ws.receive_json()
+        with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+            ack = _ws_auth(ws, token)
+            assert ack["type"] == "auth.ok"  # token is valid
+            ws.receive_json()  # channel-type check closes the connection here
 
 
 def test_voice_ws_nonmember_rejected(voice_app):
@@ -276,8 +296,10 @@ def test_voice_ws_nonmember_rejected(voice_app):
     guest_token = _token(voice_app, "vguest_mem")
     _, channel_id = _setup_voice_channel(voice_app, owner_token)
     with pytest.raises(Exception):
-        with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={guest_token}") as ws:
-            ws.receive_json()
+        with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+            ack = _ws_auth(ws, guest_token)
+            assert ack["type"] == "auth.ok"  # token is valid
+            ws.receive_json()  # membership check closes the connection here
 
 
 # --- Join / leave -----------------------------------------------------------
@@ -286,7 +308,8 @@ def test_voice_ws_accepted_and_member_list(voice_app):
     """Connecting as a server member should succeed and immediately deliver member list."""
     token = _token(voice_app, "vjoin_user")
     _, channel_id = _setup_voice_channel(voice_app, token)
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token}") as ws:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+        _ws_auth(ws, token)
         msg = ws.receive_json()
         assert msg["type"] == "voice.members"
         assert isinstance(msg["data"], list)
@@ -300,7 +323,8 @@ def test_voice_ws_user_appears_in_rest_members(voice_app):
     results: list[list] = []
 
     def _ws_thread():
-        with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token}") as ws:
+        with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+            _ws_auth(ws, token)
             ws.receive_json()  # consume voice.members
             # Signal main thread
             results.append(
@@ -326,7 +350,8 @@ def test_voice_ws_mute_broadcast(voice_app):
 
     events: list[dict] = []
 
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token}") as ws:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+        _ws_auth(ws, token)
         ws.receive_json()  # voice.members
 
         def _send_mute():
@@ -348,7 +373,8 @@ def test_voice_ws_deafen_broadcast(voice_app):
 
     events: list[dict] = []
 
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token}") as ws:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+        _ws_auth(ws, token)
         ws.receive_json()  # voice.members
 
         def _send():
@@ -370,7 +396,8 @@ def test_voice_ws_screen_share_broadcast(voice_app):
 
     events: list[dict] = []
 
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token}") as ws:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+        _ws_auth(ws, token)
         ws.receive_json()  # voice.members
 
         def _send():
@@ -392,7 +419,8 @@ def test_voice_ws_webcam_broadcast(voice_app):
 
     events: list[dict] = []
 
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token}") as ws:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+        _ws_auth(ws, token)
         ws.receive_json()  # voice.members
 
         def _send():
@@ -436,7 +464,8 @@ def test_voice_ws_offer_relay(voice_app):
     b_done = threading.Event()
 
     def _b_thread():
-        with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token_b}") as ws_b:
+        with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws_b:
+            _ws_auth(ws_b, token_b)
             ws_b.receive_json()  # voice.members (just B)
             b_ready.set()
             # Wait for the offer (or a joined event + offer)
@@ -451,7 +480,8 @@ def test_voice_ws_offer_relay(voice_app):
     t_b.start()
     b_ready.wait(timeout=5)
 
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token_a}") as ws_a:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws_a:
+        _ws_auth(ws_a, token_a)
         ws_a.receive_json()  # voice.members (A + B)
         # consume the voice.user_joined that B may receive
         import time; time.sleep(0.1)
@@ -483,7 +513,8 @@ def test_voice_ws_user_left_on_disconnect(voice_app):
     a_done = threading.Event()
 
     def _a_thread():
-        with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token_a}") as ws_a:
+        with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws_a:
+            _ws_auth(ws_a, token_a)
             ws_a.receive_json()  # voice.members
             a_ready.set()
             while True:
@@ -497,7 +528,8 @@ def test_voice_ws_user_left_on_disconnect(voice_app):
     t_a.start()
     a_ready.wait(timeout=5)
 
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token_b}") as ws_b:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws_b:
+        _ws_auth(ws_b, token_b)
         ws_b.receive_json()  # voice.members
         # A gets voice.user_joined; then B disconnects
 
@@ -529,7 +561,8 @@ def test_server_ws_receives_voice_user_joined(voice_app):
     b_ready = threading.Event()
 
     def _b_server_ws():
-        with voice_app.websocket_connect(f"/ws/servers/{server_id}?token={token_b}") as ws:
+        with voice_app.websocket_connect(f"/ws/servers/{server_id}") as ws:
+            _ws_auth(ws, token_b)
             b_ready.set()
             while True:
                 msg = ws.receive_json()
@@ -543,7 +576,8 @@ def test_server_ws_receives_voice_user_joined(voice_app):
     import time; time.sleep(0.2)
 
     # A joins voice
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token_a}") as ws_a:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws_a:
+        _ws_auth(ws_a, token_a)
         ws_a.receive_json()  # voice.members
         t_b.join(timeout=5)
 
@@ -571,7 +605,8 @@ def test_server_ws_receives_voice_user_left(voice_app):
     b_done = threading.Event()
 
     def _b_server_ws():
-        with voice_app.websocket_connect(f"/ws/servers/{server_id}?token={token_b}") as ws:
+        with voice_app.websocket_connect(f"/ws/servers/{server_id}") as ws:
+            _ws_auth(ws, token_b)
             b_ready.set()
             while True:
                 msg = ws.receive_json()
@@ -586,7 +621,8 @@ def test_server_ws_receives_voice_user_left(voice_app):
     import time; time.sleep(0.2)
 
     # A joins then disconnects from voice
-    with voice_app.websocket_connect(f"/ws/voice/{channel_id}?token={token_a}") as ws_a:
+    with voice_app.websocket_connect(f"/ws/voice/{channel_id}") as ws_a:
+        _ws_auth(ws_a, token_a)
         ws_a.receive_json()  # voice.members
 
     # A disconnected — B should receive voice.user_left

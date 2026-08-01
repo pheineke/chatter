@@ -32,14 +32,26 @@ async function tryRefreshToken(): Promise<boolean> {
 }
 
 /**
- * Opens a WebSocket to `path?token=<JWT>` and calls `onMessage` for every
- * incoming JSON frame. Reconnects automatically with exponential back-off.
+ * Opens a WebSocket to `path` and calls `onMessage` for every incoming JSON
+ * frame. Reconnects automatically with exponential back-off.
+ *
+ * Auth: the token is never put in the URL (query strings end up in proxy
+ * access logs, APM tools, etc., and browsers give WebSocket no way to set
+ * an Authorization header). Instead, as soon as the socket opens, the first
+ * frame sent is {"type": "auth", "token": "<jwt>"}; the server replies
+ * {"type": "auth.ok", ...} once it has validated it. The consumer's
+ * `onOpen` callback — and forwarding of any further messages to
+ * `onMessage` — is deferred until that ack arrives, so callers can treat
+ * `onOpen` as "authenticated and ready" exactly like before.
  *
  * Close code 4001 (expired/invalid token) triggers a token refresh before
- * the next reconnect attempt.
+ * the next reconnect attempt. Code 4008 (server gave up waiting for the
+ * auth frame) is treated the same as any other drop — reconnect with
+ * back-off.
  */
 export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }: Options) {
   const wsRef = useRef<WebSocket | null>(null)
+  const authenticatedRef = useRef(false)   // gates send() until auth.ok is received
   const reconnectDelay = useRef(1000)
   const generation = useRef(0)   // incremented on every cleanup so stale callbacks self-discard
   const onMessageRef = useRef(onMessage)
@@ -53,19 +65,32 @@ export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }
     const token = localStorage.getItem('token')
     if (!token) return
 
-    const url = `${WS_BASE}${path}?token=${token}`
+    const url = `${WS_BASE}${path}`
     const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws'
     const ws = new WebSocket(url.startsWith('ws') ? url : `${wsScheme}://${location.host}${url}`)
     wsRef.current = ws
+    authenticatedRef.current = false
 
     ws.onmessage = (e) => {
       if (generation.current !== gen) return
+      let msg: WSMessage
       try {
-        const msg = JSON.parse(e.data) as WSMessage
-        onMessageRef.current(msg)
+        msg = JSON.parse(e.data) as WSMessage
       } catch {
-        /* ignore malformed frames */
+        return   // ignore malformed frames
       }
+
+      if (!authenticatedRef.current) {
+        // The only frame we expect before auth.ok is auth.ok itself.
+        if (msg.type === 'auth.ok') {
+          authenticatedRef.current = true
+          reconnectDelay.current = 1000
+          onOpenRef.current?.()
+        }
+        return
+      }
+
+      onMessageRef.current(msg)
     }
 
     ws.onclose = (event) => {
@@ -95,8 +120,8 @@ export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }
 
     ws.onopen = () => {
       if (generation.current !== gen) return
-      reconnectDelay.current = 1000
-      onOpenRef.current?.()
+      // Authenticate immediately — this is the first frame the server sees.
+      ws.send(JSON.stringify({ type: 'auth', token }))
     }
   }, [path, enabled])
 
@@ -105,6 +130,7 @@ export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }
     connect(gen)
     return () => {
       generation.current++       // invalidate this generation; disables all callbacks
+      authenticatedRef.current = false
       if (wsRef.current) {
         wsRef.current.onclose = null   // prevent the close handler triggering a reconnect
         wsRef.current.close()
@@ -114,7 +140,10 @@ export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }
   }, [connect])
 
   const send = useCallback((data: unknown) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    // authenticatedRef guards against ever sending a non-auth frame before
+    // the server has acked {"type": "auth.ok"} — the server treats
+    // anything else as protocol violation on first frame and closes.
+    if (authenticatedRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(data))
     }
   }, [])
