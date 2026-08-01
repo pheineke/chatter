@@ -8,7 +8,7 @@ columns to the channels table.
   bitrate    — voice channel audio quality in bps; NULL = server default
 
 Revision ID: h9c0d1e2f3a4
-Revises: g8b9c0d1e2f3
+Revises: g9c1d2e3f4a5
 Create Date: 2026-02-22 00:00:00.000000
 """
 from typing import Sequence, Union
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 
 
 revision: str = 'h9c0d1e2f3a4'
-down_revision: Union[str, None] = 'g8b9c0d1e2f3'
+down_revision: Union[str, None] = 'g9c1d2e3f4a5'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

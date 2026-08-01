@@ -11,6 +11,12 @@ _WARNED = False
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    # Deployment environment. Set ENVIRONMENT=production to enable hard
+    # startup checks that refuse to run with insecure defaults (see
+    # _reject_insecure_production_defaults below). Defaults to "development"
+    # so local/dev workflows are unaffected.
+    environment: str = "development"
+
     # Database
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/chat"
 
@@ -49,7 +55,41 @@ class Settings(BaseSettings):
                 "     JWT-based authentication will be insecure otherwise.",
                 file=sys.stderr,
             )
+        if self.decoration_admin_ids == "*":
+            print(
+                "  ⚠  WARNING: DECORATION_ADMIN_IDS is unset ('*'). Any authenticated user can\n"
+                "     generate decoration codes. Restrict this to specific admin UUIDs in production.",
+                file=sys.stderr,
+            )
         _WARNED = True
+        return self
+
+    @model_validator(mode="after")
+    def _reject_insecure_production_defaults(self) -> "Settings":
+        """Refuse to start with known-insecure defaults when explicitly
+        running in production. Local/dev runs (the default) are unaffected;
+        this only trips when ENVIRONMENT=production is set, e.g. in the
+        deployment's .env or docker-compose environment block.
+        """
+        if self.environment.lower() != "production":
+            return self
+
+        problems = []
+        if self.secret_key == "change-me-in-production":
+            problems.append("SECRET_KEY is still the default placeholder")
+        if len(self.secret_key) < 32:
+            problems.append("SECRET_KEY is shorter than 32 characters")
+        if self.decoration_admin_ids == "*":
+            problems.append("DECORATION_ADMIN_IDS is '*' (any user can act as admin)")
+        if "postgres:postgres@" in self.database_url:
+            problems.append("DATABASE_URL still uses the default postgres:postgres credentials")
+
+        if problems:
+            raise RuntimeError(
+                "Refusing to start with ENVIRONMENT=production and insecure settings:\n  - "
+                + "\n  - ".join(problems)
+                + "\nSet proper values via environment variables or .env before deploying."
+            )
         return self
 
     def is_decoration_admin(self, user_id: uuid.UUID | str) -> bool:

@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.dependencies import CurrentUser, DB
-from app.utils.rate_limiter import image_limiter
+from app.rate_limiter import rate_limit_decoration_generate
 from models.decoration_code import DecorationCode
 
 router = APIRouter(prefix="/decorations", tags=["decorations"])
@@ -96,9 +96,7 @@ async def generate_codes(body: GenerateBody, current_user: CurrentUser, db: DB):
     if not settings.is_decoration_admin(current_user.id):
         raise HTTPException(status_code=403, detail="Admin permission required")
 
-    allowed, _ = image_limiter.check(f"deco_gen:{current_user.id}")
-    if not allowed:
-        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
+    await rate_limit_decoration_generate(current_user)
 
     if body.count < 1 or body.count > 50:
         raise HTTPException(status_code=422, detail="Count must be between 1 and 50")

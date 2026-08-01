@@ -1,54 +1,27 @@
-"""In-memory sliding-window rate limiter for profile-update endpoints.
+"""Deprecated — merged into app.rate_limiter.
 
-Two shared instances are exported:
-  - ``image_limiter``   : 2 changes per 10 minutes  (avatar / banner)
-  - ``profile_limiter`` : 5 changes per 10 minutes  (display-name fields)
+This module used to hold a second, independent in-memory-only rate limiter
+(``image_limiter`` / ``profile_limiter``) that duplicated the Redis-backed
+sliding-window limiter in ``app/rate_limiter.py``. Having two implementations
+meant profile/avatar/banner limits didn't share state across worker
+processes and never pruned stale per-user entries.
+
+Everything has been consolidated into ``app/rate_limiter.py``:
+  - ``rate_limit_profile_update``   (was ``profile_limiter``)
+  - ``rate_limit_avatar_change``    (was ``image_limiter`` for avatars)
+  - ``rate_limit_banner_change``    (was ``image_limiter`` for banners)
+  - ``rate_limit_decoration_generate`` (was ``image_limiter`` for deco codes)
+
+This file is kept only so a stray import doesn't hard-crash with an
+unhelpful "no module named" error; it deliberately does not re-export the
+old ``RateLimiter``/``image_limiter``/``profile_limiter`` names, since their
+call signature (sync ``.check(key)``) is not compatible with the new async,
+Redis-aware limiter. Import from ``app.rate_limiter`` instead.
 """
-from __future__ import annotations
 
-from collections import defaultdict
-from datetime import datetime, timezone
-from threading import Lock
-
-
-class RateLimiter:
-    """Thread-safe sliding-window rate limiter."""
-
-    def __init__(self, max_calls: int, window_seconds: int) -> None:
-        self.max_calls = max_calls
-        self.window = window_seconds
-        self._log: dict[str, list[float]] = defaultdict(list)
-        self._lock = Lock()
-
-    def check(self, key: str) -> tuple[bool, int]:
-        """Check whether *key* is within its limit.
-
-        Consumes one slot and returns ``(True, 0)`` when allowed.
-        Returns ``(False, retry_after_seconds)`` without consuming a slot
-        when the limit has been reached.
-        """
-        now = datetime.now(timezone.utc).timestamp()
-        cutoff = now - self.window
-        with self._lock:
-            calls = [t for t in self._log[key] if t > cutoff]
-            if len(calls) >= self.max_calls:
-                # Oldest entry in the window tells us when a slot reopens
-                retry_after = int(calls[0] - cutoff) + 1
-                self._log[key] = calls
-                return False, retry_after
-            calls.append(now)
-            self._log[key] = calls
-            return True, 0
-
-
-# ---------------------------------------------------------------------------
-# Shared instances
-# ---------------------------------------------------------------------------
-
-#: Avatar and banner changes: max 2 per 10 minutes per user.
-image_limiter = RateLimiter(max_calls=2, window_seconds=600)
-
-#: Bio / pronouns changes: max 5 per 10 minutes per user.
-profile_limiter = RateLimiter(max_calls=5, window_seconds=600)
-
-
+raise ImportError(
+    "app.utils.rate_limiter has been removed. Import the equivalent "
+    "async rate_limit_profile_update / rate_limit_avatar_change / "
+    "rate_limit_banner_change / rate_limit_decoration_generate from "
+    "app.rate_limiter instead."
+)

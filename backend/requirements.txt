@@ -1,24 +1,33 @@
-fastapi
-uvicorn[standard]
-pydantic-settings
-python-jose[cryptography]
-bcrypt
-python-multipart
-sqlalchemy[asyncio]
-alembic
-asyncpg
-python-dotenv
-aiofiles
-filetype
-Pillow
-redis
+# Pinned for reproducible builds. Previously unpinned, so every fresh
+# `pip install` could silently pull in a newer (possibly breaking or
+# vulnerable) release. Versions below are the latest resolvable set as of
+# this pin; bump deliberately and re-run the test suite, rather than letting
+# installs drift on their own.
+#
+# To refresh: pip install -r requirements.txt --upgrade && pip freeze
+# (review the diff before committing).
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+pydantic-settings==2.14.2
+python-jose[cryptography]==3.5.0
+bcrypt==5.0.0
+python-multipart==0.0.32
+sqlalchemy[asyncio]==2.0.51
+alembic==1.18.5
+asyncpg==0.31.0
+python-dotenv==1.2.2
+aiofiles==25.1.0
+filetype==1.2.0
+Pillow==12.3.0
+redis==8.1.0
 
 # Linting
-ruff
+ruff==0.16.1
 
 # Testing
-pytest
-pytest-asyncio
-httpx
-aiosqlite
-websockets
+pytest==9.1.1
+pytest-asyncio==1.4.0
+httpx==0.28.1
+aiosqlite==0.22.1
+websockets==16.1.1

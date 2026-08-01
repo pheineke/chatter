@@ -147,10 +147,16 @@ async def check_and_set_slowmode(channel_key: str, user_key: str, delay_seconds:
 
 
 async def _enforce_limit(key: str, limit: int, window_seconds: float, detail: str) -> None:
+    """Check *key* against the shared sliding-window limiter and raise 429 if
+    over limit. *detail* may contain a ``{retry_after}`` placeholder, which is
+    filled in with the computed retry-after seconds.
+    """
     if not settings.ratelimit_enabled:
         return
     allowed, retry_after = await _check_sliding_window(key, limit, window_seconds)
     if not allowed:
+        if "{retry_after}" in detail:
+            detail = detail.format(retry_after=retry_after)
         raise HTTPException(
             status_code=429,
             detail=detail,
@@ -220,4 +226,53 @@ async def rate_limit_dm_channel(current_user: CurrentUser) -> None:
         limit=20,
         window_seconds=60.0,
         detail="You're opening DMs too quickly. Please slow down!",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Profile / avatar / banner / decoration limits
+#
+# These used to live in a second, separate in-memory-only rate limiter
+# (app/utils/rate_limiter.py) that didn't share state across workers/
+# processes and never pruned old per-user entries. Consolidated here onto
+# the same Redis-backed sliding window as everything else.
+# ---------------------------------------------------------------------------
+
+async def rate_limit_profile_update(current_user: CurrentUser) -> None:
+    """Bio / pronouns changes: max 5 per 10 minutes per user."""
+    await _enforce_limit(
+        key=f"profile-update:{current_user.id}",
+        limit=5,
+        window_seconds=600.0,
+        detail="You're updating your profile too quickly. Please wait {retry_after} seconds.",
+    )
+
+
+async def rate_limit_avatar_change(current_user: CurrentUser) -> None:
+    """Avatar changes: max 2 per 10 minutes per user."""
+    await _enforce_limit(
+        key=f"avatar:{current_user.id}",
+        limit=2,
+        window_seconds=600.0,
+        detail="You're updating your profile too quickly. Please wait {retry_after} seconds.",
+    )
+
+
+async def rate_limit_banner_change(current_user: CurrentUser) -> None:
+    """Banner changes: max 2 per 10 minutes per user."""
+    await _enforce_limit(
+        key=f"banner:{current_user.id}",
+        limit=2,
+        window_seconds=600.0,
+        detail="You're updating your profile too quickly. Please wait {retry_after} seconds.",
+    )
+
+
+async def rate_limit_decoration_generate(current_user: CurrentUser) -> None:
+    """Decoration-code generation batches: max 2 per 10 minutes per admin."""
+    await _enforce_limit(
+        key=f"deco-gen:{current_user.id}",
+        limit=2,
+        window_seconds=600.0,
+        detail="Too many requests. Please slow down.",
     )

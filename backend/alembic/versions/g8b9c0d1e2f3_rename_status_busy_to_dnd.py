@@ -1,8 +1,22 @@
 """rename_status_busy_to_dnd
 
-Rename UserStatus enum value 'busy' -> 'dnd' in the users table.
-SQLite stores enum values as plain TEXT so only a data UPDATE is needed —
-no DDL column type change required.
+Add 'dnd' to the UserStatus enum in PostgreSQL.
+
+NOTE: This migration only adds the new enum value. It intentionally does
+NOT touch any data. PostgreSQL does not allow a newly added enum value to
+be referenced (e.g. in an UPDATE ... = 'dnd') within the same transaction
+that added it — Alembic runs each migration inside a transaction, so doing
+both here would fail with "unsafe use of new value of enum type". The data
+migration (busy -> dnd) lives in the next revision,
+g9c1d2e3f4a5_migrate_status_busy_to_dnd_data, which runs in its own
+transaction after this one has committed.
+
+(An earlier version of this migration tried to work around the same
+constraint by shelling out to a `psql` subprocess so the ADD VALUE would
+commit immediately. That relied on a `psql` client binary and PG* env vars
+that are not present in this project's backend container, so it silently
+failed and the subsequent data UPDATE would error out on any real Postgres
+deployment. Splitting into two migrations is the correct, portable fix.)
 
 Revision ID: g8b9c0d1e2f3
 Revises: f7a8b9c0d1e2
@@ -24,25 +38,14 @@ def upgrade() -> None:
     conn = op.get_bind()
     dialect_name = getattr(conn.dialect, "name", None)
     if dialect_name == "postgresql":
-        # Try to add the enum value using the psql subprocess so it is
-        # executed in its own transaction and committed immediately. This
-        # avoids driver/transaction issues that can prevent using the new
-        # enum value in later statements within the same migration run.
-        import subprocess
-        import shlex
-
-        try:
-            # Build a simple psql command; rely on env vars or .env for creds
-            cmd = "psql -c \"ALTER TYPE user_status ADD VALUE 'dnd';\""
-            subprocess.run(shlex.split(cmd), check=True)
-        except Exception:
-            # If the value already exists or psql isn't available, ignore.
-            pass
-
-    op.execute("UPDATE users SET status           = 'dnd' WHERE status           = 'busy'")
-    op.execute("UPDATE users SET preferred_status = 'dnd' WHERE preferred_status = 'busy'")
+        # IF NOT EXISTS makes this safe to re-run and idempotent across envs.
+        op.execute("ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'dnd'")
+    # SQLite stores enum values as plain TEXT, so there is no type to alter —
+    # the data migration in the next revision handles it directly.
 
 
 def downgrade() -> None:
-    op.execute("UPDATE users SET status           = 'busy' WHERE status           = 'dnd'")
-    op.execute("UPDATE users SET preferred_status = 'busy' WHERE preferred_status = 'dnd'")
+    # PostgreSQL does not support removing individual enum values; nothing to
+    # undo here. The data migration's downgrade() reverts 'dnd' rows back to
+    # 'busy' before this step would ever be reached.
+    pass

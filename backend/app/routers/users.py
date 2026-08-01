@@ -11,8 +11,8 @@ from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.presence import broadcast_presence
 from app.schemas.user import UserRead, UserUpdate, UserPublicRead
+from app.rate_limiter import rate_limit_profile_update, rate_limit_avatar_change, rate_limit_banner_change
 from app.utils.file_validation import verify_image_magic_with_dims, AVATAR_MAX, BANNER_MAX
-from app.utils.rate_limiter import image_limiter, profile_limiter
 from app.ws_manager import manager
 from models.friend import FriendRequest, FriendRequestStatus
 from models.server import ServerMember
@@ -67,13 +67,7 @@ async def get_me(current_user: CurrentUser):
 async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, response: Response):
     # Rate-limit profile text changes (not pure status toggles)
     if body.description is not None or body.pronouns is not None:
-        allowed, retry_after = profile_limiter.check(str(current_user.id))
-        if not allowed:
-            response.headers["Retry-After"] = str(retry_after)
-            raise HTTPException(
-                status_code=429,
-                detail=f"You're updating your profile too quickly. Please wait {retry_after} seconds.",
-            )
+        await rate_limit_profile_update(current_user)
     status_changed = body.status is not None and body.status != current_user.status
     hide_status_changed = body.hide_status is not None and body.hide_status != current_user.hide_status
     if body.description is not None:
@@ -136,13 +130,7 @@ async def upload_avatar(
     response: Response,
     file: UploadFile = File(...),
 ):
-    allowed, retry_after = image_limiter.check(f"avatar:{current_user.id}")
-    if not allowed:
-        response.headers["Retry-After"] = str(retry_after)
-        raise HTTPException(
-            status_code=429,
-            detail=f"You're updating your profile too quickly. Please wait {retry_after} seconds.",
-        )
+    await rate_limit_avatar_change(current_user)
     # Validate magic bytes and enforce maximum dimensions; ext is MIME-derived
     content, ext = await verify_image_magic_with_dims(file, AVATAR_MAX, label="Avatar")
 
@@ -168,13 +156,7 @@ async def upload_banner(
     response: Response,
     file: UploadFile = File(...),
 ):
-    allowed, retry_after = image_limiter.check(f"banner:{current_user.id}")
-    if not allowed:
-        response.headers["Retry-After"] = str(retry_after)
-        raise HTTPException(
-            status_code=429,
-            detail=f"You're updating your profile too quickly. Please wait {retry_after} seconds.",
-        )
+    await rate_limit_banner_change(current_user)
     # Validate magic bytes and enforce maximum dimensions; ext is MIME-derived
     content, ext = await verify_image_magic_with_dims(file, BANNER_MAX, label="Banner")
 

@@ -19,8 +19,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Add 'dm' to the channel_type enum in PostgreSQL.
-    # IF NOT EXISTS prevents failure when re-run or on non-PG dialects.
-    op.execute("ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'dm'")
+    # IF NOT EXISTS prevents failure when re-run, but this syntax is
+    # PostgreSQL-specific (`ALTER TYPE ... ADD VALUE`) and errors out on
+    # SQLite, which stores enum values as plain TEXT and needs no DDL here.
+    conn = op.get_bind()
+    if getattr(conn.dialect, "name", None) == "postgresql":
+        op.execute("ALTER TYPE channel_type ADD VALUE IF NOT EXISTS 'dm'")
 
 
 def downgrade() -> None:

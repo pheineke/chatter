@@ -5,7 +5,7 @@ import sys
 # are importable when running `uvicorn main:app` from the backend/ directory.
 sys.path.insert(0, os.path.dirname(__file__))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -29,6 +29,28 @@ app = FastAPI(
 
 # Static files (avatars, attachments, server images …)
 os.makedirs(settings.static_dir, exist_ok=True)
+
+
+@app.middleware("http")
+async def force_attachment_download(request: Request, call_next):
+    """Force Content-Disposition: attachment on user-uploaded message
+    attachments so browsers never render them inline in the app's origin.
+
+    Defense in depth alongside the MIME allowlist in
+    app/utils/file_validation.py: even if a mislabelled or future file type
+    slipped through validation, a direct/copy-pasted URL to it will prompt a
+    download instead of executing as HTML/script in our origin.
+    Avatars/banners/server images are excluded — they're always
+    magic-byte-verified images and are rendered via <img>, which is
+    unaffected by Content-Disposition.
+    """
+    response = await call_next(request)
+    if request.url.path.startswith("/static/attachments/"):
+        filename = request.url.path.rsplit("/", 1)[-1]
+        response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
 app.mount("/static", StaticFiles(directory=settings.static_dir), name="static")
 
 # Routers

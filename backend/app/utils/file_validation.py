@@ -33,14 +33,19 @@ _ATTACHMENT_MIMES: Set[str] = _IMAGE_MIMES | {
 
 # MIME types that have no reliable magic bytes but are safe to allow by
 # Content-Type header + extension check (plain text, various document formats)
+#
+# SECURITY: text/html, text/xml and application/xml are intentionally NOT
+# included here. Attachments are served back same-origin (see /static mount
+# in main.py). If a browser were to render an uploaded HTML/XML file inline
+# instead of downloading it, any script it contains would execute with the
+# app's origin (stored XSS, session/token theft). Do not re-add markup MIME
+# types to this allowlist without also serving attachments from an isolated
+# origin and/or forcing Content-Disposition: attachment.
 _FALLBACK_MIMES: Set[str] = {
     "text/plain",
     "text/csv",
-    "text/html",
     "text/markdown",
     "application/json",
-    "application/xml",
-    "text/xml",
     "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/msword",
@@ -48,6 +53,11 @@ _FALLBACK_MIMES: Set[str] = {
     "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
+
+# Content-Type prefixes that are safe to allow even without magic bytes.
+# "text/" is handled separately below with an explicit denylist for markup
+# types that browsers will render (and thus execute script from).
+_UNSAFE_TEXT_SUBTYPES: Set[str] = {"html", "xml", "xhtml+xml", "svg+xml"}
 
 # Maximum allowed dimensions per image purpose
 AVATAR_MAX: Tuple[int, int] = (1024, 1024)
@@ -172,7 +182,10 @@ async def verify_attachment_magic(file: UploadFile) -> bytes:
 
     # No magic bytes detected — fall back to the Content-Type header
     ct = (file.content_type or "").lower().split(";")[0].strip()
-    if ct in _FALLBACK_MIMES or ct.startswith("text/"):
+    ct_subtype = ct.split("/", 1)[-1] if "/" in ct else ""
+    if ct in _FALLBACK_MIMES:
+        return content
+    if ct.startswith("text/") and ct_subtype not in _UNSAFE_TEXT_SUBTYPES:
         return content
 
     raise HTTPException(
