@@ -211,52 +211,43 @@ async def get_or_create_dm_channel(
             )
         )
         shared_memberships = (await db.execute(shared_query)).scalars().all()
-        
-        # If no shared servers, check global permission only
+
         if not shared_memberships:
-             if target_user.dm_permission != DMPermission.everyone:
-                 raise HTTPException(status_code=403, detail="You do not share any servers with this user")
-        
-        # If shared servers exist, we must check if AT LEAST ONE "path" allows DMs.
-        # A path exists if:
-        # 1. The server membership has allow_dms=True
-        # 2. OR (allow_dms is None AND global_permission != blocked)
-        
-        can_dm = False
-
-        if target_user.dm_permission == DMPermission.friends_only:
-             # If strictly friends-only and we aren't friends (checked above), blocked.
-             # Unless there is a specific server override allowing it? 
-             # Discord logic: "Allow DMs from server members" is the toggle.
-             # If global is "Friends Only", server override ON allows DMs from that server's members.
-             pass 
-        
-        # Simpler Logic: 
-        # Iterate shared servers. 
-        # If ANY shared server has allow_dms=True -> Allow
-        # If ALL shared servers have allow_dms=False -> Block
-        # If mix of None/False -> Fallback to global setting
-
-        # Logic Matrix for a single shared server:
-        # Override | Global         | Result
-        # True     | *              | Allow
-        # False    | *              | Block (for this server path)
-        # None     | Everyone       | Allow
-        # None     | Server Members | Allow
-        # None     | Friends Only   | Block (since we passed friend check)
-
-        for mem in shared_memberships:
-            if mem.allow_dms is True:
-                can_dm = True
-                break
-            if mem.allow_dms is None:
-                # Fallback to global
-                if target_user.dm_permission in [DMPermission.everyone, DMPermission.server_members_only]:
+            # No shared servers and not friends: the target's global
+            # permission is the only signal we have (there's no per-server
+            # allow_dms override to fall back on). This must be a standalone
+            # branch — previously it fell through into the shared-servers
+            # loop below, which iterates an empty list, leaves can_dm=False,
+            # and incorrectly 403s "everyone"-permission users who share no
+            # server with the sender.
+            if target_user.dm_permission != DMPermission.everyone:
+                raise HTTPException(status_code=403, detail="You do not share any servers with this user")
+        else:
+            # Shared servers exist: allow if AT LEAST ONE "path" allows DMs.
+            # A path exists if:
+            # 1. The server membership has allow_dms=True
+            # 2. OR (allow_dms is None AND global_permission != blocked)
+            #
+            # Logic Matrix for a single shared server:
+            # Override | Global         | Result
+            # True     | *              | Allow
+            # False    | *              | Block (for this server path)
+            # None     | Everyone       | Allow
+            # None     | Server Members | Allow
+            # None     | Friends Only   | Block (since we passed friend check)
+            can_dm = False
+            for mem in shared_memberships:
+                if mem.allow_dms is True:
                     can_dm = True
                     break
-        
-        if not can_dm:
-             raise HTTPException(status_code=403, detail="This user's privacy settings prevent you from sending a message.")
+                if mem.allow_dms is None:
+                    # Fallback to global
+                    if target_user.dm_permission in [DMPermission.everyone, DMPermission.server_members_only]:
+                        can_dm = True
+                        break
+
+            if not can_dm:
+                raise HTTPException(status_code=403, detail="This user's privacy settings prevent you from sending a message.")
 
     # Normalise pair so (a,b) and (b,a) always map to the same row
     a, b = sorted([current_user.id, user_id])

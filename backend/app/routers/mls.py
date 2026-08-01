@@ -23,9 +23,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, update, func, or_
+from sqlalchemy.exc import IntegrityError
 
 from app.dependencies import CurrentUser, DB
-from app.rate_limiter import rate_limit_mls_key_package_publish, rate_limit_mls_commit
+from app.rate_limiter import (
+    rate_limit_mls_key_package_publish,
+    rate_limit_mls_key_package_purge,
+    rate_limit_mls_commit,
+)
 from app.routers.messages import _get_channel_or_404, _require_channel_access
 from app.routers.servers import _require_member
 from app.schemas.mls import (
@@ -94,6 +99,36 @@ async def publish_key_package(
     )
 
 
+@router.delete("/key-packages", status_code=status.HTTP_204_NO_CONTENT)
+async def purge_my_key_packages(
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_mls_key_package_purge),
+):
+    """Drop all of the caller's own unclaimed KeyPackages.
+
+    A KeyPackage can only ever be redeemed by the exact device that generated
+    it (the private half never leaves that browser's IndexedDB). So when a
+    user starts on a fresh device — new browser, cleared site data,
+    reinstall — every KeyPackage still sitting on the server is dead weight:
+    `fetch_key_package` would happily hand one to someone Adding this user to
+    a group, and the resulting Welcome could never be decrypted by anyone,
+    permanently locking them out of that group.
+
+    The new device calls this once, before publishing its own pool (see
+    ensureIdentity in frontend/src/mls/session.ts). Already-consumed rows are
+    left alone: they're an audit trail of Adds that really happened, and
+    they're never handed out again anyway.
+    """
+    await db.execute(
+        MLSKeyPackage.__table__.delete().where(
+            MLSKeyPackage.user_id == current_user.id,
+            MLSKeyPackage.consumed_at.is_(None),
+        )
+    )
+    await db.commit()
+
+
 @router.get("/key-packages/{user_id}", response_model=KeyPackageRead)
 async def fetch_key_package(user_id: uuid.UUID, current_user: CurrentUser, db: DB):
     """Claim one unused KeyPackage for `user_id` so they can be Added to a
@@ -150,7 +185,26 @@ async def init_group(channel_id: uuid.UUID, body: GroupInit, current_user: Curre
         group_info=_b64_to_bytes(body.group_info, "group_info") if body.group_info else None,
     )
     db.add(group)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Lost the founder race between the SELECT above and this INSERT
+        # (channel_id is MLSGroup's primary key) — the other DM participant's
+        # concurrent init_group call won. Roll back our failed insert and
+        # return the row that actually landed, keeping this endpoint
+        # genuinely idempotent under a race rather than just in the
+        # read-then-write happy path (this used to surface as an unhandled
+        # 500, which left the loser's frontend with no group to sync against
+        # until an unrelated later retry).
+        await db.rollback()
+        existing = await db.execute(select(MLSGroup).where(MLSGroup.channel_id == channel_id))
+        group = existing.scalar_one()
+        return GroupRead(
+            channel_id=group.channel_id, ciphersuite=group.ciphersuite,
+            current_epoch=group.current_epoch,
+            group_info=_bytes_to_b64(group.group_info) if group.group_info else None,
+            created_at=group.created_at, updated_at=group.updated_at,
+        )
     await db.refresh(group)
     return GroupRead(
         channel_id=group.channel_id, ciphersuite=group.ciphersuite,

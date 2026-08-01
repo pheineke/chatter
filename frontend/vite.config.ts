@@ -58,6 +58,26 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      // ts-mls's public entry point (index.js) unconditionally re-exports
+      // `nobleCryptoProvider` alongside the `defaultCryptoProvider` we
+      // actually use (see src/mls/session.ts) — that pulls in a static
+      // top-level `import { gcm } from "@noble/ciphers/aes.js"`, which is why
+      // `@noble/ciphers` is a real (not externalized) dependency below, pinned
+      // to the exact version ts-mls's peerDependencies requires.
+      //
+      // `@hpke/chacha20poly1305` is different: it's only reached via a
+      // dynamic `import()` inside the CHACHA20POLY1305 branch of makeAead.js,
+      // guarded by try/catch. We only use the
+      // MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 ciphersuite (see
+      // CIPHERSUITE_NAME), so that branch never executes — safe to
+      // externalize per Rollup's own suggestion rather than installing an
+      // unused crypto dependency. If CHACHA20POLY1305 support is ever added,
+      // install '@hpke/chacha20poly1305' as a real dependency and drop this.
+      external: ['@hpke/chacha20poly1305'],
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

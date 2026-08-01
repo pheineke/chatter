@@ -105,6 +105,23 @@ async function loadLive(channelId: string): Promise<{ state: ClientState; lastPr
 export async function ensureIdentity(userId: string): Promise<{ signKey: Uint8Array; publicKey: Uint8Array }> {
   const existing = await store.loadIdentity(userId)
   if (existing) return existing
+
+  // No local identity => this is a fresh device for this user (new browser,
+  // cleared site data, reinstall). Any KeyPackages still published under
+  // their account belong to a device whose private halves we don't have, so
+  // they're unusable: whoever Adds this user next would claim one and send a
+  // Welcome nobody can ever decrypt, silently locking them out of that
+  // group. Clear them out before publishing our own.
+  //
+  // Best-effort: a failure here (offline, transient 5xx) shouldn't block
+  // identity creation. The stale packages get claimed and fail as before,
+  // which is no worse than not trying.
+  try {
+    await api.purgeMyKeyPackages()
+  } catch (err) {
+    console.warn('[MLS] Could not purge stale server-side key packages:', err)
+  }
+
   const cs = await getCs()
   const { signKey, publicKey } = await cs.signature.keygen()
   await store.saveIdentity(userId, signKey, publicKey)
@@ -302,8 +319,13 @@ async function tryJoinFromWelcome(
       const state = await joinGroup(msg.welcome, keyPackage, privatePackage, makePskIndex(undefined, {}), cs, undefined, undefined, clientConfig)
       if (candidate.id !== undefined) await store.markKeyPackageConsumed(candidate.id)
       return state
-    } catch {
+    } catch (err) {
       // Not the right KeyPackage for this Welcome — try the next candidate.
+      // Logged (not swallowed silently) since "every candidate failed" is
+      // otherwise indistinguishable from "no welcome existed at all" from
+      // the caller's perspective, which makes real bugs here very hard to
+      // diagnose (see the syncGroup doc comment).
+      console.warn('[MLS] joinGroup candidate rejected:', candidate.id, err)
       continue
     }
   }
@@ -432,4 +454,18 @@ export async function decryptFromChannel(
     throw new Error(`Expected an application message, got ${result.kind}`)
   }
   return new TextDecoder().decode(result.message)
+}
+
+/** Remember a ciphertext's plaintext. Required, not an optimization — see
+ * storage.ts's savePlaintext: MLS forward secrecy means any given ciphertext
+ * can only be turned into plaintext once on this device, whether we produced
+ * it (encrypt) or received it (first decrypt). */
+export async function cachePlaintext(ciphertext: string, plaintext: string): Promise<void> {
+  await store.savePlaintext(ciphertext, plaintext)
+}
+
+/** Previously-resolved plaintext for a ciphertext, or null if this device
+ * has never successfully encrypted or decrypted it. */
+export async function getCachedPlaintext(ciphertext: string): Promise<string | null> {
+  return store.loadPlaintext(ciphertext)
 }

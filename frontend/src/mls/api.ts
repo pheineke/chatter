@@ -41,6 +41,13 @@ export async function publishKeyPackage(keyPackage: Uint8Array): Promise<void> {
   await client.post('/mls/key-packages', { key_package: toB64(keyPackage) })
 }
 
+/** Delete our own still-unclaimed KeyPackages server-side. Called by a fresh
+ * device before publishing its own — see the backend handler's docstring and
+ * ensureIdentity in session.ts for why stale ones are actively harmful. */
+export async function purgeMyKeyPackages(): Promise<void> {
+  await client.delete('/mls/key-packages')
+}
+
 /** Claims (and marks consumed) one of `userId`'s published KeyPackages.
  * Throws if none are available (404) — caller should surface this as
  * "user is offline / hasn't published key material yet". */

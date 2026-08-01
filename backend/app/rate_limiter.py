@@ -294,6 +294,19 @@ async def rate_limit_mls_key_package_publish(current_user: CurrentUser) -> None:
     )
 
 
+async def rate_limit_mls_key_package_purge(current_user: CurrentUser) -> None:
+    """Purging one's own unclaimed KeyPackages: max 5 per 10 minutes per user.
+    Only ever called once per fresh device (see the DELETE /mls/key-packages
+    handler), so this is purely a brake on a buggy or hostile client
+    repeatedly wiping its own pool."""
+    await _enforce_limit(
+        key=f"mls-kp-purge:{current_user.id}",
+        limit=5,
+        window_seconds=600.0,
+        detail="Resetting key packages too quickly. Please wait {retry_after} seconds.",
+    )
+
+
 async def rate_limit_mls_commit(current_user: CurrentUser) -> None:
     """Submitting commits: max 20 per minute per user across all their groups."""
     await _enforce_limit(

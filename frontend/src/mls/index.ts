@@ -23,4 +23,12 @@ export {
   removeMemberFromGroup,
   encryptForChannel,
   decryptFromChannel,
+  cachePlaintext,
+  getCachedPlaintext,
 } from './session'
+
+// Byte<->base64 conversion for callers that need to carry ciphertext over
+// JSON (e.g. the `messages.content` field): the same encoding api.ts uses
+// on the wire, re-exported here so nothing outside src/mls has to reach
+// into api.ts directly.
+export { toB64, fromB64 } from './api'

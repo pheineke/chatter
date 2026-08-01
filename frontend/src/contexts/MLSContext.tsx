@@ -128,8 +128,22 @@ export function MLSProvider({ userId, children }: Props) {
           // match whichever commit actually won server-side. Discard it and
           // sync again — this will find and process the real founder's
           // Welcome instead.
+          //
+          // The winner's Add-commit (with our Welcome) may not have reached
+          // the server yet at this exact instant — both sides typically hit
+          // this path within milliseconds of each other when a brand-new DM
+          // is opened by both participants around the same time, and the
+          // winner still has to fetch our KeyPackage and build+submit their
+          // own commit after "winning". A single immediate sync attempt was
+          // observed to lose this race often enough in practice to leave us
+          // permanently stuck with no group (nothing else retries), so give
+          // the winner a few short windows to finish before giving up.
           await mls.resetLocalGroup(channelId)
-          await mls.syncGroup(channelId, userId)
+          for (const delayMs of [0, 300, 800, 1500]) {
+            if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs))
+            await mls.syncGroup(channelId, userId)
+            if (await mls.hasLocalGroupState(channelId)) break
+          }
           if (!(await mls.hasLocalGroupState(channelId))) throw err
         }
       })
@@ -140,7 +154,16 @@ export function MLSProvider({ userId, children }: Props) {
   const encryptForChannel = useCallback(
     async (channelId: string, plaintext: string) => {
       try {
-        return await withChannelLock(channelId, () => mls.encryptForChannel(channelId, plaintext))
+        const result = await withChannelLock(channelId, () => mls.encryptForChannel(channelId, plaintext))
+        // session.ts works in raw Uint8Array; the app carries ciphertext as
+        // base64 in `messages.content` (JSON), so convert at this boundary.
+        const ciphertext = mls.toB64(result.ciphertext)
+        // See storage.ts's savePlaintext: this isn't a UI-latency
+        // optimization — the sender can never legitimately re-decrypt this
+        // ciphertext again once encrypted (MLS forward secrecy), so this
+        // cache is the only way this device will ever see this content again.
+        await mls.cachePlaintext(ciphertext, plaintext)
+        return { ciphertext, epoch: result.epoch }
       } catch (err) {
         console.error('[MLS] encrypt failed:', err)
         return null
@@ -151,14 +174,30 @@ export function MLSProvider({ userId, children }: Props) {
 
   const decryptForChannel = useCallback(
     async (channelId: string, ciphertext: string, epoch: number) => {
-      try {
-        return await withChannelLock(channelId, () =>
-          mls.decryptFromChannel(channelId, userId, ciphertext, epoch),
-        )
-      } catch (err) {
-        console.error('[MLS] decrypt failed:', err)
-        return null
-      }
+      // Whole operation runs under the channel lock, including the cache
+      // check: two concurrent callers for the same ciphertext (a re-render
+      // racing the initial mount, say) would otherwise both miss the cache
+      // and both attempt a real decrypt, and the loser fails permanently
+      // with "Desired gen in the past" — the ratchet only allows one.
+      return withChannelLock(channelId, async () => {
+        const cached = await mls.getCachedPlaintext(ciphertext)
+        if (cached !== null) return cached
+        try {
+          const plaintext = await mls.decryptFromChannel(
+            channelId,
+            userId,
+            mls.fromB64(ciphertext),
+            epoch,
+          )
+          // Required, not an optimization — see storage.ts's savePlaintext.
+          // This ciphertext can never be decrypted again on this device.
+          await mls.cachePlaintext(ciphertext, plaintext)
+          return plaintext
+        } catch (err) {
+          console.error('[MLS] decrypt failed:', err)
+          return null
+        }
+      })
     },
     [userId],
   )

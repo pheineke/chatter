@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+.venv
+venv
+.git
+.env
+.env.*
+*.log
+static/attachments
+static/avatars

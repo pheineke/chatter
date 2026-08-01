@@ -243,8 +243,10 @@ export interface Message {
   is_encrypted: boolean
   /** AES-GCM nonce (base64); only set for legacy (pre-MLS) encrypted DMs */
   nonce: string | null
-  /** MLS group epoch `content` was encrypted under; set for MLS-encrypted channels/DMs */
-  mls_epoch: number | null
+  /** MLS group epoch `content` was encrypted under; set for MLS-encrypted channels/DMs.
+   * Optional (rather than required-but-nullable) so existing object literals/mocks/tests
+   * that predate MLS don't all need updating just to add `mls_epoch: null`. */
+  mls_epoch?: number | null
   /** Optional flag for messages only visible to the local user (Slash command responses) */
   is_ephemeral?: boolean
 }
