@@ -43,7 +43,18 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
       for (const ch of channels) {
         if (ch.type !== 'text') continue
         const op = action === 'add' ? mls.addMember(ch.id, targetUserId) : mls.removeMember(ch.id, targetUserId)
-        op.catch(() => { /* not our commit to make right now — fine, self-heals later */ })
+        op.catch((err) => {
+          // Genuinely expected much of the time: we may have no local group
+          // state for this channel, or have lost the commit race to another
+          // member — hence warn, not error, and no user-facing surface.
+          //
+          // Logged rather than swallowed because the failure modes that
+          // aren't self-healing look identical from the outside. A member
+          // who rejoins while nobody with local state is online simply never
+          // gets re-Added, and silently produces exactly this warning; with a
+          // bare catch there was no way to tell that from the benign case.
+          console.warn(`[MLS] membership ${action} for ${targetUserId} in ${ch.id} did not apply:`, err)
+        })
       }
     },
     [serverId, qc, mls],

@@ -69,8 +69,32 @@ function getCs(): Promise<CiphersuiteImpl> {
   return _csPromise
 }
 
-function credentialFor(userId: string): Credential {
-  return { credentialType: 'basic', identity: new TextEncoder().encode(userId) }
+/**
+ * Credential identity for one of a user's devices.
+ *
+ * Encoded as `${userId}:${deviceId}` — both are UUIDs, so ':' is an
+ * unambiguous separator. Per-device (not per-user) because each device is
+ * its own leaf in the ratchet tree, and several operations need to tell them
+ * apart: unlinking one device, and removing *all* of a kicked member's
+ * devices rather than whichever leaf happened to match first.
+ *
+ * ts-mls doesn't require distinct identities per leaf — it enforces
+ * uniqueness on signature and HPKE keys, not credentials (see
+ * validateLeafNodeCredentialAndKeyUniqueness in its clientState.js), so two
+ * devices sharing an identity would technically be accepted. We encode the
+ * device anyway so leaf→device attribution is possible at all.
+ */
+function credentialFor(userId: string, deviceId: string): Credential {
+  return { credentialType: 'basic', identity: new TextEncoder().encode(`${userId}:${deviceId}`) }
+}
+
+/** userId portion of a credential identity written by credentialFor.
+ * Tolerates the pre-multi-device format (bare userId, no ':') so groups
+ * created before this change still resolve to the right member. */
+function userIdFromIdentity(identity: Uint8Array): string {
+  const decoded = new TextDecoder().decode(identity)
+  const sep = decoded.indexOf(':')
+  return sep === -1 ? decoded : decoded.slice(0, sep)
 }
 
 // In-memory cache of live ClientState per channel, so we're not
@@ -99,33 +123,42 @@ async function loadLive(channelId: string): Promise<{ state: ClientState; lastPr
 
 // ─── Identity ───────────────────────────────────────────────────────────────
 
-/** Long-term Ed25519 signing keypair for this (user, device). Reused across
- * every KeyPackage we generate so peers see a stable identity instead of a
- * new unrelated one on every Add. Generated once, cached in IndexedDB. */
-export async function ensureIdentity(userId: string): Promise<{ signKey: Uint8Array; publicKey: Uint8Array }> {
+/** Long-term Ed25519 signing keypair plus stable device id for this
+ * (user, browser profile). Reused across every KeyPackage we generate so
+ * peers see a stable device identity instead of a new unrelated one on every
+ * Add. Generated once, cached in IndexedDB. */
+export async function ensureIdentity(
+  userId: string,
+): Promise<{ signKey: Uint8Array; publicKey: Uint8Array; deviceId: string }> {
   const existing = await store.loadIdentity(userId)
   if (existing) return existing
 
-  // No local identity => this is a fresh device for this user (new browser,
-  // cleared site data, reinstall). Any KeyPackages still published under
-  // their account belong to a device whose private halves we don't have, so
-  // they're unusable: whoever Adds this user next would claim one and send a
-  // Welcome nobody can ever decrypt, silently locking them out of that
-  // group. Clear them out before publishing our own.
+  // No local identity => a device we've never seen before for this user: a
+  // second device being linked, or the same one after its site data was
+  // cleared. Either way it needs its own id and signing key; we can't tell
+  // the two cases apart locally, and don't need to.
   //
-  // Best-effort: a failure here (offline, transient 5xx) shouldn't block
-  // identity creation. The stale packages get claimed and fail as before,
-  // which is no worse than not trying.
-  try {
-    await api.purgeMyKeyPackages()
-  } catch (err) {
-    console.warn('[MLS] Could not purge stale server-side key packages:', err)
-  }
-
+  // Note we deliberately do NOT purge this user's other published
+  // KeyPackages here. An earlier version did, to clean up after a wiped
+  // device — but those packages may equally belong to a *live* second
+  // device, and deleting them would stop that device from being Added to
+  // any new group. Stale packages from a dead device are handled instead by
+  // scoping cleanup to a single deviceId (see purgeMyKeyPackages).
+  const deviceId = crypto.randomUUID()
   const cs = await getCs()
   const { signKey, publicKey } = await cs.signature.keygen()
-  await store.saveIdentity(userId, signKey, publicKey)
-  return { signKey, publicKey }
+  await store.saveIdentity(userId, signKey, publicKey, deviceId)
+
+  // Best-effort: drop anything still published under *this* device id.
+  // Normally a no-op (the id is brand new); it matters only if a previous
+  // profile somehow minted the same id, and costs one request either way.
+  try {
+    await api.purgeMyKeyPackages(deviceId)
+  } catch (err) {
+    console.warn('[MLS] Could not purge stale key packages for this device:', err)
+  }
+
+  return { signKey, publicKey, deviceId }
 }
 
 // ─── KeyPackages ────────────────────────────────────────────────────────────
@@ -141,7 +174,7 @@ export async function topUpKeyPackages(userId: string): Promise<void> {
 
   const cs = await getCs()
   const identity = await ensureIdentity(userId)
-  const credential = credentialFor(userId)
+  const credential = credentialFor(userId, identity.deviceId)
 
   for (let i = remaining; i < KEY_PACKAGE_POOL_TARGET; i++) {
     const { publicPackage, privatePackage } = await generateKeyPackageWithKey(
@@ -160,7 +193,7 @@ export async function topUpKeyPackages(userId: string): Promise<void> {
       privatePackage.hpkePrivateKey,
       privatePackage.signaturePrivateKey,
     )
-    await api.publishKeyPackage(encoded)
+    await api.publishKeyPackage(encoded, identity.deviceId)
   }
   await store.pruneConsumedKeyPackages(userId)
 }
@@ -219,6 +252,24 @@ export async function getGroupEpoch(channelId: string): Promise<number | null> {
   return live ? Number(live.state.groupContext.epoch) : null
 }
 
+/** User ids currently occupying a leaf in this channel's group, deduped
+ * across devices. Returns [] if we hold no local state for the channel.
+ * Used to reconcile MLS membership against server membership. */
+export async function groupMemberUserIds(channelId: string): Promise<string[]> {
+  const live = await loadLive(channelId)
+  if (!live) return []
+  const ids = new Set<string>()
+  const tree = live.state.ratchetTree
+  for (let nodeIndex = 0; nodeIndex < tree.length; nodeIndex += 2) {
+    const node = tree[nodeIndex]
+    if (node && node.nodeType === 'leaf') {
+      const cred = node.leaf.credential
+      if (cred.credentialType === 'basic') ids.add(userIdFromIdentity(cred.identity))
+    }
+  }
+  return [...ids]
+}
+
 /** Bootstrap a brand-new group as its founding (and, until an Add, only)
  * member. Idempotent server-side — if another client already registered the
  * channel, `api.initGroup` just returns the existing record, and we detect
@@ -228,7 +279,7 @@ export async function getGroupEpoch(channelId: string): Promise<number | null> {
 export async function createGroupAsFounder(channelId: string, userId: string): Promise<void> {
   const cs = await getCs()
   const identity = await ensureIdentity(userId)
-  const credential = credentialFor(userId)
+  const credential = credentialFor(userId, identity.deviceId)
   const { publicPackage, privatePackage } = await generateKeyPackageWithKey(
     credential,
     defaultCapabilities(),
@@ -295,6 +346,18 @@ export async function syncGroup(channelId: string, userId: string): Promise<void
       const result = await processMessage(msg, state, emptyPskIndex, acceptAll, cs)
       state = result.newState
       lastSeq = event.seq
+
+      // That commit may have been the one that removed us. Once it is, the
+      // state we're holding is a husk: it can't decrypt anything from here
+      // on, and — more importantly — leaving it in place makes the
+      // `if (state)` check above skip any later Welcome as "not for us",
+      // so being re-invited would never take effect. Drop it and keep
+      // walking; a Welcome further along this same feed is exactly how a
+      // re-Add arrives.
+      if (state.groupActiveState.kind === 'removedFromGroup') {
+        await resetLocalGroup(channelId)
+        state = null
+      }
     }
 
     if (lastSeq <= startSeq) break
@@ -349,23 +412,42 @@ async function tryJoinFromWelcome(
 
 // ─── Membership changes ─────────────────────────────────────────────────────
 
-/** Fetch `memberUserId`'s KeyPackage from the server and commit an Add,
- * publishing the resulting Welcome. Throws if the target has no available
- * KeyPackages (they need to be online at least once with the app open to
- * have published some) or if our commit loses a concurrency race — callers
- * should sync and retry on failure. */
+/** Add every one of `memberUserId`'s devices to the group in a single
+ * commit, publishing the resulting Welcome.
+ *
+ * A user is not one leaf but one leaf per device, so we claim a KeyPackage
+ * for each and put an Add proposal for each into the same commit — one epoch
+ * bump however many devices they have. MLS emits a single Welcome carrying
+ * one HPKE-encrypted EncryptedGroupSecrets entry per added leaf, so the same
+ * Welcome bytes serve all of them; each device picks out the entry matching
+ * the KeyPackage it holds (see tryJoinFromWelcome). That's why this is
+ * addressed to the *user* rather than fanned out per device.
+ *
+ * Throws if the target has no usable KeyPackages on any device (they need to
+ * have been online at least once with the app open) or if our commit loses a
+ * concurrency race — callers should sync and retry on failure. */
 export async function addMemberToGroup(channelId: string, memberUserId: string): Promise<void> {
   const live = await loadLive(channelId)
   if (!live) throw new Error(`No local MLS state for channel ${channelId}; sync/join first`)
   const cs = await getCs()
 
-  const kpBytes = await api.fetchKeyPackage(memberUserId)
-  const keyPackage = decodeKeyPackage(kpBytes)
+  const claimed = await api.fetchKeyPackages(memberUserId)
+  if (claimed.length === 0) {
+    throw new Error(
+      `${memberUserId} has no available key packages on any device (never online, or pool drained)`,
+    )
+  }
 
   const parentEpoch = Number(live.state.groupContext.epoch)
   const addResult = await createCommit(
     { state: live.state, cipherSuite: cs },
-    { extraProposals: [{ proposalType: 'add', add: { keyPackage } }], ratchetTreeExtension: true },
+    {
+      extraProposals: claimed.map((kp) => ({
+        proposalType: 'add' as const,
+        add: { keyPackage: decodeKeyPackage(kp.keyPackage) },
+      })),
+      ratchetTreeExtension: true,
+    },
   )
   if (!addResult.welcome) throw new Error('createCommit did not produce a Welcome for an Add proposal')
 
@@ -388,37 +470,48 @@ export async function addMemberToGroup(channelId: string, memberUserId: string):
  * surface in 1.6.2 (confirmed against the installed package's index.d.ts),
  * so Remove proposals need this manual lookup instead. Leaf nodes sit at
  * even positions in the flat array; leafIndex = nodeIndex / 2. */
-function findLeafIndexByIdentity(state: ClientState, userId: string): number | undefined {
-  const target = new TextEncoder().encode(userId)
+function findLeafIndicesForUser(state: ClientState, userId: string): number[] {
+  const found: number[] = []
   const tree = state.ratchetTree
   for (let nodeIndex = 0; nodeIndex < tree.length; nodeIndex += 2) {
     const node = tree[nodeIndex]
     if (node && node.nodeType === 'leaf') {
       const cred = node.leaf.credential
-      if (
-        cred.credentialType === 'basic' &&
-        cred.identity.length === target.length &&
-        cred.identity.every((b, i) => b === target[i])
-      ) {
-        return nodeIndex / 2
+      if (cred.credentialType === 'basic' && userIdFromIdentity(cred.identity) === userId) {
+        found.push(nodeIndex / 2)
       }
     }
   }
-  return undefined
+  return found
 }
 
+/** Remove a member from the group — meaning *every device* they have in it.
+ *
+ * Getting this wrong is a security bug, not a cosmetic one: a user with a
+ * phone and a laptop occupies two leaves, and removing only the first one
+ * found would leave the other holding live group secrets, still able to
+ * decrypt everything sent after they were "removed". So we collect all of
+ * their leaves and put a Remove proposal for each into one commit, which
+ * rotates the keys once and evicts them completely. */
 export async function removeMemberFromGroup(channelId: string, memberUserId: string): Promise<void> {
   const live = await loadLive(channelId)
   if (!live) throw new Error(`No local MLS state for channel ${channelId}; sync/join first`)
   const cs = await getCs()
 
-  const leafIndex = findLeafIndexByIdentity(live.state, memberUserId)
-  if (leafIndex === undefined) throw new Error(`${memberUserId} is not a current member of this group`)
+  const leafIndices = findLeafIndicesForUser(live.state, memberUserId)
+  if (leafIndices.length === 0) {
+    throw new Error(`${memberUserId} is not a current member of this group`)
+  }
 
   const parentEpoch = Number(live.state.groupContext.epoch)
   const removeResult = await createCommit(
     { state: live.state, cipherSuite: cs },
-    { extraProposals: [{ proposalType: 'remove', remove: { removed: leafIndex } } as Proposal], ratchetTreeExtension: true },
+    {
+      extraProposals: leafIndices.map(
+        (leafIndex) => ({ proposalType: 'remove', remove: { removed: leafIndex } }) as Proposal,
+      ),
+      ratchetTreeExtension: true,
+    },
   )
   const commitBytes = encodeMlsMessage(removeResult.commit)
 

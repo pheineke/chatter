@@ -32,13 +32,21 @@ MAX_CIPHERSUITE_NAME = 128
 MAX_WELCOMES_PER_COMMIT = 256
 
 
+MAX_DEVICE_ID = 64
+
+
 class KeyPackagePublish(BaseModel):
     key_package: str = Field(max_length=MAX_KEY_PACKAGE_B64)  # base64 encoded MLS KeyPackage message
+    # Which of the caller's devices generated this; only that device holds the
+    # matching private half. Client-generated UUID (see ensureIdentity in
+    # frontend/src/mls/session.ts).
+    device_id: str = Field(min_length=1, max_length=MAX_DEVICE_ID)
 
 
 class KeyPackageRead(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
+    device_id: str
     key_package: str
     created_at: datetime
 

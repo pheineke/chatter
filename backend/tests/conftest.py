@@ -4,6 +4,23 @@ Shared pytest fixtures.
 Each test function gets its own in-memory SQLite database so tests are fully
 isolated.  The `client` fixture exposes an httpx.AsyncClient wired to the
 FastAPI app with the real database dependency replaced by the per-test session.
+
+KNOWN GAP — the ws/voice suites:
+Code that can't receive a Depends(get_db) session opens its own from the
+module-level AsyncSessionLocal, which is bound to the configured (Postgres)
+engine rather than this fixture's. WebSocket handlers are the main case, so
+tests/test_ws.py and tests/test_voice.py fail against a database that has none
+of their fixture data.
+
+Redirecting that sessionmaker at the test engine looks like the obvious fix
+and isn't: an in-memory database lives on a single connection (hence
+StaticPool), so a second session deadlocks on it, while a file-backed database
+avoids that but leaves fire-and-forget background tasks — see the "the request
+session may be closed by now" sessions in app/routers/messages.py — still
+querying after the fixture has disposed the engine. Both variants stalled the
+suite partway through. Making these pass properly needs the app to accept an
+injectable session factory rather than reaching for a module global; that's a
+production-code change, deliberately not bundled in with a test fix.
 """
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport

@@ -79,12 +79,15 @@ async def test_mark_dm_read_persists_to_conversations(client: AsyncClient, alice
     dm = await client.get(f"/dms/{bob_id}/channel", headers=alice_headers)
     channel_id = dm.json()["channel_id"]
 
+    # Messages live under the channel: the router is
+    # APIRouter(prefix="/channels/{channel_id}"). The old "/messages?channel_id="
+    # form doesn't route anywhere and just 404'd.
     sent = await client.post(
-        f"/messages?channel_id={channel_id}",
+        f"/channels/{channel_id}/messages",
         json={"content": "hello bob"},
         headers=alice_headers,
     )
-    assert sent.status_code == 201
+    assert sent.status_code == 201, sent.text
 
     convs_before = await client.get("/dms/conversations", headers=alice_headers)
     assert convs_before.status_code == 200

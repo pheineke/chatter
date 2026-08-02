@@ -88,13 +88,14 @@ async def publish_key_package(
 ):
     kp = MLSKeyPackage(
         user_id=current_user.id,
+        device_id=body.device_id,
         key_package=_b64_to_bytes(body.key_package, "key_package"),
     )
     db.add(kp)
     await db.commit()
     await db.refresh(kp)
     return KeyPackageRead(
-        id=kp.id, user_id=kp.user_id,
+        id=kp.id, user_id=kp.user_id, device_id=kp.device_id,
         key_package=_bytes_to_b64(kp.key_package),
         created_at=kp.created_at,
     )
@@ -104,69 +105,103 @@ async def publish_key_package(
 async def purge_my_key_packages(
     current_user: CurrentUser,
     db: DB,
+    device_id: str = Query(min_length=1, max_length=64),
     _rl: None = Depends(rate_limit_mls_key_package_purge),
 ):
-    """Drop all of the caller's own unclaimed KeyPackages.
+    """Drop unclaimed KeyPackages belonging to one of the caller's devices.
 
     A KeyPackage can only ever be redeemed by the exact device that generated
-    it (the private half never leaves that browser's IndexedDB). So when a
-    user starts on a fresh device — new browser, cleared site data,
-    reinstall — every KeyPackage still sitting on the server is dead weight:
-    `fetch_key_package` would happily hand one to someone Adding this user to
-    a group, and the resulting Welcome could never be decrypted by anyone,
-    permanently locking them out of that group.
+    it (the private half never leaves that browser's IndexedDB), so packages
+    from a device that no longer exists are dead weight: claiming one yields
+    a Welcome nobody can decrypt, silently locking its recipient out of that
+    group.
 
-    The new device calls this once, before publishing its own pool (see
-    ensureIdentity in frontend/src/mls/session.ts). Already-consumed rows are
-    left alone: they're an audit trail of Adds that really happened, and
-    they're never handed out again anyway.
+    Scoped to a single device deliberately. An earlier version deleted every
+    unclaimed package the user had, which was fine while everyone had one
+    device and actively harmful once they didn't — linking a phone would
+    strip the laptop's ability to be Added to any new group. Callers pass
+    their own device id (see ensureIdentity in frontend/src/mls/session.ts).
+
+    Already-consumed rows are left alone: they're an audit trail of Adds that
+    really happened, and are never handed out again anyway.
     """
     await db.execute(
         MLSKeyPackage.__table__.delete().where(
             MLSKeyPackage.user_id == current_user.id,
+            MLSKeyPackage.device_id == device_id,
             MLSKeyPackage.consumed_at.is_(None),
         )
     )
     await db.commit()
 
 
-@router.get("/key-packages/{user_id}", response_model=KeyPackageRead)
-async def fetch_key_package(
+@router.get("/key-packages/{user_id}", response_model=list[KeyPackageRead])
+async def fetch_key_packages(
     user_id: uuid.UUID,
     current_user: CurrentUser,
     db: DB,
     _rl: None = Depends(rate_limit_mls_key_package_claim),
 ):
-    """Claim one unused KeyPackage for `user_id` so they can be Added to a
-    group. Marks it consumed — KeyPackages are single-use in MLS (reusing one
-    would let two different Adds derive the same init secret).
+    """Claim one unused KeyPackage for **each** of `user_id`'s devices, so the
+    caller can Add every device to a group in a single commit.
 
-    Note this is deliberately not gated on a relationship between caller and
-    target: the caller may be Adding them to a channel the target isn't in
-    yet, so there's no shared context to check against at this point. The
-    rate limit above is what keeps the consume-on-read behaviour from being a
-    pool-draining DoS.
+    A user is not one MLS member but one per device: each holds its own
+    private keys and its own leaf in the ratchet tree. Adding only one device
+    would leave their other devices unable to decrypt anything in the
+    channel. Each returned package is marked consumed — KeyPackages are
+    single-use in MLS (reusing one would let two different Adds derive the
+    same init secret).
+
+    Returns an empty list rather than 404 when the user has no usable key
+    material: with several devices in play "none available" is a normal
+    transient state (every pool drained, or a device that has never been
+    online), and the caller is better placed to decide whether that's fatal.
+
+    Deliberately not gated on a relationship between caller and target: the
+    caller may be Adding them to a channel they aren't in yet, so there's no
+    shared context to check against. The rate limit above is what keeps the
+    consume-on-read behaviour from being a pool-draining DoS.
     """
-    result = await db.execute(
-        select(MLSKeyPackage)
+    device_rows = await db.execute(
+        select(MLSKeyPackage.device_id)
         .where(MLSKeyPackage.user_id == user_id, MLSKeyPackage.consumed_at.is_(None))
-        .order_by(MLSKeyPackage.created_at.asc())
-        .limit(1)
-        .with_for_update(skip_locked=True)
+        .distinct()
     )
-    kp = result.scalar_one_or_none()
-    if kp is None:
-        raise HTTPException(
-            status_code=404,
-            detail="This user has no available key packages (they may be offline / need to publish more).",
+    device_ids = list(device_rows.scalars().all())
+
+    claimed: list[MLSKeyPackage] = []
+    for device_id in device_ids:
+        # Oldest-first per device, locked individually so two concurrent
+        # claimers take different rows instead of colliding on one.
+        result = await db.execute(
+            select(MLSKeyPackage)
+            .where(
+                MLSKeyPackage.user_id == user_id,
+                MLSKeyPackage.device_id == device_id,
+                MLSKeyPackage.consumed_at.is_(None),
+            )
+            .order_by(MLSKeyPackage.created_at.asc())
+            .limit(1)
+            .with_for_update(skip_locked=True)
         )
-    kp.consumed_at = datetime.now(timezone.utc)
+        kp = result.scalar_one_or_none()
+        if kp is None:
+            # Raced with another claimer for this device's last package.
+            # Skipping is right: the group just won't include that device
+            # until it publishes more and someone re-Adds it.
+            continue
+        kp.consumed_at = datetime.now(timezone.utc)
+        claimed.append(kp)
+
     await db.commit()
-    return KeyPackageRead(
-        id=kp.id, user_id=kp.user_id,
-        key_package=_bytes_to_b64(kp.key_package),
-        created_at=kp.created_at,
-    )
+    return [
+        KeyPackageRead(
+            id=kp.id, user_id=kp.user_id, device_id=kp.device_id,
+            key_package=_bytes_to_b64(kp.key_package),
+            created_at=kp.created_at,
+        )
+        for kp in claimed
+    ]
 
 
 # ─── Groups ─────────────────────────────────────────────────────────────────

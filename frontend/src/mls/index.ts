@@ -17,6 +17,7 @@ export {
   remoteGroupExists,
   resetLocalGroup,
   getGroupEpoch,
+  groupMemberUserIds,
   createGroupAsFounder,
   syncGroup,
   addMemberToGroup,

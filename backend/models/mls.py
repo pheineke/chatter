@@ -39,6 +39,13 @@ class MLSKeyPackage(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # Which of the user's devices published this. MLS is a protocol between
+    # devices, not accounts: each device holds its own private keys and its
+    # own leaf in the ratchet tree, so a KeyPackage is only ever redeemable
+    # by the device that made it. Adding a user to a group means claiming one
+    # package per device, and cleanup after a wiped device must not touch a
+    # sibling device's packages — both need this column.
+    device_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     # Encoded KeyPackage bytes (ts-mls encodeMlsMessage / mls_key_package wireformat)
     key_package: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -130,3 +137,72 @@ class MLSGroupEvent(Base):
     group: Mapped["MLSGroup"] = relationship("MLSGroup")
     sender: Mapped["User"] = relationship("User", foreign_keys=[sender_user_id])
     recipient: Mapped["User | None"] = relationship("User", foreign_keys=[recipient_user_id])
+
+
+class MLSHistoryRequest(Base):
+    """A newly-linked device asking this user's other devices for message
+    history, publishing an ephemeral public key to receive it under.
+
+    MLS is forward-secret: a device Added at epoch N cannot derive keys for
+    anything sent earlier, so history can't come from the protocol itself. It
+    has to be handed over by a device that already holds the plaintext. This
+    mirrors how WhatsApp links a companion device — the existing device
+    encrypts a bundle to the new one, rather than the server keeping a
+    decryptable archive.
+
+    The public key here is ephemeral and exists only for one transfer. It is
+    deliberately NOT the device's MLS signature or init key: MLS init keys are
+    single-use and consumed by Adds, so borrowing one would interfere with
+    joining groups.
+    """
+
+    __tablename__ = "mls_history_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Base64 SPKI ECDH P-256 public key (see frontend/src/crypto/index.ts).
+    public_key: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        # One outstanding request per device; re-requesting replaces it.
+        UniqueConstraint("user_id", "device_id", name="uq_mls_history_request_user_device"),
+    )
+
+    user: Mapped["User"] = relationship("User")
+
+
+class MLSHistoryBundle(Base):
+    """Encrypted message history handed from one of a user's devices to
+    another, in transit.
+
+    The server stores only ciphertext it cannot read: the payload is
+    AES-GCM-encrypted under a key derived from ECDH between the sending
+    device and the ephemeral public key in the matching MLSHistoryRequest.
+    Rows are deleted as soon as the recipient consumes them, so this is a
+    relay and not an archive — that's what keeps "we never hold your
+    readable history" true even though history does cross the server.
+    """
+
+    __tablename__ = "mls_history_bundles"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Device this bundle is for — the one that raised the request.
+    target_device_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # Which device produced it, for display ("restored from your laptop").
+    sender_device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    user: Mapped["User"] = relationship("User")

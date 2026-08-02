@@ -123,6 +123,28 @@ export function MLSProvider({ userId, children }: Props) {
         await mls.syncGroup(channelId, userId)
         if (await mls.hasLocalGroupState(channelId)) {
           foundedRef.current.add(channelId)
+          // Reconcile MLS membership against who should be here.
+          //
+          // Adds are event-driven (useServerWS reacts to server.member_joined),
+          // but only a client that already holds group state can commit one —
+          // so if nobody like that happened to be online at the moment someone
+          // joined, that person is never Added and silently sees nothing,
+          // forever. Re-checking whenever a member opens the channel turns
+          // that permanent hole into a delay: the next person to show up
+          // repairs it.
+          //
+          // Losing the race to a concurrent committer is fine and expected;
+          // addMemberToGroup throws on a stale epoch and we simply try again
+          // next time.
+          const inGroup = new Set(await mls.groupMemberUserIds(channelId))
+          const missing = initialMembers.filter((id) => id && !inGroup.has(id))
+          for (const memberId of missing) {
+            try {
+              await mls.addMemberToGroup(channelId, memberId)
+            } catch (err) {
+              console.warn(`[MLS] could not reconcile ${memberId} into ${channelId}:`, err)
+            }
+          }
           return
         }
         if (foundedRef.current.has(channelId) || (await mls.remoteGroupExists(channelId))) {

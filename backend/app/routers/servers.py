@@ -609,8 +609,11 @@ async def remove_role(
     user_role = result.scalar_one_or_none()
     if user_role:
         await db.delete(user_role)
-        # Audit Log
-        from app.routers.audit_logs import create_audit_log, AuditLogAction
+        # Audit Log — create_audit_log and AuditLogAction are already imported
+        # at module scope (from app.services.audit_log_service and
+        # models.audit_log). A local re-import pointed at app.routers.audit_logs,
+        # which exports neither, so this endpoint raised ImportError the moment
+        # it was reached.
         await create_audit_log(
             session=db,
             server_id=server_id,

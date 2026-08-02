@@ -37,23 +37,30 @@ export interface RemoteGroupEvent {
   payload: Uint8Array
 }
 
-export async function publishKeyPackage(keyPackage: Uint8Array): Promise<void> {
-  await client.post('/mls/key-packages', { key_package: toB64(keyPackage) })
+export async function publishKeyPackage(keyPackage: Uint8Array, deviceId: string): Promise<void> {
+  await client.post('/mls/key-packages', { key_package: toB64(keyPackage), device_id: deviceId })
 }
 
-/** Delete our own still-unclaimed KeyPackages server-side. Called by a fresh
- * device before publishing its own — see the backend handler's docstring and
- * ensureIdentity in session.ts for why stale ones are actively harmful. */
-export async function purgeMyKeyPackages(): Promise<void> {
-  await client.delete('/mls/key-packages')
+/** Delete still-unclaimed KeyPackages belonging to one of our own devices.
+ * Scoped to a device on purpose — a user's other devices are live and need
+ * their published packages left alone. */
+export async function purgeMyKeyPackages(deviceId: string): Promise<void> {
+  await client.delete('/mls/key-packages', { params: { device_id: deviceId } })
 }
 
-/** Claims (and marks consumed) one of `userId`'s published KeyPackages.
- * Throws if none are available (404) — caller should surface this as
- * "user is offline / hasn't published key material yet". */
-export async function fetchKeyPackage(userId: string): Promise<Uint8Array> {
+/** Claims (and marks consumed) one KeyPackage for *each* of `userId`'s
+ * devices, so every device can be Added to the group in a single commit.
+ * Returns an empty array if the user has no usable key material at all
+ * (never online, or every device's pool is drained) — callers decide
+ * whether that's fatal. */
+export async function fetchKeyPackages(
+  userId: string,
+): Promise<{ deviceId: string; keyPackage: Uint8Array }[]> {
   const { data } = await client.get(`/mls/key-packages/${userId}`)
-  return fromB64(data.key_package)
+  return (data as { device_id: string; key_package: string }[]).map((kp) => ({
+    deviceId: kp.device_id,
+    keyPackage: fromB64(kp.key_package),
+  }))
 }
 
 export async function initGroup(channelId: string, ciphersuite: string): Promise<RemoteGroup> {

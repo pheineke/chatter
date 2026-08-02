@@ -283,20 +283,47 @@ async def test_list_sessions_returns_own_sessions(client: AsyncClient, alice_hea
 
 
 async def test_revoke_specific_own_session(client: AsyncClient):
+    """Revoking one session leaves the others working.
+
+    Signs in twice so there are two sessions, then kills the *older* one from
+    the newer. The original form of this test revoked its own current session
+    and then tried to list sessions with the very token it had just revoked —
+    which correctly 401s, so it was really asserting against
+    `{"detail": ...}` and failing with a confusing TypeError from indexing a
+    string. Revoking a different session is both the realistic case ("log out
+    my other device") and the one that actually exercises the endpoint.
+    """
     await client.post("/auth/register", json={"username": "sess_user", "password": "password1"})
-    r = await client.post("/auth/login", data={"username": "sess_user", "password": "password1"})
-    tokens = r.json()
-    hdrs = {"Authorization": f"Bearer {tokens['access_token']}"}
+    first = (await client.post("/auth/login", data={"username": "sess_user", "password": "password1"})).json()
+    second = (await client.post("/auth/login", data={"username": "sess_user", "password": "password1"})).json()
+    second_hdrs = {"Authorization": f"Bearer {second['access_token']}"}
 
-    sessions = (await client.get("/auth/sessions", headers=hdrs)).json()
-    sid = sessions[0]["id"]
+    sessions = (await client.get("/auth/sessions", headers=second_hdrs)).json()
+    assert len(sessions) == 2
+    other_sid = next(s["id"] for s in sessions if not s["is_current"])
 
-    r_del = await client.delete(f"/auth/sessions/{sid}", headers=hdrs)
+    r_del = await client.delete(f"/auth/sessions/{other_sid}", headers=second_hdrs)
     assert r_del.status_code == 204
 
-    # Token should now be gone from session list
-    sessions_after = (await client.get("/auth/sessions", headers=hdrs)).json()
-    assert all(s["id"] != sid for s in sessions_after)
+    # The surviving session still works, and the revoked one is gone from it.
+    sessions_after = (await client.get("/auth/sessions", headers=second_hdrs)).json()
+    assert [s["id"] for s in sessions_after] == [s["id"] for s in sessions if s["is_current"]]
+
+    # And the revoked session's refresh token can no longer be exchanged.
+    refreshed = await client.post("/auth/refresh", json={"refresh_token": first["refresh_token"]})
+    assert refreshed.status_code == 401, refreshed.text
+
+
+async def test_revoking_current_session_logs_you_out(client: AsyncClient):
+    """Killing the session you're using invalidates the token you're holding."""
+    await client.post("/auth/register", json={"username": "sess_self", "password": "password1"})
+    tokens = (await client.post("/auth/login", data={"username": "sess_self", "password": "password1"})).json()
+    hdrs = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    sid = (await client.get("/auth/sessions", headers=hdrs)).json()[0]["id"]
+    assert (await client.delete(f"/auth/sessions/{sid}", headers=hdrs)).status_code == 204
+
+    assert (await client.get("/auth/sessions", headers=hdrs)).status_code == 401
 
 
 async def test_cannot_revoke_another_users_session(client: AsyncClient, alice_headers, bob_headers):

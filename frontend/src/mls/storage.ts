@@ -31,6 +31,17 @@ interface StoredIdentity {
   userId: string // primary key
   signKey: Uint8Array
   publicKey: Uint8Array
+  /** Stable per-(user, browser profile) identifier, minted on first use.
+   *
+   * MLS is a protocol between *devices*, not accounts: each device holds its
+   * own signature key and occupies its own leaf in the ratchet tree. This id
+   * is what lets us tell one of a user's devices from another — to Add every
+   * device of a member to a group, to remove all of them when that member is
+   * kicked, and to avoid one device clobbering another's published
+   * KeyPackages. Generated locally and never reused across profiles, so
+   * clearing site data yields a genuinely new device, which is the correct
+   * interpretation: the old device's private keys are gone. */
+  deviceId: string
 }
 
 interface StoredGroup {
@@ -121,8 +132,9 @@ export async function saveIdentity(
   userId: string,
   signKey: Uint8Array,
   publicKey: Uint8Array,
+  deviceId: string,
 ): Promise<void> {
-  await db.identity.put({ userId, signKey, publicKey })
+  await db.identity.put({ userId, signKey, publicKey, deviceId })
 }
 
 // ─── Group state ────────────────────────────────────────────────────────────

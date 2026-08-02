@@ -40,25 +40,87 @@ async def test_key_package_publish_and_single_use(client: AsyncClient):
     bob = await register_and_login(client, "mls_bob", "pass1234")
     bob_me = (await client.get("/users/me", headers=bob)).json()
 
-    r = await client.post("/mls/key-packages", json={"key_package": _b64(b"bob-kp-bytes")}, headers=bob)
+    r = await client.post(
+        "/mls/key-packages",
+        json={"key_package": _b64(b"bob-kp-bytes"), "device_id": "bob-laptop"},
+        headers=bob,
+    )
     assert r.status_code == 201, r.text
 
     r = await client.get(f"/mls/key-packages/{bob_me['id']}", headers=alice)
     assert r.status_code == 200, r.text
-    assert base64.b64decode(r.json()["key_package"]) == b"bob-kp-bytes"
+    claimed = r.json()
+    assert len(claimed) == 1
+    assert base64.b64decode(claimed[0]["key_package"]) == b"bob-kp-bytes"
+    assert claimed[0]["device_id"] == "bob-laptop"
 
     # Single-use: a second claim finds nothing left.
     r = await client.get(f"/mls/key-packages/{bob_me['id']}", headers=alice)
-    assert r.status_code == 404, r.text
+    assert r.status_code == 200, r.text
+    assert r.json() == []
 
 
-async def test_key_package_missing_returns_404(client: AsyncClient):
+async def test_key_package_claim_returns_one_per_device(client: AsyncClient):
+    """A user with several devices must yield one package per device, so a
+    single Add commit can bring every device of theirs into the group."""
+    alice = await register_and_login(client, "mls_alice_md", "pass1234")
+    bob = await register_and_login(client, "mls_bob_md", "pass1234")
+    bob_id = (await client.get("/users/me", headers=bob)).json()["id"]
+
+    for device, blob in (("phone", b"kp-phone-1"), ("phone", b"kp-phone-2"), ("laptop", b"kp-laptop-1")):
+        r = await client.post(
+            "/mls/key-packages",
+            json={"key_package": _b64(blob), "device_id": device},
+            headers=bob,
+        )
+        assert r.status_code == 201, r.text
+
+    r = await client.get(f"/mls/key-packages/{bob_id}", headers=alice)
+    assert r.status_code == 200, r.text
+    claimed = r.json()
+    assert {kp["device_id"] for kp in claimed} == {"phone", "laptop"}
+    # Oldest-first within a device, and exactly one taken per device.
+    by_device = {kp["device_id"]: base64.b64decode(kp["key_package"]) for kp in claimed}
+    assert by_device["phone"] == b"kp-phone-1"
+    assert by_device["laptop"] == b"kp-laptop-1"
+
+    # The phone's second package survives for the next Add; the laptop is dry.
+    r = await client.get(f"/mls/key-packages/{bob_id}", headers=alice)
+    claimed = r.json()
+    assert [kp["device_id"] for kp in claimed] == ["phone"]
+    assert base64.b64decode(claimed[0]["key_package"]) == b"kp-phone-2"
+
+
+async def test_purge_is_scoped_to_one_device(client: AsyncClient):
+    """Wiping a dead device's packages must leave a sibling device's alone —
+    otherwise linking a new device would strip the old one's ability to be
+    Added to any new group."""
+    bob = await register_and_login(client, "mls_bob_purge", "pass1234")
+    bob_id = (await client.get("/users/me", headers=bob)).json()["id"]
+    alice = await register_and_login(client, "mls_alice_purge", "pass1234")
+
+    for device, blob in (("old", b"kp-old"), ("new", b"kp-new")):
+        await client.post(
+            "/mls/key-packages",
+            json={"key_package": _b64(blob), "device_id": device},
+            headers=bob,
+        )
+
+    r = await client.delete("/mls/key-packages", params={"device_id": "old"}, headers=bob)
+    assert r.status_code == 204, r.text
+
+    claimed = (await client.get(f"/mls/key-packages/{bob_id}", headers=alice)).json()
+    assert [kp["device_id"] for kp in claimed] == ["new"]
+
+
+async def test_key_package_missing_returns_empty_list(client: AsyncClient):
     alice = await register_and_login(client, "mls_alice2", "pass1234")
     bob = await register_and_login(client, "mls_bob2", "pass1234")
     bob_id = (await client.get("/users/me", headers=bob)).json()["id"]
 
     r = await client.get(f"/mls/key-packages/{bob_id}", headers=alice)
-    assert r.status_code == 404
+    assert r.status_code == 200
+    assert r.json() == []
 
 
 async def test_group_init_is_idempotent(client: AsyncClient):
@@ -168,7 +230,7 @@ async def test_oversized_payloads_rejected(client: AsyncClient):
 
     r = await client.post(
         "/mls/key-packages",
-        json={"key_package": _b64(b"x" * 32_768)},
+        json={"key_package": _b64(b"x" * 32_768), "device_id": "dev"},
         headers=alice,
     )
     assert r.status_code == 422, r.text
