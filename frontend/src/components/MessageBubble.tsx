@@ -106,33 +106,36 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
   const [forwardQuery, setForwardQuery] = useState('')
   const [forwardBusyUserId, setForwardBusyUserId] = useState<string | null>(null)
 
-  // MLS: decrypt the message content if it was sent encrypted
+  // MLS: decrypt the message content if it was sent encrypted.
+  // null once resolved successfully; otherwise which non-success state we
+  // landed in (see DecryptResult) so the UI can distinguish "you weren't in
+  // the group yet" from an actual failure.
   const [decryptedContent, setDecryptedContent] = useState<string | null>(null)
-  const [decryptFailed, setDecryptFailed] = useState(false)
+  const [decryptState, setDecryptState] = useState<'before_you_joined' | 'failed' | null>(null)
 
   useEffect(() => {
     if (!msg.is_encrypted || !msg.content || msg.mls_epoch == null) return
 
     // Wait for MLS identity/key-package bootstrap to finish — avoid a
-    // permanent decryptFailed flag while it's still loading on first mount.
+    // permanent failure flag while it's still loading on first mount.
     if (!mls.ready) return
 
     // Reset on every retry so a previous false-fail doesn't persist
-    setDecryptFailed(false)
+    setDecryptState(null)
     setDecryptedContent(null)
 
     let cancelled = false
-    mls.decryptForChannel(channelId, msg.content, msg.mls_epoch).then(plain => {
+    mls.decryptForChannel(channelId, msg.content, msg.mls_epoch).then(result => {
       if (cancelled) return
-      if (plain === null) setDecryptFailed(true)
-      else setDecryptedContent(plain)
+      if (result.status === 'ok') setDecryptedContent(result.plaintext)
+      else setDecryptState(result.status)
     })
     return () => { cancelled = true }
   }, [msg.id, msg.is_encrypted, msg.content, msg.mls_epoch, channelId, mls])
 
   // Effective display content: decrypted (if E2EE), otherwise raw
   const displayContent = msg.is_encrypted
-    ? (decryptFailed ? null : decryptedContent)
+    ? (decryptState !== null ? null : decryptedContent)
     : msg.content
 
   const pinMut = useMutation({
@@ -433,13 +436,22 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
           </div>
         ) : (
           <div className="text-sm break-words leading-relaxed text-sp-text max-w-full">
-            {msg.is_encrypted && !decryptedContent && !decryptFailed && (
+            {msg.is_encrypted && !decryptedContent && decryptState === null && (
               <span className="text-sp-muted italic text-xs flex items-center gap-1">
                 <Icon name="lock" size={11} />
                 Decrypting…
               </span>
             )}
-            {msg.is_encrypted && decryptFailed && (
+            {/* Expected and permanent, so stated plainly rather than as an
+                error: MLS only grants keys from the epoch you were added
+                onward, so history before that is unreadable by design. */}
+            {msg.is_encrypted && decryptState === 'before_you_joined' && (
+              <span className="text-sp-muted italic text-xs flex items-center gap-1">
+                <Icon name="lock" size={11} />
+                Sent before you joined — not available to you
+              </span>
+            )}
+            {msg.is_encrypted && decryptState === 'failed' && (
               <span className="text-red-400 italic text-xs flex items-center gap-1">
                 <Icon name="lock" size={11} />
                 Could not decrypt message (key mismatch or missing)

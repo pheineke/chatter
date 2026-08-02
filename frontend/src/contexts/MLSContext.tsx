@@ -25,6 +25,21 @@ import {
 import * as mls from '../mls'
 import { useWebSocket } from '../hooks/useWebSocket'
 
+/**
+ * Why a message couldn't be shown in the clear.
+ *
+ * `before_you_joined` is the expected, permanent, non-alarming case: MLS
+ * only lets a member derive secrets from the epoch they were added onward,
+ * so history predating your Add is cryptographically unreachable — by
+ * design, not by malfunction. Worth telling the user apart from `failed`,
+ * which means something actually went wrong (missing group state, corrupt
+ * ciphertext, a bug) and may be worth retrying or reporting.
+ */
+export type DecryptResult =
+  | { status: 'ok'; plaintext: string }
+  | { status: 'before_you_joined' }
+  | { status: 'failed' }
+
 export interface MLSContextValue {
   /** True once this device's identity + key package pool are set up. */
   ready: boolean
@@ -41,14 +56,18 @@ export interface MLSContextValue {
    * should fall back to a "not encrypted yet" state rather than blocking). */
   encryptForChannel(channelId: string, plaintext: string): Promise<{ ciphertext: string; epoch: number } | null>
 
-  decryptForChannel(channelId: string, ciphertext: string, epoch: number): Promise<string | null>
+  decryptForChannel(channelId: string, ciphertext: string, epoch: number): Promise<DecryptResult>
 
   addMember(channelId: string, userId: string): Promise<void>
   removeMember(channelId: string, userId: string): Promise<void>
   hasGroup(channelId: string): Promise<boolean>
 }
 
-const MLSContext = createContext<MLSContextValue | null>(null)
+/** Exported so tests can inject a stub value without standing up the real
+ * provider, which would pull WebCrypto, ts-mls and IndexedDB into jsdom for
+ * components that only incidentally consume this context. App code should
+ * use `useMLS()` / `<MLSProvider>` rather than touching this directly. */
+export const MLSContext = createContext<MLSContextValue | null>(null)
 
 interface Props {
   userId: string
@@ -179,9 +198,9 @@ export function MLSProvider({ userId, children }: Props) {
       // racing the initial mount, say) would otherwise both miss the cache
       // and both attempt a real decrypt, and the loser fails permanently
       // with "Desired gen in the past" — the ratchet only allows one.
-      return withChannelLock(channelId, async () => {
+      return withChannelLock(channelId, async (): Promise<DecryptResult> => {
         const cached = await mls.getCachedPlaintext(ciphertext)
-        if (cached !== null) return cached
+        if (cached !== null) return { status: 'ok', plaintext: cached }
         try {
           const plaintext = await mls.decryptFromChannel(
             channelId,
@@ -192,10 +211,15 @@ export function MLSProvider({ userId, children }: Props) {
           // Required, not an optimization — see storage.ts's savePlaintext.
           // This ciphertext can never be decrypted again on this device.
           await mls.cachePlaintext(ciphertext, plaintext)
-          return plaintext
+          return { status: 'ok', plaintext }
         } catch (err) {
+          if (mls.isEpochTooOld(err)) {
+            // Not a malfunction: this message predates our Add to the group,
+            // so we never had (and can never obtain) the keys for it.
+            return { status: 'before_you_joined' }
+          }
           console.error('[MLS] decrypt failed:', err)
-          return null
+          return { status: 'failed' }
         }
       })
     },

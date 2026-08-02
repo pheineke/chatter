@@ -252,44 +252,59 @@ export async function createGroupAsFounder(channelId: string, userId: string): P
 export async function syncGroup(channelId: string, userId: string): Promise<void> {
   const live = await loadLive(channelId)
   const cs = await getCs()
-  const events = await api.fetchGroupEvents(channelId, live?.lastProcessedSeq ?? 0)
-  if (events.length === 0) return
 
   let state = live?.state ?? null
-  let lastSeq = live?.lastProcessedSeq ?? 0
+  const originalSeq = live?.lastProcessedSeq ?? 0
+  let lastSeq = originalSeq
 
-  for (const event of events) {
-    if (event.eventType === 'welcome') {
-      if (state) {
-        // Already in the group — this welcome is for someone else's copy of
-        // history (or a re-join we don't need); skip.
+  // The events endpoint returns a bounded page (mls.py's _MAX_EVENTS_PAGE),
+  // so keep pulling until it stops advancing our bookmark. A client that
+  // falls far behind — offline for a while in a busy channel — would
+  // otherwise silently stop partway through catch-up and stay unable to
+  // decrypt anything at the current epoch. Guarded on seq strictly
+  // increasing so a malformed page can't spin forever.
+  for (;;) {
+    const events = await api.fetchGroupEvents(channelId, lastSeq)
+    if (events.length === 0) break
+    const startSeq = lastSeq
+
+    for (const event of events) {
+      if (event.eventType === 'welcome') {
+        if (state) {
+          // Already in the group — this welcome is for someone else's copy of
+          // history (or a re-join we don't need); skip.
+          lastSeq = event.seq
+          continue
+        }
+        const joined = await tryJoinFromWelcome(channelId, userId, event.payload, cs)
+        if (joined) {
+          state = joined
+          lastSeq = event.seq
+        }
+        continue
+      }
+
+      // commit
+      if (!state) {
+        // We haven't joined yet and this is a commit we have no state to apply
+        // — nothing to do until we find our welcome (may arrive at a later seq).
         lastSeq = event.seq
         continue
       }
-      const joined = await tryJoinFromWelcome(channelId, userId, event.payload, cs)
-      if (joined) {
-        state = joined
-        lastSeq = event.seq
-      }
-      continue
+      const msg = decodeProcessableMessage(event.payload)
+      const result = await processMessage(msg, state, emptyPskIndex, acceptAll, cs)
+      state = result.newState
+      lastSeq = event.seq
     }
 
-    // commit
-    if (!state) {
-      // We haven't joined yet and this is a commit we have no state to apply
-      // — nothing to do until we find our welcome (may arrive at a later seq).
-      lastSeq = event.seq
-      continue
-    }
-    const msg = decodeProcessableMessage(event.payload)
-    const result = await processMessage(msg, state, emptyPskIndex, acceptAll, cs)
-    state = result.newState
-    lastSeq = event.seq
+    if (lastSeq <= startSeq) break
   }
 
   // If we still have no state, we haven't found our Welcome yet (it may
-  // arrive in a later batch) — nothing to persist in that case.
-  if (state) await persist(channelId, state, lastSeq)
+  // arrive later) — nothing to persist in that case. Otherwise persist even
+  // if we only skipped past events, so the bookmark advance sticks and we
+  // don't refetch them on every subsequent sync.
+  if (state && lastSeq > originalSeq) await persist(channelId, state, lastSeq)
 }
 
 async function tryJoinFromWelcome(
@@ -454,6 +469,23 @@ export async function decryptFromChannel(
     throw new Error(`Expected an application message, got ${result.kind}`)
   }
   return new TextDecoder().decode(result.message)
+}
+
+/** True if `err` is ts-mls rejecting a message whose epoch predates the keys
+ * we hold — i.e. it was sent before we were Added to the group, so we never
+ * had and can never obtain the secrets for it. An expected, permanent state
+ * rather than a malfunction; callers surface it differently (see
+ * DecryptResult in MLSContext.tsx).
+ *
+ * Matched on the message text because ts-mls 1.6.2 doesn't re-export its
+ * error classes from the package entry point (confirmed against the
+ * published index.d.ts), so there's no `instanceof ValidationError` to use
+ * without depending on an undocumented deep import path. Both options are
+ * version-fragile; this one at least fails safe — if the wording changes
+ * upstream we just fall back to reporting a generic decrypt failure, which
+ * is exactly the behaviour we had before this distinction existed. */
+export function isEpochTooOld(err: unknown): boolean {
+  return err instanceof Error && /epoch too old/i.test(err.message)
 }
 
 /** Remember a ciphertext's plaintext. Required, not an optimization — see

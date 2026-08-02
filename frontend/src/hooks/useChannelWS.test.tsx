@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { InfiniteData } from '@tanstack/react-query'
 import type { Message } from '../api/types'
 import { useChannelWS } from './useChannelWS'
+import { MLSContext } from '../contexts/MLSContext'
+import { stubMLS } from '../test/utils'
 
 // Capture the onMessage callback so we can fire fake WS events in tests
 type OnMessage = (msg: { type: string; data: unknown }) => void
@@ -52,7 +54,11 @@ function makeInfiniteData(pages: Message[][]): InfiniteData<Message[]> {
 
 function wrapper(qc: QueryClient) {
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>
+      {/* The hook under test reaches useMLS() to decrypt incoming messages;
+          the stub keeps that inert so these tests stay about cache updates. */}
+      <MLSContext.Provider value={stubMLS}>{children}</MLSContext.Provider>
+    </QueryClientProvider>
   )
 }
 

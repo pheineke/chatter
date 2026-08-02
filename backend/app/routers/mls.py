@@ -28,6 +28,7 @@ from sqlalchemy.exc import IntegrityError
 from app.dependencies import CurrentUser, DB
 from app.rate_limiter import (
     rate_limit_mls_key_package_publish,
+    rate_limit_mls_key_package_claim,
     rate_limit_mls_key_package_purge,
     rate_limit_mls_commit,
 )
@@ -130,10 +131,22 @@ async def purge_my_key_packages(
 
 
 @router.get("/key-packages/{user_id}", response_model=KeyPackageRead)
-async def fetch_key_package(user_id: uuid.UUID, current_user: CurrentUser, db: DB):
+async def fetch_key_package(
+    user_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_mls_key_package_claim),
+):
     """Claim one unused KeyPackage for `user_id` so they can be Added to a
     group. Marks it consumed — KeyPackages are single-use in MLS (reusing one
-    would let two different Adds derive the same init secret)."""
+    would let two different Adds derive the same init secret).
+
+    Note this is deliberately not gated on a relationship between caller and
+    target: the caller may be Adding them to a channel the target isn't in
+    yet, so there's no shared context to check against at this point. The
+    rate limit above is what keeps the consume-on-read behaviour from being a
+    pool-draining DoS.
+    """
     result = await db.execute(
         select(MLSKeyPackage)
         .where(MLSKeyPackage.user_id == user_id, MLSKeyPackage.consumed_at.is_(None))
@@ -251,6 +264,26 @@ async def commit_group(
     new_group_info = (
         _b64_to_bytes(body.group_info, "group_info") if body.group_info is not None else None
     )
+
+    # Welcomes may only be addressed to people who belong in this channel.
+    # The payload itself is opaque and individually encrypted, so a Welcome
+    # aimed elsewhere is useless to its recipient — but without this check,
+    # `POST /commit` would let any channel member push arbitrary bytes to any
+    # user on the instance via the mls.welcome WebSocket fan-out below, and
+    # park a row addressed to them in this channel's event log. Neither is
+    # something a well-behaved client ever needs.
+    if body.welcomes:
+        allowed_recipients = set(await _channel_member_ids(channel, db))
+        invalid = [
+            str(w.recipient_user_id)
+            for w in body.welcomes
+            if w.recipient_user_id not in allowed_recipients
+        ]
+        if invalid:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Welcome recipients are not members of this channel: {', '.join(invalid)}",
+            )
 
     # Optimistic-concurrency commit: only succeeds if the group is still at
     # the epoch this commit was built against. A conditional UPDATE makes the

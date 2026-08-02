@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { MessageInput } from './MessageInput'
+import { MLSContext } from '../contexts/MLSContext'
+import { AuthContext } from '../contexts/AuthContext'
+import { stubMLS, makeStubAuth } from '../test/utils'
 
 // ---- Mocks ----
 
@@ -51,7 +54,15 @@ function wrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={qc}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <MemoryRouter>
+        {/* MessageInput calls useAuth() (for the current user) and useMLS()
+            (to encrypt outgoing messages). Both are stubbed: the MLS stub
+            reports ready:false so these tests exercise the plaintext send
+            path, which is what they actually assert on. */}
+        <AuthContext.Provider value={makeStubAuth()}>
+          <MLSContext.Provider value={stubMLS}>{children}</MLSContext.Provider>
+        </AuthContext.Provider>
+      </MemoryRouter>
     </QueryClientProvider>
   )
 }

@@ -83,9 +83,21 @@ async def test_get_group_404_before_init(client: AsyncClient):
 
 async def test_commit_advances_epoch_and_delivers_scoped_welcome(client: AsyncClient):
     alice = await register_and_login(client, "mls_alice5", "pass1234")
-    channel_id = await _channel_for(client, alice)
+    server = await create_server(client, alice, "MLS Test Server")
+    channel = await create_channel(client, alice, server["id"], "general")
+    channel_id = channel["id"]
+
     bob = await register_and_login(client, "mls_bob5", "pass1234")
     bob_id = (await client.get("/users/me", headers=bob)).json()["id"]
+    # Bob has to actually be in the server: he's both the Welcome recipient
+    # (commit_group only accepts welcomes addressed to channel members) and
+    # expected below to read the channel's event feed, which
+    # _require_channel_access gates on membership. This mirrors the real
+    # flow, where a user joins the server and is then Added to each text
+    # channel's MLS group.
+    await client.post(f"/servers/{server['id']}/join", headers=bob)
+
+    # Carol never joins — she's the negative case for event visibility.
     carol = await register_and_login(client, "mls_carol5", "pass1234")
 
     await client.post(f"/mls/groups/{channel_id}", json={"ciphersuite": "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"}, headers=alice)
@@ -114,6 +126,52 @@ async def test_commit_advances_epoch_and_delivers_scoped_welcome(client: AsyncCl
     # Carol has no server/channel access at all -> 403, not just an empty/filtered list.
     r = await client.get(f"/mls/groups/{channel_id}/events?since_seq=0", headers=carol)
     assert r.status_code == 403
+
+
+async def test_welcome_to_non_member_rejected(client: AsyncClient):
+    """A commit may not carry a Welcome addressed to someone outside the
+    channel. Otherwise any member could use the commit endpoint to push
+    arbitrary bytes at any user on the instance via the mls.welcome
+    WebSocket fan-out, and leave a row addressed to them in this channel's
+    event log."""
+    alice = await register_and_login(client, "mls_alice_nm", "pass1234")
+    channel_id = await _channel_for(client, alice)
+    outsider = await register_and_login(client, "mls_outsider_nm", "pass1234")
+    outsider_id = (await client.get("/users/me", headers=outsider)).json()["id"]
+
+    await client.post(
+        f"/mls/groups/{channel_id}",
+        json={"ciphersuite": "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"},
+        headers=alice,
+    )
+
+    r = await client.post(
+        f"/mls/groups/{channel_id}/commit",
+        json={
+            "parent_epoch": 0,
+            "commit": _b64(b"commit-bytes"),
+            "welcomes": [{"recipient_user_id": outsider_id, "welcome": _b64(b"not-for-you")}],
+        },
+        headers=alice,
+    )
+    assert r.status_code == 403, r.text
+
+    # And the rejected commit must not have advanced the epoch.
+    group = (await client.get(f"/mls/groups/{channel_id}", headers=alice)).json()
+    assert group["current_epoch"] == 0
+
+
+async def test_oversized_payloads_rejected(client: AsyncClient):
+    """Opaque blobs are length-capped: the server can't parse them, so size
+    is the only abuse vector it can police (see app/schemas/mls.py)."""
+    alice = await register_and_login(client, "mls_alice_big", "pass1234")
+
+    r = await client.post(
+        "/mls/key-packages",
+        json={"key_package": _b64(b"x" * 32_768)},
+        headers=alice,
+    )
+    assert r.status_code == 422, r.text
 
 
 async def test_stale_commit_rejected_with_current_epoch(client: AsyncClient):

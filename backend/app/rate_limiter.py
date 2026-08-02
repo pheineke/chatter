@@ -294,6 +294,27 @@ async def rate_limit_mls_key_package_publish(current_user: CurrentUser) -> None:
     )
 
 
+async def rate_limit_mls_key_package_claim(current_user: CurrentUser) -> None:
+    """Claiming other users' KeyPackages: max 60 per 10 minutes per caller.
+
+    KeyPackages are single-use and consumed on read, so without a limit any
+    authenticated user could repeatedly GET another user's packages until
+    their pool is empty — after which nobody can Add that user to a group
+    until their client happens to come online and top up, and even then an
+    attacker can just drain it again. That's a cheap, targeted denial of
+    service against a specific person's ability to be invited anywhere.
+
+    60/10min is far above the handful a real client needs (one per Add) while
+    making sustained draining impractical.
+    """
+    await _enforce_limit(
+        key=f"mls-kp-claim:{current_user.id}",
+        limit=60,
+        window_seconds=600.0,
+        detail="Claiming key packages too quickly. Please wait {retry_after} seconds.",
+    )
+
+
 async def rate_limit_mls_key_package_purge(current_user: CurrentUser) -> None:
     """Purging one's own unclaimed KeyPackages: max 5 per 10 minutes per user.
     Only ever called once per fresh device (see the DELETE /mls/key-packages

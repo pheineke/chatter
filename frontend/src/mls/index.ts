@@ -25,6 +25,7 @@ export {
   decryptFromChannel,
   cachePlaintext,
   getCachedPlaintext,
+  isEpochTooOld,
 } from './session'
 
 // Byte<->base64 conversion for callers that need to carry ciphertext over

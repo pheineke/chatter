@@ -19,6 +19,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.database import get_db
 from models.base import Base
 
+# Importing the app at module scope is load-bearing, not just convenience:
+# it transitively imports every router and therefore every model module,
+# which is what registers those tables on Base.metadata. The `db` fixture
+# below calls Base.metadata.create_all(), so anything not imported by then
+# simply doesn't get a table — previously the only import of `main` lived
+# inside the `client` fixture, which runs *after* `db`, so create_all() saw
+# whatever subset of models happened to be imported already. That made table
+# creation depend on pytest's collection order: run the suite one way and
+# you'd get "no such table: users", run a single file another way and it
+# passed.
+import main  # noqa: E402,F401  (imported for its import side effects)
+
 # ---------------------------------------------------------------------------
 # Database fixture
 # ---------------------------------------------------------------------------
@@ -52,7 +64,7 @@ async def db() -> AsyncSession:
 
 @pytest_asyncio.fixture()
 async def client(db: AsyncSession) -> AsyncClient:
-    from main import app
+    from main import app  # already imported at module scope; cheap lookup
 
     async def _override_get_db():
         yield db
@@ -87,7 +99,10 @@ async def alice_headers(client: AsyncClient) -> dict[str, str]:
 
 @pytest_asyncio.fixture()
 async def bob_headers(client: AsyncClient) -> dict[str, str]:
-    return await register_and_login(client, "bob", "bobpass")
+    # 8 chars minimum — see the password policy in app/schemas/user.py.
+    # "bobpass" (7) predates that rule and made every test depending on this
+    # fixture fail at registration with a 422.
+    return await register_and_login(client, "bob", "bobpassword")
 
 
 # ---------------------------------------------------------------------------

@@ -74,6 +74,8 @@ describe('sendMessage', () => {
     expect(mockPost).toHaveBeenCalledWith('/channels/chan-1/messages', {
       content: 'hello',
       reply_to_id: null,
+      is_encrypted: false,
+      mls_epoch: null,
     })
     expect(result).toEqual(fakeMsg)
   })
@@ -84,6 +86,8 @@ describe('sendMessage', () => {
     expect(mockPost).toHaveBeenCalledWith('/channels/chan-1/messages', {
       content: 'reply',
       reply_to_id: 'msg-0',
+      is_encrypted: false,
+      mls_epoch: null,
     })
   })
 
@@ -93,6 +97,22 @@ describe('sendMessage', () => {
     expect(mockPost).toHaveBeenCalledWith('/channels/chan-1/messages', {
       content: null,
       reply_to_id: null,
+      is_encrypted: false,
+      mls_epoch: null,
+    })
+  })
+
+  it('sends the MLS ciphertext and epoch instead of plaintext when encrypted', async () => {
+    mockPost.mockResolvedValue({ data: fakeMsg })
+    await sendMessage('chan-1', 'plaintext that must not be sent', undefined, {
+      ciphertext: 'BASE64CIPHERTEXT',
+      epoch: 7,
+    })
+    expect(mockPost).toHaveBeenCalledWith('/channels/chan-1/messages', {
+      content: 'BASE64CIPHERTEXT',
+      reply_to_id: null,
+      is_encrypted: true,
+      mls_epoch: 7,
     })
   })
 })

@@ -167,8 +167,11 @@ export function useUnreadDMs(): number {
           // Attempt decryption if encrypted and we have the tools
           if (data.is_encrypted && data.content && data.mls_epoch != null) {
             try {
-              const plain = await mls.decryptForChannel(data.channel_id, data.content, data.mls_epoch)
-              body = plain ?? 'Encrypted Message'
+              const result = await mls.decryptForChannel(data.channel_id, data.content, data.mls_epoch)
+              // Any non-ok status collapses to the same generic notification
+              // body — a toast isn't the place to explain MLS epochs, and in
+              // practice a live incoming DM is never pre-join anyway.
+              body = result.status === 'ok' ? result.plaintext : 'Encrypted Message'
             } catch {
               body = 'Encrypted Message'
             }

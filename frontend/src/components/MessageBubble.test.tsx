@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { MessageBubble } from './MessageBubble'
 import type { Message } from '../api/types'
+import { MLSContext } from '../contexts/MLSContext'
+import { stubMLS } from '../test/utils'
 
 // ---- Mock heavy deps ----
 
@@ -79,7 +81,13 @@ function qcWrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={qc}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <MemoryRouter>
+        {/* MessageBubble calls useMLS() to decrypt encrypted messages. These
+            tests use plaintext fixtures (is_encrypted: false), so the stub's
+            inert decrypt is never reached — it just satisfies the hook.
+            (useAuth is handled by the module mock above, not a provider.) */}
+        <MLSContext.Provider value={stubMLS}>{children}</MLSContext.Provider>
+      </MemoryRouter>
     </QueryClientProvider>
   )
 }

@@ -4,7 +4,7 @@ import { getMe, login as apiLogin, register as apiRegister, logout as apiLogout 
 
 import { applyColorOverrides, loadColorOverrides } from '../utils/colorOverrides'
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: User | null
   loading: boolean
   login: (username: string, password: string) => Promise<void>
@@ -17,7 +17,10 @@ interface AuthContextValue {
   updateUser: (patch: Partial<User>) => void
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null)
+/** Exported so tests can inject a fixed user instead of mounting the real
+ * AuthProvider, which fetches /users/me on mount. App code should use
+ * `useAuth()` / `<AuthProvider>`. */
+export const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
