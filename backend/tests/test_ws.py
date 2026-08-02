@@ -6,6 +6,8 @@ Integration tests use starlette's sync TestClient (supports ws_connect)
 with a disposable in-memory SQLite database.
 """
 import asyncio
+import os
+import tempfile
 import threading
 import uuid
 from datetime import datetime
@@ -106,7 +108,15 @@ async def test_manager_multiple_subscribers():
 # Integration tests via starlette sync TestClient
 # ---------------------------------------------------------------------------
 
-DB_URL_SYNC = "sqlite+aiosqlite:///:memory:"
+# A file, not ":memory:". Tables are created here via asyncio.run(), which
+# closes that event loop when it finishes; TestClient then runs the app in a
+# different loop and thread. An in-memory SQLite database belongs to the
+# connection that made it, so the app's loop would open a fresh, empty one and
+# every query would fail with "no such table". A file is shared by every
+# connection regardless of loop or thread.
+_DB_FD, _DB_PATH = tempfile.mkstemp(suffix=".sqlite3", prefix="chatter-ws-test-")
+os.close(_DB_FD)
+DB_URL_SYNC = f"sqlite+aiosqlite:///{_DB_PATH}"
 
 
 @pytest.fixture(scope="module")
@@ -119,13 +129,16 @@ def ws_app():
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
     from main import app
-    from app.database import get_db
+    from app.database import get_db, reset_session_factory, set_session_factory
     from models.base import Base
 
+    # No StaticPool: it pins the engine to one connection, and that connection
+    # belongs to the loop that opened it — the one asyncio.run() below closes.
+    # Reusing it afterwards fails with "no active connection". Pooling normally
+    # is fine now the database is a file every connection can reach.
     engine = create_async_engine(
         DB_URL_SYNC,
         connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
     )
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -134,18 +147,23 @@ def ws_app():
             await conn.run_sync(Base.metadata.create_all)
 
     asyncio.run(_setup())
-    asyncio.run(_setup())
 
     async def _override_get_db():
         async with session_factory() as session:
             yield session
 
     app.dependency_overrides[get_db] = _override_get_db
+    # WebSocket handlers have no request-scoped dependency to hang a session
+    # on, so they open their own via app.database.session_factory(). Overriding
+    # get_db alone leaves them pointed at the configured Postgres, holding none
+    # of this module's fixture data.
+    set_session_factory(session_factory)
 
     with TestClient(app) as client:
         yield client
 
     app.dependency_overrides.clear()
+    reset_session_factory()
 
     async def _teardown():
         async with engine.begin() as conn:
@@ -305,11 +323,17 @@ def test_ws_me_receives_dm_read_updated_event(ws_app):
         t = threading.Thread(target=_mark_read)
         t.start()
 
-        event = ws.receive_json()
-        event_holder.append(event)
+        # The personal room carries more than one kind of event — connecting
+        # publishes a presence change, so "user.status_changed" can arrive
+        # first. Read until the one under test shows up rather than assuming
+        # it's frame zero.
+        for _ in range(5):
+            event = ws.receive_json()
+            if event["type"] == "dm.read_updated":
+                event_holder.append(event)
+                break
         t.join()
 
-    assert len(event_holder) == 1
-    assert event_holder[0]["type"] == "dm.read_updated"
+    assert len(event_holder) == 1, "never received dm.read_updated"
     assert event_holder[0]["data"]["channel_id"] == channel_id
     assert datetime.fromisoformat(event_holder[0]["data"]["last_read_at"].replace("Z", "+00:00")) == datetime.fromisoformat(read_at)

@@ -41,7 +41,7 @@ from fastapi import WebSocket
 from sqlalchemy import select
 
 from app.auth import decode_access_token, hash_api_token
-from app.database import AsyncSessionLocal
+from app.database import session_factory
 from models.api_token import ApiToken
 from models.refresh_token import RefreshToken
 
@@ -69,7 +69,7 @@ async def _resolve_token(token: str) -> uuid.UUID | None:
         except ValueError:
             return None
 
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             rt = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
             rt_row = rt.scalar_one_or_none()
         if rt_row and not rt_row.revoked:
@@ -80,7 +80,7 @@ async def _resolve_token(token: str) -> uuid.UUID | None:
     # (format "<prefix8>.<body>").
     if "." in token:
         token_hash = hash_api_token(token)
-        async with AsyncSessionLocal() as db:
+        async with session_factory() as db:
             result = await db.execute(
                 select(ApiToken).where(
                     ApiToken.token_hash == token_hash,

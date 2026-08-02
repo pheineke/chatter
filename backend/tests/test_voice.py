@@ -7,6 +7,8 @@ Part 2 – Integration tests via starlette sync TestClient.
 from __future__ import annotations
 
 import asyncio
+import os
+import tempfile
 import threading
 import uuid
 
@@ -180,7 +182,13 @@ async def test_voice_manager_disconnect_cleans_empty_room():
 # Part 2 – Integration tests (starlette sync TestClient)
 # ============================================================================
 
-DB_URL = "sqlite+aiosqlite:///:memory:"
+# A file, not ":memory:" — see the same note in tests/test_ws.py. Tables are
+# created under asyncio.run(), whose loop closes; TestClient then serves the
+# app from another loop and thread, where an in-memory database would be a
+# different, empty one.
+_DB_FD, _DB_PATH = tempfile.mkstemp(suffix=".sqlite3", prefix="chatter-voice-test-")
+os.close(_DB_FD)
+DB_URL = f"sqlite+aiosqlite:///{_DB_PATH}"
 
 
 @pytest.fixture(scope="module")
@@ -189,11 +197,13 @@ def voice_app():
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
     from main import app
-    from app.database import get_db
+    from app.database import get_db, reset_session_factory, set_session_factory
     from models.base import Base
 
+    # No StaticPool — see the note in tests/test_ws.py: it would pin the engine
+    # to a connection owned by the loop asyncio.run() closes below.
     engine = create_async_engine(
-        DB_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
+        DB_URL, connect_args={"check_same_thread": False}
     )
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -208,11 +218,16 @@ def voice_app():
             yield session
 
     app.dependency_overrides[get_db] = _override_get_db
+    # Voice WebSocket handlers open their own sessions rather than receiving
+    # one through get_db, so they need redirecting too — otherwise they query
+    # the configured Postgres, which has none of this module's fixture data.
+    set_session_factory(session_factory)
 
     with TestClient(app) as client:
         yield client
 
     app.dependency_overrides.clear()
+    reset_session_factory()
 
     async def _teardown():
         async with engine.begin() as conn:

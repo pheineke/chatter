@@ -28,7 +28,7 @@ import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+from app.database import session_factory
 from app.presence import broadcast_presence
 from app.ws_auth import accept_and_authenticate
 from app.ws_manager import manager
@@ -65,7 +65,7 @@ async def channel_ws(
         return
 
     # Verify the caller is allowed to read this channel.
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         channel = await db.get(Channel, channel_id)
         if channel is None:
             await ws.close(code=4004, reason="Channel not found")
@@ -107,7 +107,7 @@ async def channel_ws(
                 data = json.loads(text)
                 if isinstance(data, dict) and data.get("type") == "typing":
                     # Fan out typing indicator to all OTHER members of the channel room
-                    async with AsyncSessionLocal() as db:
+                    async with session_factory() as db:
                         user = await db.get(User, user_id)
                         username = user.username if user else str(user_id)
                     await manager.broadcast_channel_except(
@@ -151,7 +151,7 @@ async def server_ws(
 
     # Verify caller is a member – use a short-lived session so the DB
     # connection is released before the long-running receive loop.
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         row = await db.execute(
             select(ServerMember).where(
                 ServerMember.server_id == server_id,
@@ -210,7 +210,7 @@ async def personal_ws(
     # --- restore preferred status on connect (short-lived session) -----
     # preferred_status is the DB-persisted status the user last chose.
     # If they chose 'offline' (invisible mode), we honour it — no broadcast needed.
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         user = await db.get(User, user_id)
         if user and user.status != user.preferred_status:
             restore_to = user.preferred_status.value   # capture before commit expires attrs
@@ -248,7 +248,7 @@ async def personal_ws(
         # --- set offline when last connection for this user drops -------
         # Do NOT touch preferred_status — it persists for the next reconnect.
         if not manager._rooms.get(room):
-            async with AsyncSessionLocal() as db:
+            async with session_factory() as db:
                 user = await db.get(User, user_id)
                 if user and user.status != UserStatus.offline:
                     user.status = UserStatus.offline
@@ -283,7 +283,7 @@ async def bot_gateway_ws(
         return
 
     # Gather all rooms: personal + all servers the user belongs to
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         rows = await db.execute(
             select(ServerMember.server_id).where(ServerMember.user_id == user_id)
         )
