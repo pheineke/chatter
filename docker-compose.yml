@@ -26,7 +26,12 @@ services:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-chat}
       - STATIC_DIR=/app/static
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - DECORATION_ADMIN_IDS=${DECORATION_ADMIN_IDS:-*}
+      # `-` not `:-` on purpose: `:-` treats an *empty* value as unset and
+      # would substitute `*`, so `DECORATION_ADMIN_IDS=` in .env — the
+      # natural way to express "nobody is a decoration admin" — would
+      # silently mean "everybody is". With `-`, only a genuinely absent
+      # variable falls back to the permissive dev default.
+      - DECORATION_ADMIN_IDS=${DECORATION_ADMIN_IDS-*}
     depends_on:
       - db
 
