@@ -66,6 +66,48 @@ class GroupRead(BaseModel):
     updated_at: datetime
 
 
+# ---- Link-time history transfer -------------------------------------------
+# Sizes are larger than the protocol payloads above because a bundle carries
+# actual message plaintext. Capped anyway: the server can't read it, so length
+# is the only thing it can police, and an uncapped "store this blob" endpoint
+# is a storage-exhaustion primitive.
+MAX_TRANSFER_PUBLIC_KEY_B64 = 1_024
+MAX_HISTORY_BUNDLE_B64 = 8_388_608  # ~8 MiB of ciphertext
+MAX_NONCE_B64 = 64
+
+
+class HistoryRequestCreate(BaseModel):
+    """A newly-linked device asking this user's other devices for history."""
+    device_id: str = Field(min_length=1, max_length=MAX_DEVICE_ID)
+    # Base64 SPKI ECDH P-256 public key, ephemeral and used for this transfer
+    # only. Deliberately not an MLS init key: those are single-use and consumed
+    # by Adds, so borrowing one would interfere with joining groups.
+    public_key: str = Field(min_length=1, max_length=MAX_TRANSFER_PUBLIC_KEY_B64)
+
+
+class HistoryRequestRead(BaseModel):
+    id: uuid.UUID
+    device_id: str
+    public_key: str
+    created_at: datetime
+
+
+class HistoryBundleCreate(BaseModel):
+    """History encrypted by one of the user's devices for another."""
+    target_device_id: str = Field(min_length=1, max_length=MAX_DEVICE_ID)
+    sender_device_id: str = Field(min_length=1, max_length=MAX_DEVICE_ID)
+    ciphertext: str = Field(min_length=1, max_length=MAX_HISTORY_BUNDLE_B64)
+    nonce: str = Field(min_length=1, max_length=MAX_NONCE_B64)
+
+
+class HistoryBundleRead(BaseModel):
+    id: uuid.UUID
+    sender_device_id: str
+    ciphertext: str
+    nonce: str
+    created_at: datetime
+
+
 class WelcomeRecipient(BaseModel):
     recipient_user_id: uuid.UUID
     # base64, individually HPKE-encrypted to the recipient's init key

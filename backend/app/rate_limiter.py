@@ -328,6 +328,22 @@ async def rate_limit_mls_key_package_purge(current_user: CurrentUser) -> None:
     )
 
 
+async def rate_limit_mls_history_transfer(current_user: CurrentUser) -> None:
+    """Link-time history transfer: max 30 operations per 10 minutes per user.
+
+    Covers raising a request and uploading a bundle. Both are rare — once per
+    newly-linked device — but a bundle carries real message history, so this
+    is the brake that stops a misbehaving client repeatedly uploading multi-MB
+    blobs.
+    """
+    await _enforce_limit(
+        key=f"mls-history:{current_user.id}",
+        limit=30,
+        window_seconds=600.0,
+        detail="Syncing history too quickly. Please wait {retry_after} seconds.",
+    )
+
+
 async def rate_limit_mls_commit(current_user: CurrentUser) -> None:
     """Submitting commits: max 20 per minute per user across all their groups."""
     await _enforce_limit(

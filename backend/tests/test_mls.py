@@ -283,3 +283,136 @@ async def test_application_message_carries_mls_epoch(client: AsyncClient):
     body = r.json()
     assert body["is_encrypted"] is True
     assert body["mls_epoch"] == 3
+
+
+# ---- Link-time history transfer -------------------------------------------
+
+
+async def test_history_transfer_round_trip(client: AsyncClient):
+    """A new device requests history; an existing device serves it; the new
+    device collects it and the server keeps nothing."""
+    alice = await register_and_login(client, "mls_hist_alice", "pass1234")
+
+    r = await client.post(
+        "/mls/history-requests",
+        json={"device_id": "new-phone", "public_key": "PUBKEYB64"},
+        headers=alice,
+    )
+    assert r.status_code == 201, r.text
+
+    # The laptop sees the phone waiting, and the key to encrypt to.
+    pending = (await client.get("/mls/history-requests", headers=alice)).json()
+    assert [p["device_id"] for p in pending] == ["new-phone"]
+    assert pending[0]["public_key"] == "PUBKEYB64"
+
+    r = await client.post(
+        "/mls/history-bundles",
+        json={
+            "target_device_id": "new-phone",
+            "sender_device_id": "laptop",
+            "ciphertext": _b64(b"encrypted-history"),
+            "nonce": _b64(b"nonce12bytes"),
+        },
+        headers=alice,
+    )
+    assert r.status_code == 204, r.text
+
+    bundles = (await client.get(
+        "/mls/history-bundles", params={"device_id": "new-phone"}, headers=alice
+    )).json()
+    assert len(bundles) == 1
+    assert base64.b64decode(bundles[0]["ciphertext"]) == b"encrypted-history"
+    assert bundles[0]["sender_device_id"] == "laptop"
+
+    # Collecting it clears both the bundle and the now-served request, so the
+    # server retains no history and no stale public key.
+    r = await client.delete(f"/mls/history-bundles/{bundles[0]['id']}", headers=alice)
+    assert r.status_code == 204, r.text
+    assert (await client.get(
+        "/mls/history-bundles", params={"device_id": "new-phone"}, headers=alice
+    )).json() == []
+    assert (await client.get("/mls/history-requests", headers=alice)).json() == []
+
+
+async def test_history_requests_are_per_user(client: AsyncClient):
+    """One user's pending devices are invisible to everyone else."""
+    alice = await register_and_login(client, "mls_hist_a2", "pass1234")
+    bob = await register_and_login(client, "mls_hist_b2", "pass1234")
+
+    await client.post(
+        "/mls/history-requests",
+        json={"device_id": "alice-phone", "public_key": "K"},
+        headers=alice,
+    )
+    assert (await client.get("/mls/history-requests", headers=bob)).json() == []
+
+
+async def test_history_bundle_requires_a_matching_request(client: AsyncClient):
+    """Without an outstanding request this would be an open 'store arbitrary
+    bytes under any device id' endpoint."""
+    alice = await register_and_login(client, "mls_hist_a3", "pass1234")
+
+    r = await client.post(
+        "/mls/history-bundles",
+        json={
+            "target_device_id": "never-asked",
+            "sender_device_id": "laptop",
+            "ciphertext": _b64(b"x"),
+            "nonce": _b64(b"n"),
+        },
+        headers=alice,
+    )
+    assert r.status_code == 404, r.text
+
+
+async def test_history_bundles_not_readable_by_other_users(client: AsyncClient):
+    """Bob cannot collect, or delete, history addressed to Alice's device."""
+    alice = await register_and_login(client, "mls_hist_a4", "pass1234")
+    bob = await register_and_login(client, "mls_hist_b4", "pass1234")
+
+    await client.post(
+        "/mls/history-requests",
+        json={"device_id": "shared-name", "public_key": "K"},
+        headers=alice,
+    )
+    await client.post(
+        "/mls/history-bundles",
+        json={
+            "target_device_id": "shared-name",
+            "sender_device_id": "laptop",
+            "ciphertext": _b64(b"alice-secret-history"),
+            "nonce": _b64(b"n"),
+        },
+        headers=alice,
+    )
+
+    # Same device id, different user: scoping is by user, not device id alone.
+    assert (await client.get(
+        "/mls/history-bundles", params={"device_id": "shared-name"}, headers=bob
+    )).json() == []
+
+    bundle_id = (await client.get(
+        "/mls/history-bundles", params={"device_id": "shared-name"}, headers=alice
+    )).json()[0]["id"]
+    assert (await client.delete(f"/mls/history-bundles/{bundle_id}", headers=bob)).status_code == 404
+    # Still there for its rightful owner.
+    assert len((await client.get(
+        "/mls/history-bundles", params={"device_id": "shared-name"}, headers=alice
+    )).json()) == 1
+
+
+async def test_history_request_is_upserted(client: AsyncClient):
+    """Re-requesting replaces the key rather than leaving stale ones behind."""
+    alice = await register_and_login(client, "mls_hist_a5", "pass1234")
+
+    for key in ("FIRSTKEY", "SECONDKEY"):
+        r = await client.post(
+            "/mls/history-requests",
+            json={"device_id": "phone", "public_key": key},
+            headers=alice,
+        )
+        assert r.status_code == 201, r.text
+
+    pending = (await client.get("/mls/history-requests", headers=alice)).json()
+    assert len(pending) == 1
+    assert pending[0]["public_key"] == "SECONDKEY"

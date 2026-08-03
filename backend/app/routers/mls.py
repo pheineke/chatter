@@ -30,6 +30,7 @@ from app.rate_limiter import (
     rate_limit_mls_key_package_publish,
     rate_limit_mls_key_package_claim,
     rate_limit_mls_key_package_purge,
+    rate_limit_mls_history_transfer,
     rate_limit_mls_commit,
 )
 from app.routers.messages import _get_channel_or_404, _require_channel_access
@@ -37,11 +38,16 @@ from app.routers.servers import _require_member
 from app.schemas.mls import (
     KeyPackagePublish, KeyPackageRead, GroupInit, GroupRead,
     CommitSubmit, GroupEventRead, CommitResult,
+    HistoryRequestCreate, HistoryRequestRead,
+    HistoryBundleCreate, HistoryBundleRead,
 )
 from app.ws_manager import manager
 from models.channel import ChannelType
 from models.dm_channel import DMChannel
-from models.mls import MLSKeyPackage, MLSGroup, MLSGroupEvent, MLSEventType
+from models.mls import (
+    MLSKeyPackage, MLSGroup, MLSGroupEvent, MLSEventType,
+    MLSHistoryRequest, MLSHistoryBundle,
+)
 from models.server import ServerMember
 
 router = APIRouter(prefix="/mls", tags=["mls"])
@@ -202,6 +208,180 @@ async def fetch_key_packages(
         )
         for kp in claimed
     ]
+
+
+# ─── Link-time history transfer ─────────────────────────────────────────────
+#
+# MLS is forward-secret: a device Added at epoch N cannot derive keys for
+# anything sent before it joined, so history can't come from the protocol. It
+# has to be handed over by a device that already holds the plaintext,
+# encrypted to the new one. Same shape as linking a WhatsApp companion device.
+#
+# Every endpoint here is scoped to the caller's own user id — this is one of
+# your devices talking to another of your devices, and the server only ever
+# sees ciphertext it has no key for. Bundles are deleted on collection, so
+# what accumulates server-side is nothing: this is a relay, not an archive,
+# which is what keeps forward secrecy intact for everything except the one
+# transfer the user explicitly asked for.
+
+
+@router.post("/history-requests", response_model=HistoryRequestRead, status_code=status.HTTP_201_CREATED)
+async def create_history_request(
+    body: HistoryRequestCreate,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_mls_history_transfer),
+):
+    """Announce that one of my devices is new and wants history.
+
+    Upserts: re-requesting from the same device replaces the previous key
+    rather than accumulating rows, so a device that gives up waiting and
+    retries doesn't leave stale public keys other devices might encrypt to.
+    """
+    existing = await db.execute(
+        select(MLSHistoryRequest).where(
+            MLSHistoryRequest.user_id == current_user.id,
+            MLSHistoryRequest.device_id == body.device_id,
+        )
+    )
+    req = existing.scalar_one_or_none()
+    if req is None:
+        req = MLSHistoryRequest(
+            user_id=current_user.id,
+            device_id=body.device_id,
+            public_key=body.public_key,
+        )
+        db.add(req)
+    else:
+        req.public_key = body.public_key
+        req.created_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(req)
+    return HistoryRequestRead(
+        id=req.id, device_id=req.device_id,
+        public_key=req.public_key, created_at=req.created_at,
+    )
+
+
+@router.get("/history-requests", response_model=list[HistoryRequestRead])
+async def list_history_requests(current_user: CurrentUser, db: DB):
+    """My own devices that are waiting for history.
+
+    Polled by a device that already holds plaintext so it can serve them. Only
+    ever returns the caller's own devices — one user's device list is not
+    another's business.
+    """
+    result = await db.execute(
+        select(MLSHistoryRequest)
+        .where(MLSHistoryRequest.user_id == current_user.id)
+        .order_by(MLSHistoryRequest.created_at.asc())
+    )
+    return [
+        HistoryRequestRead(
+            id=r.id, device_id=r.device_id,
+            public_key=r.public_key, created_at=r.created_at,
+        )
+        for r in result.scalars().all()
+    ]
+
+
+@router.post("/history-bundles", status_code=status.HTTP_204_NO_CONTENT)
+async def upload_history_bundle(
+    body: HistoryBundleCreate,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_mls_history_transfer),
+):
+    """Hand encrypted history to another of my devices.
+
+    Requires a matching outstanding request, which pins the recipient to a
+    device that actually asked and whose ephemeral public key the sender
+    encrypted to. Without that check this would be an open "store arbitrary
+    bytes under any device id" endpoint.
+    """
+    req = await db.execute(
+        select(MLSHistoryRequest).where(
+            MLSHistoryRequest.user_id == current_user.id,
+            MLSHistoryRequest.device_id == body.target_device_id,
+        )
+    )
+    if req.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No outstanding history request for that device.",
+        )
+
+    db.add(MLSHistoryBundle(
+        user_id=current_user.id,
+        target_device_id=body.target_device_id,
+        sender_device_id=body.sender_device_id,
+        ciphertext=_b64_to_bytes(body.ciphertext, "ciphertext"),
+        nonce=_b64_to_bytes(body.nonce, "nonce"),
+    ))
+    await db.commit()
+
+
+@router.get("/history-bundles", response_model=list[HistoryBundleRead])
+async def list_history_bundles(
+    current_user: CurrentUser,
+    db: DB,
+    device_id: str = Query(min_length=1, max_length=64),
+):
+    """Bundles waiting for one of my devices."""
+    result = await db.execute(
+        select(MLSHistoryBundle)
+        .where(
+            MLSHistoryBundle.user_id == current_user.id,
+            MLSHistoryBundle.target_device_id == device_id,
+        )
+        .order_by(MLSHistoryBundle.created_at.asc())
+    )
+    return [
+        HistoryBundleRead(
+            id=b.id, sender_device_id=b.sender_device_id,
+            ciphertext=_bytes_to_b64(b.ciphertext),
+            nonce=_bytes_to_b64(b.nonce),
+            created_at=b.created_at,
+        )
+        for b in result.scalars().all()
+    ]
+
+
+@router.delete("/history-bundles/{bundle_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def consume_history_bundle(
+    bundle_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+):
+    """Delete a bundle once it's been decrypted and imported.
+
+    Called by the recipient after a successful import. Deleting on collection
+    is what makes this a relay rather than an archive — the window in which
+    the server holds any of the user's history at all is the seconds between
+    upload and import. Also clears that device's request, since it's served.
+    """
+    result = await db.execute(
+        select(MLSHistoryBundle).where(
+            MLSHistoryBundle.id == bundle_id,
+            MLSHistoryBundle.user_id == current_user.id,
+        )
+    )
+    bundle = result.scalar_one_or_none()
+    if bundle is None:
+        # Already consumed, or never the caller's — same response either way,
+        # so this doesn't confirm whether some other user's bundle id exists.
+        raise HTTPException(status_code=404, detail="Bundle not found")
+
+    target_device_id = bundle.target_device_id
+    await db.delete(bundle)
+    await db.execute(
+        MLSHistoryRequest.__table__.delete().where(
+            MLSHistoryRequest.user_id == current_user.id,
+            MLSHistoryRequest.device_id == target_device_id,
+        )
+    )
+    await db.commit()
 
 
 # ─── Groups ─────────────────────────────────────────────────────────────────
