@@ -83,12 +83,16 @@ class HistoryRequestCreate(BaseModel):
     # only. Deliberately not an MLS init key: those are single-use and consumed
     # by Adds, so borrowing one would interfere with joining groups.
     public_key: str = Field(min_length=1, max_length=MAX_TRANSFER_PUBLIC_KEY_B64)
+    # Resume point: this device holds everything at or newer than here and
+    # wants older. Omitted on the first request, meaning "start from newest".
+    synced_before: datetime | None = None
 
 
 class HistoryRequestRead(BaseModel):
     id: uuid.UUID
     device_id: str
     public_key: str
+    synced_before: datetime | None
     created_at: datetime
 
 

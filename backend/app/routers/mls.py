@@ -66,6 +66,21 @@ def _bytes_to_b64(b: bytes) -> str:
     return base64.b64encode(b).decode("ascii")
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Coerce a datetime to timezone-aware UTC.
+
+    Columns are declared DateTime(timezone=True), but what comes back depends
+    on the driver: Postgres returns aware values, SQLite has no timezone type
+    and returns naive ones. Comparing a stored value against a freshly-parsed
+    request body therefore raises "can't compare offset-naive and offset-aware
+    datetimes" on SQLite while working fine on Postgres. Normalising both sides
+    keeps the comparison correct on either.
+    """
+    if value is None:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
 async def _channel_member_ids(channel, db) -> list[uuid.UUID]:
     """All users who should receive real-time MLS group events for this
     channel — server members (matches the fan-out already used for
@@ -250,18 +265,50 @@ async def create_history_request(
             user_id=current_user.id,
             device_id=body.device_id,
             public_key=body.public_key,
+            synced_before=body.synced_before,
         )
         db.add(req)
     else:
         req.public_key = body.public_key
         req.created_at = datetime.now(timezone.utc)
+        # Only ever move the cursor further back. A device re-announcing after
+        # a restart sends what it has; taking the older of the two stops a
+        # stale or racing announcement from rewinding progress and causing
+        # already-delivered history to be sent again.
+        incoming = _as_utc(body.synced_before)
+        current = _as_utc(req.synced_before)
+        if incoming is not None and (current is None or incoming < current):
+            req.synced_before = incoming
 
     await db.commit()
     await db.refresh(req)
     return HistoryRequestRead(
         id=req.id, device_id=req.device_id,
-        public_key=req.public_key, created_at=req.created_at,
+        public_key=req.public_key, synced_before=req.synced_before,
+        created_at=req.created_at,
     )
+
+
+@router.delete("/history-requests", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_history_request(
+    current_user: CurrentUser,
+    db: DB,
+    device_id: str = Query(min_length=1, max_length=64),
+):
+    """Stop asking for history for one of my devices.
+
+    Called by a serving device once it has nothing older left to send, which
+    is how the requesting device learns the transfer is complete and can drop
+    its transfer key. Also lets a device that no longer wants history (or is
+    being unlinked) withdraw cleanly.
+    """
+    await db.execute(
+        MLSHistoryRequest.__table__.delete().where(
+            MLSHistoryRequest.user_id == current_user.id,
+            MLSHistoryRequest.device_id == device_id,
+        )
+    )
+    await db.commit()
 
 
 @router.get("/history-requests", response_model=list[HistoryRequestRead])
@@ -280,7 +327,8 @@ async def list_history_requests(current_user: CurrentUser, db: DB):
     return [
         HistoryRequestRead(
             id=r.id, device_id=r.device_id,
-            public_key=r.public_key, created_at=r.created_at,
+            public_key=r.public_key, synced_before=r.synced_before,
+            created_at=r.created_at,
         )
         for r in result.scalars().all()
     ]

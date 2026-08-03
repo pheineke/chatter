@@ -29,21 +29,32 @@ import {
 import * as api from './api'
 import * as store from './storage'
 
-/** Cache entries per bundle.
+/** Messages per batch.
  *
- * The user asked for their whole history rather than a recent slice, so this
- * chunks instead of truncating: the server caps a single bundle at ~8 MiB
- * (MAX_HISTORY_BUNDLE_B64 in app/schemas/mls.py) and several bundles per
- * device are expected. 500 messages of ordinary chat is well inside that even
- * after base64 expansion, while keeping any single encrypt/decrypt small
- * enough not to jank the tab.
+ * History is transferred newest-first, one batch per serving pass, rather
+ * than as a single archive: the newly-linked device shows recent conversation
+ * almost immediately and fills in older history behind it, and an interrupted
+ * transfer resumes rather than restarting. 200 keeps each encrypt/decrypt
+ * small enough not to jank the tab and stays well inside the server's
+ * per-bundle cap (MAX_HISTORY_BUNDLE_B64 in app/schemas/mls.py).
  */
-const ENTRIES_PER_BUNDLE = 500
+const ENTRIES_PER_BATCH = 200
+
+/** Batches one serving pass will send per requesting device.
+ *
+ * Several per pass so a transfer makes real progress while both devices are
+ * open, but bounded so a device with a large archive doesn't spend minutes
+ * uploading before doing anything else. Whatever's left continues on the next
+ * load — the cursor makes that safe.
+ */
+const BATCHES_PER_PASS = 5
 
 interface HistoryPayload {
   /** Format marker, so a future change can be detected rather than guessed. */
   v: 1
-  entries: { c: string; p: string }[]
+  /** `t` is the original cache timestamp, preserved across the transfer so
+   * the receiving device can order and resume correctly. */
+  entries: { c: string; p: string; t: string }[]
 }
 
 /**
@@ -56,8 +67,9 @@ interface HistoryPayload {
  */
 export async function requestHistory(userId: string, deviceId: string): Promise<void> {
   const pair = await generateKeyPair()
-  await store.saveTransferPrivateKey(userId, await exportPrivateKey(pair.privateKey))
-  await api.requestHistory(deviceId, await exportPublicKey(pair.publicKey))
+  const publicKey = await exportPublicKey(pair.publicKey)
+  await store.saveTransferKeyPair(userId, await exportPrivateKey(pair.privateKey), publicKey)
+  await api.requestHistory(deviceId, publicKey)
 }
 
 /**
@@ -74,20 +86,25 @@ export async function servePendingHistoryRequests(ownDeviceId: string): Promise<
   const requests = (await api.fetchHistoryRequests()).filter((r) => r.deviceId !== ownDeviceId)
   if (requests.length === 0) return 0
 
-  const entries = await store.allPlaintext()
-  if (entries.length === 0) return 0
-
-  const payloadChunks: HistoryPayload[] = []
-  for (let i = 0; i < entries.length; i += ENTRIES_PER_BUNDLE) {
-    payloadChunks.push({
-      v: 1,
-      entries: entries.slice(i, i + ENTRIES_PER_BUNDLE).map((e) => ({ c: e.ciphertext, p: e.plaintext })),
-    })
-  }
-
-  let served = 0
+  let batchesSent = 0
   for (const request of requests) {
     try {
+      // Walk backwards from wherever this device got to. A device that has
+      // never synced starts at the newest message.
+      let cursor = request.syncedBefore
+      const first = await store.plaintextOlderThan(cursor, 1)
+      if (first.length === 0) {
+        // Nothing older to give: either we hold no history at all (we may be
+        // a freshly-linked device ourselves), or this device already has
+        // everything we do. Only retire the request in the latter case —
+        // withdrawing it while empty-handed would tell the requester the
+        // transfer is finished when a device that actually holds history
+        // hasn't had its turn.
+        const anything = await store.plaintextOlderThan(null, 1)
+        if (anything.length > 0 && cursor !== null) await api.deleteHistoryRequest(request.deviceId)
+        continue
+      }
+
       const theirPublicKey = await importPublicKey(request.publicKey)
       // A fresh ephemeral keypair per recipient: the shared secret is derived
       // from it and their published key, so nothing about this transfer is
@@ -96,8 +113,19 @@ export async function servePendingHistoryRequests(ownDeviceId: string): Promise<
       const sharedKey = await deriveSharedKey(ourPair.privateKey, theirPublicKey)
       const ourPublicKey = await exportPublicKey(ourPair.publicKey)
 
-      for (const chunk of payloadChunks) {
-        const { ciphertext, nonce } = await encryptMessage(sharedKey, JSON.stringify(chunk))
+      for (let batch = 0; batch < BATCHES_PER_PASS; batch++) {
+        const entries = await store.plaintextOlderThan(cursor, ENTRIES_PER_BATCH)
+        if (entries.length === 0) break
+
+        const payload: HistoryPayload = {
+          v: 1,
+          entries: entries.map((e) => ({
+            c: e.ciphertext,
+            p: e.plaintext,
+            t: e.createdAt.toISOString(),
+          })),
+        }
+        const { ciphertext, nonce } = await encryptMessage(sharedKey, JSON.stringify(payload))
         await api.uploadHistoryBundle({
           targetDeviceId: request.deviceId,
           senderDeviceId: ownDeviceId,
@@ -105,15 +133,18 @@ export async function servePendingHistoryRequests(ownDeviceId: string): Promise<
           ciphertext,
           nonce,
         })
+        batchesSent += 1
+        // entries are newest-first, so the last one is the oldest we just
+        // sent — the next batch continues from there.
+        cursor = entries[entries.length - 1].createdAt
       }
-      served += 1
     } catch (err) {
       // One unreachable or malformed request shouldn't stop us serving the
       // others; the requesting device retries on its next load anyway.
       console.warn('[MLS] could not serve history to', request.deviceId, err)
     }
   }
-  return served
+  return batchesSent
 }
 
 /**
@@ -125,14 +156,22 @@ export async function servePendingHistoryRequests(ownDeviceId: string): Promise<
  * only to decrypt this one handover.
  */
 export async function collectHistory(userId: string, deviceId: string): Promise<number> {
-  const privateKeyB64 = await store.loadTransferPrivateKey(userId)
-  if (!privateKeyB64) return 0 // never asked, or already imported and cleaned up
+  const keys = await store.loadTransferKeyPair(userId)
+  if (!keys) return 0 // never asked, or already finished and cleaned up
 
   const bundles = await api.fetchHistoryBundles(deviceId)
-  if (bundles.length === 0) return 0
+  if (bundles.length === 0) {
+    // No bundles and no outstanding request means a serving device has told
+    // us there's nothing older left, so the transfer is complete and the key
+    // has no further use.
+    const stillWanted = (await api.fetchHistoryRequests()).some((r) => r.deviceId === deviceId)
+    if (!stillWanted) await store.clearTransferKeyPair(userId)
+    return 0
+  }
 
-  const ourPrivateKey = await importPrivateKey(privateKeyB64)
+  const ourPrivateKey = await importPrivateKey(keys.privateKey)
   let imported = 0
+  let oldestSeen: Date | null = null
 
   for (const bundle of bundles) {
     try {
@@ -151,8 +190,19 @@ export async function collectHistory(userId: string, deviceId: string): Promise<
         continue
       }
 
-      await store.importPlaintext(payload.entries.map((e) => ({ ciphertext: e.c, plaintext: e.p })))
-      imported += payload.entries.length
+      const entries = payload.entries.map((e) => ({
+        ciphertext: e.c,
+        plaintext: e.p,
+        // Preserve the sending device's timestamp rather than stamping "now":
+        // it's what orders history sync, so flattening it would break both
+        // ordering and the resume cursor on this device.
+        createdAt: new Date(e.t),
+      }))
+      await store.importPlaintext(entries)
+      imported += entries.length
+      for (const e of entries) {
+        if (oldestSeen === null || e.createdAt < oldestSeen) oldestSeen = e.createdAt
+      }
       await api.consumeHistoryBundle(bundle.id)
     } catch (err) {
       // Leave the bundle in place: a decrypt failure here is worth another
@@ -162,6 +212,14 @@ export async function collectHistory(userId: string, deviceId: string): Promise<
     }
   }
 
-  if (imported > 0) await store.clearTransferPrivateKey(userId)
+  // Re-announce with the cursor moved back, so the next serving pass — this
+  // session or a later one, from this device or another — continues from
+  // where we got to instead of resending what already arrived. The request
+  // stays open until a serving device retires it, which is how we learn
+  // there's genuinely nothing older left.
+  if (oldestSeen !== null) {
+    await api.requestHistory(deviceId, keys.publicKey, oldestSeen)
+  }
+
   return imported
 }

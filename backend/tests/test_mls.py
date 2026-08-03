@@ -419,3 +419,84 @@ async def test_history_request_is_upserted(client: AsyncClient):
     pending = (await client.get("/mls/history-requests", headers=alice)).json()
     assert len(pending) == 1
     assert pending[0]["public_key"] == "SECONDKEY"
+
+
+async def test_history_sync_is_resumable_and_moves_backwards(client: AsyncClient):
+    """The cursor records how far back a device has been filled in, and only
+    ever moves further back.
+
+    History arrives newest-first in batches, so progress has to survive a
+    client closing mid-transfer — and a device re-announcing after a restart
+    must not rewind it, or already-delivered history gets sent all over again.
+    """
+    alice = await register_and_login(client, "mls_cursor", "pass1234")
+
+    # First announcement: nothing yet, so no cursor — start from the newest.
+    r = await client.post(
+        "/mls/history-requests",
+        json={"device_id": "phone", "public_key": "K"},
+        headers=alice,
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["synced_before"] is None
+
+    # After a batch lands, the device re-announces with the cursor moved back.
+    r = await client.post(
+        "/mls/history-requests",
+        json={"device_id": "phone", "public_key": "K", "synced_before": "2026-06-15T12:00:00+00:00"},
+        headers=alice,
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["synced_before"].startswith("2026-06-15")
+
+    # A stale or racing announcement carrying a *newer* cursor must not rewind
+    # progress — the older value wins.
+    r = await client.post(
+        "/mls/history-requests",
+        json={"device_id": "phone", "public_key": "K", "synced_before": "2026-07-01T12:00:00+00:00"},
+        headers=alice,
+    )
+    assert r.json()["synced_before"].startswith("2026-06-15")
+
+    # Genuinely older progress does move it.
+    r = await client.post(
+        "/mls/history-requests",
+        json={"device_id": "phone", "public_key": "K", "synced_before": "2026-01-01T12:00:00+00:00"},
+        headers=alice,
+    )
+    assert r.json()["synced_before"].startswith("2026-01-01")
+
+    pending = (await client.get("/mls/history-requests", headers=alice)).json()
+    assert len(pending) == 1, "re-announcing must update, not accumulate"
+
+
+async def test_history_request_can_be_retired(client: AsyncClient):
+    """A serving device withdraws the request once there is nothing older to
+    send; that's how the requesting device learns the transfer is complete and
+    can drop its transfer key."""
+    alice = await register_and_login(client, "mls_retire", "pass1234")
+
+    await client.post(
+        "/mls/history-requests",
+        json={"device_id": "phone", "public_key": "K"},
+        headers=alice,
+    )
+    r = await client.delete("/mls/history-requests", params={"device_id": "phone"}, headers=alice)
+    assert r.status_code == 204, r.text
+    assert (await client.get("/mls/history-requests", headers=alice)).json() == []
+
+
+async def test_history_request_retire_is_scoped_to_the_owner(client: AsyncClient):
+    """Bob cannot cancel Alice's pending sync, even with the same device id."""
+    alice = await register_and_login(client, "mls_retire_a", "pass1234")
+    bob = await register_and_login(client, "mls_retire_b", "pass1234")
+
+    await client.post(
+        "/mls/history-requests",
+        json={"device_id": "shared-name", "public_key": "K"},
+        headers=alice,
+    )
+    await client.delete("/mls/history-requests", params={"device_id": "shared-name"}, headers=bob)
+
+    still = (await client.get("/mls/history-requests", headers=alice)).json()
+    assert [p["device_id"] for p in still] == ["shared-name"]

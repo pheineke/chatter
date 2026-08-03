@@ -42,12 +42,19 @@ interface StoredIdentity {
    * clearing site data yields a genuinely new device, which is the correct
    * interpretation: the old device's private keys are gone. */
   deviceId: string
-  /** Private half of the ephemeral ECDH keypair this device published when it
-   * asked its siblings for message history (base64 PKCS#8, see
-   * crypto/index.ts). Present only between raising a history request and
-   * importing the bundle that answers it, then cleared — it exists solely to
-   * decrypt that one transfer. */
+  /** Ephemeral ECDH keypair this device published when it asked its siblings
+   * for message history (base64 PKCS#8 / SPKI, see crypto/index.ts).
+   *
+   * The public half is kept too because history arrives in batches: after
+   * each one the device re-announces itself with the cursor moved back, and
+   * that announcement has to carry the same key so in-flight batches from a
+   * serving device stay decryptable. WebCrypto can't recover a public key
+   * from a PKCS#8 private key, so it has to be stored rather than derived.
+   *
+   * Both are present only while a transfer is outstanding, then cleared —
+   * they exist solely to receive that history. */
   transferPrivateKey?: string
+  transferPublicKey?: string
 }
 
 interface StoredGroup {
@@ -123,6 +130,15 @@ class MlsDatabase extends Dexie {
             kp.consumed = kp.consumed ? 1 : 0
           }),
       )
+    // v4: index plaintextCache.createdAt. History sync walks the cache
+    // newest-first in batches, which needs an ordered index rather than a
+    // full scan and sort on every batch.
+    this.version(4).stores({
+      identity: 'userId',
+      groups: 'channelId',
+      keyPackagePool: '++id, userId, consumed',
+      plaintextCache: 'ciphertext, createdAt',
+    })
   }
 }
 
@@ -235,47 +251,76 @@ export async function loadPlaintext(ciphertext: string): Promise<string | null> 
   return row?.plaintext ?? null
 }
 
-/** Every cached (ciphertext, plaintext) pair on this device.
+export interface PlaintextEntry {
+  ciphertext: string
+  plaintext: string
+  /** When this message first became readable on the device that originally
+   * held it. Carried across transfers rather than reset on import, because
+   * it's what history sync orders by — resetting it would flatten every
+   * imported message to the same instant and make "newest first" meaningless
+   * on any device that was itself filled in from another. */
+  createdAt: Date
+}
+
+/** Cached plaintext older than `before`, newest first, at most `limit`.
  *
- * This is what gets handed to a newly-linked device: it's the only readable
- * copy of history that exists anywhere, since MLS won't let the new device
- * derive keys for anything sent before it joined. */
-export async function allPlaintext(): Promise<{ ciphertext: string; plaintext: string }[]> {
-  const rows = await db.plaintextCache.toArray()
-  return rows.map((r) => ({ ciphertext: r.ciphertext, plaintext: r.plaintext }))
+ * The shape history sync needs: it walks backwards from the newest message in
+ * batches so a newly-linked device shows recent conversation immediately, then
+ * fills in older history behind it. Pass `before = null` to start from the
+ * newest. */
+export async function plaintextOlderThan(
+  before: Date | null,
+  limit: number,
+): Promise<PlaintextEntry[]> {
+  const rows = await db.plaintextCache.orderBy('createdAt').reverse().toArray()
+  const filtered = before === null ? rows : rows.filter((r) => r.createdAt < before)
+  return filtered.slice(0, limit).map((r) => ({
+    ciphertext: r.ciphertext,
+    plaintext: r.plaintext,
+    createdAt: r.createdAt,
+  }))
 }
 
 /** Bulk-import plaintext received from another of the user's devices.
  * `put` semantics, so re-importing is harmless and anything already decrypted
  * locally is simply overwritten with the same value. */
-export async function importPlaintext(
-  entries: { ciphertext: string; plaintext: string }[],
-): Promise<void> {
-  const now = new Date()
+export async function importPlaintext(entries: PlaintextEntry[]): Promise<void> {
   await db.plaintextCache.bulkPut(
-    entries.map((e) => ({ ciphertext: e.ciphertext, plaintext: e.plaintext, createdAt: now })),
+    entries.map((e) => ({
+      ciphertext: e.ciphertext,
+      plaintext: e.plaintext,
+      createdAt: e.createdAt,
+    })),
   )
 }
 
 // ─── History-transfer key ──────────────────────────────────────────────────
 
-export async function saveTransferPrivateKey(userId: string, pkcs8B64: string): Promise<void> {
+export async function saveTransferKeyPair(
+  userId: string,
+  pkcs8B64: string,
+  spkiB64: string,
+): Promise<void> {
   const existing = await db.identity.get(userId)
   if (!existing) throw new Error('No local identity; cannot store a transfer key')
-  await db.identity.put({ ...existing, transferPrivateKey: pkcs8B64 })
+  await db.identity.put({ ...existing, transferPrivateKey: pkcs8B64, transferPublicKey: spkiB64 })
 }
 
-export async function loadTransferPrivateKey(userId: string): Promise<string | null> {
-  return (await db.identity.get(userId))?.transferPrivateKey ?? null
+export async function loadTransferKeyPair(
+  userId: string,
+): Promise<{ privateKey: string; publicKey: string } | null> {
+  const row = await db.identity.get(userId)
+  if (!row?.transferPrivateKey || !row.transferPublicKey) return null
+  return { privateKey: row.transferPrivateKey, publicKey: row.transferPublicKey }
 }
 
-/** Drop the transfer key once the history it was created for has arrived.
- * Keeping it around would leave a private key on disk that can decrypt a
- * bundle for no further benefit. */
-export async function clearTransferPrivateKey(userId: string): Promise<void> {
+/** Drop the transfer keypair once history has finished arriving. Keeping it
+ * would leave a private key on disk that can decrypt a bundle for no further
+ * benefit. */
+export async function clearTransferKeyPair(userId: string): Promise<void> {
   const existing = await db.identity.get(userId)
   if (!existing) return
-  const { transferPrivateKey: _drop, ...rest } = existing
+  const { transferPrivateKey: _priv, transferPublicKey: _pub, ...rest } = existing
   await db.identity.put(rest)
 }
 

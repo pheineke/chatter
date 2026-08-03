@@ -146,6 +146,9 @@ export interface HistoryRequest {
   deviceId: string
   /** Base64 SPKI ECDH public key to encrypt the bundle to. */
   publicKey: string
+  /** This device holds everything at or newer than here and wants older;
+   * null means it has nothing yet and wants the newest first. */
+  syncedBefore: Date | null
 }
 
 export interface HistoryBundle {
@@ -157,18 +160,35 @@ export interface HistoryBundle {
   nonce: string
 }
 
-export async function requestHistory(deviceId: string, publicKey: string): Promise<void> {
-  await client.post('/mls/history-requests', { device_id: deviceId, public_key: publicKey })
+export async function requestHistory(
+  deviceId: string,
+  publicKey: string,
+  syncedBefore: Date | null = null,
+): Promise<void> {
+  await client.post('/mls/history-requests', {
+    device_id: deviceId,
+    public_key: publicKey,
+    synced_before: syncedBefore ? syncedBefore.toISOString() : null,
+  })
 }
 
 /** This user's own devices currently waiting for history. */
 export async function fetchHistoryRequests(): Promise<HistoryRequest[]> {
   const { data } = await client.get('/mls/history-requests')
-  return (data as { id: string; device_id: string; public_key: string }[]).map((r) => ({
+  return (
+    data as { id: string; device_id: string; public_key: string; synced_before: string | null }[]
+  ).map((r) => ({
     id: r.id,
     deviceId: r.device_id,
     publicKey: r.public_key,
+    syncedBefore: r.synced_before ? new Date(r.synced_before) : null,
   }))
+}
+
+/** Stop asking for history for a device — sent by a serving device once
+ * there's nothing older left, which is how the requester learns it's done. */
+export async function deleteHistoryRequest(deviceId: string): Promise<void> {
+  await client.delete('/mls/history-requests', { params: { device_id: deviceId } })
 }
 
 export async function uploadHistoryBundle(payload: {

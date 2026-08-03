@@ -165,6 +165,19 @@ class MLSHistoryRequest(Base):
     device_id: Mapped[str] = mapped_column(String(64), nullable=False)
     # Base64 SPKI ECDH P-256 public key (see frontend/src/crypto/index.ts).
     public_key: Mapped[str] = mapped_column(Text, nullable=False)
+    # How far back this device has been filled in: it holds everything at or
+    # newer than this, and wants older. NULL means "nothing yet, start from
+    # the newest".
+    #
+    # History is transferred newest-first in batches rather than in one go, so
+    # a device becomes useful immediately instead of after the whole archive
+    # lands. Keeping the cursor server-side (rather than only on the device)
+    # is what makes it resumable: close the tab mid-sync and the next session
+    # picks up from the same point instead of restarting or re-sending what
+    # already arrived.
+    synced_before: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
