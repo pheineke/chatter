@@ -165,12 +165,17 @@ def ws_app():
     app.dependency_overrides.clear()
     reset_session_factory()
 
+    # No drop_all: the database is a temp file we're about to delete, and
+    # WebSocket connections opened during these tests may still be closing,
+    # holding a lock that makes DROP TABLE fail with "database is locked".
     async def _teardown():
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
         await engine.dispose()
 
     asyncio.run(_teardown())
+    try:
+        os.unlink(_DB_PATH)
+    except OSError:
+        pass
 
 
 def _get_token(ws_app: TestClient, username: str, password: str = "pass1234") -> str:

@@ -229,12 +229,17 @@ def voice_app():
     app.dependency_overrides.clear()
     reset_session_factory()
 
+    # No drop_all — see the note in tests/test_ws.py: the database is a temp
+    # file about to be deleted, and voice WebSocket connections may still be
+    # closing, which makes DROP TABLE fail with "database is locked".
     async def _teardown():
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
         await engine.dispose()
 
     asyncio.run(_teardown())
+    try:
+        os.unlink(_DB_PATH)
+    except OSError:
+        pass
 
 
 def _token(tc: TestClient, user: str, pw: str = "pass1234") -> str:

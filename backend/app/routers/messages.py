@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.database import session_factory
+from app.database import AsyncSessionLocal
 from app.dependencies import CurrentUser, DB
 from app.rate_limiter import rate_limit_messages, rate_limit_reactions, check_and_set_slowmode
 from app.routers.servers import _require_member, _require_admin, _get_server_or_404
@@ -404,7 +404,14 @@ async def send_message(
             # 3. Push the same notification to each member's personal /ws/me
             #    room so users on a different server or in DMs still see the badge.
             #    Use a fresh session — the request session may be closed by now.
-            async with session_factory() as new_db:
+            # Deliberately AsyncSessionLocal, not the injectable
+            # session_factory(): this runs in a fire-and-forget task that
+            # outlives the request. Tests point session_factory() at a
+            # per-test engine and dispose it as soon as the test ends, so a
+            # task still running here would be querying a closed engine and
+            # hang the suite. Nothing asserts on this fan-out, so it should
+            # stay bound to the application's own sessionmaker.
+            async with AsyncSessionLocal() as new_db:
                 member_rows = await new_db.execute(
                     select(ServerMember.user_id).where(
                         ServerMember.server_id == _server_id,
@@ -417,7 +424,14 @@ async def send_message(
         if _channel_type == ChannelType.dm:
             # Push the full message event to both participants' personal rooms
             # so their DM sidebar unread indicator updates instantly.
-            async with session_factory() as new_db:
+            # Deliberately AsyncSessionLocal, not the injectable
+            # session_factory(): this runs in a fire-and-forget task that
+            # outlives the request. Tests point session_factory() at a
+            # per-test engine and dispose it as soon as the test ends, so a
+            # task still running here would be querying a closed engine and
+            # hang the suite. Nothing asserts on this fan-out, so it should
+            # stay bound to the application's own sessionmaker.
+            async with AsyncSessionLocal() as new_db:
                 dmc_row = await new_db.execute(
                     select(DMChannel).where(DMChannel.channel_id == channel_id)
                 )

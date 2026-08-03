@@ -5,23 +5,22 @@ Each test function gets its own in-memory SQLite database so tests are fully
 isolated.  The `client` fixture exposes an httpx.AsyncClient wired to the
 FastAPI app with the real database dependency replaced by the per-test session.
 
-Code that can't receive a Depends(get_db) session — WebSocket handlers, and
-background tasks that outlive the request — opens its own via
-app.database.session_factory(). This fixture redirects that at the test engine
-so those paths see the same data as the request-scoped session.
+In-memory and pinned to one connection with StaticPool, which is the fastest
+option and fine here: everything reached through the `client` fixture below
+takes its session from Depends(get_db), which this overrides.
 
-The database is a file rather than ":memory:" precisely because of them. An
-in-memory SQLite database only exists on the connection that created it, so it
-has to be pinned to one connection with StaticPool — and a second, concurrent
-session then deadlocks waiting for that connection. A file is readable by as
-many connections as we need. Durability is switched off below since the file
-is discarded at the end of the test.
+Code that opens its own session instead — WebSocket handlers, via
+app.database.session_factory() — is NOT exercised by these fixtures; httpx
+can't open a WebSocket. Those suites (tests/test_ws.py, tests/test_voice.py)
+bring their own TestClient-based fixtures and redirect session_factory
+themselves. Don't move this fixture to a file-backed database to accommodate
+them: it makes every test pay real disk I/O for a case none of them hit, which
+took the suite from ~2.5 minutes to over 40.
 """
-import tempfile
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 # Ensure backend/ is on sys.path whether pytest is run from backend/ or the
 # repo root.
@@ -29,7 +28,7 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.database import get_db, reset_session_factory, set_session_factory
+from app.database import get_db
 from models.base import Base
 
 # Importing the app at module scope is load-bearing, not just convenience:
@@ -48,44 +47,27 @@ import main  # noqa: E402,F401  (imported for its import side effects)
 # Database fixture
 # ---------------------------------------------------------------------------
 
+DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
 @pytest_asyncio.fixture()
 async def db() -> AsyncSession:
-    """A fresh SQLite database for one test function."""
-    fd, db_path = tempfile.mkstemp(suffix=".sqlite3", prefix="chatter-test-")
-    os.close(fd)
+    """A fresh in-memory SQLite session for one test function."""
     engine = create_async_engine(
-        f"sqlite+aiosqlite:///{db_path}",
+        DATABASE_URL,
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
-
-    # The file is thrown away at the end of the test, so fsync-per-commit buys
-    # nothing and costs a lot. WAL additionally lets the app's own sessions
-    # read while the fixture session holds a write open, instead of blocking.
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fast_pragmas(dbapi_connection, _record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=OFF")
-        cursor.close()
-
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    test_sessions = async_sessionmaker(engine, expire_on_commit=False)
-    set_session_factory(test_sessions)
-
-    async with test_sessions() as session:
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_factory() as session:
         yield session
 
-    reset_session_factory()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
-    # Leave the file to the OS temp dir if it's still held: a background task
-    # that outlived the request may still be finishing with it, and failing to
-    # unlink is not worth failing a test over.
-    try:
-        os.unlink(db_path)
-    except OSError:
-        pass
 
 
 # ---------------------------------------------------------------------------
