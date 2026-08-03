@@ -310,6 +310,7 @@ async def test_history_transfer_round_trip(client: AsyncClient):
         json={
             "target_device_id": "new-phone",
             "sender_device_id": "laptop",
+            "sender_public_key": "SENDERPUBKEYB64",
             "ciphertext": _b64(b"encrypted-history"),
             "nonce": _b64(b"nonce12bytes"),
         },
@@ -357,6 +358,7 @@ async def test_history_bundle_requires_a_matching_request(client: AsyncClient):
         json={
             "target_device_id": "never-asked",
             "sender_device_id": "laptop",
+            "sender_public_key": "SENDERPUBKEYB64",
             "ciphertext": _b64(b"x"),
             "nonce": _b64(b"n"),
         },
@@ -380,6 +382,7 @@ async def test_history_bundles_not_readable_by_other_users(client: AsyncClient):
         json={
             "target_device_id": "shared-name",
             "sender_device_id": "laptop",
+            "sender_public_key": "SENDERPUBKEYB64",
             "ciphertext": _b64(b"alice-secret-history"),
             "nonce": _b64(b"n"),
         },

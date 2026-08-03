@@ -82,8 +82,35 @@ function bootstrap(userId: string): Promise<void> {
   let p = _bootstrapPromises.get(userId)
   if (!p) {
     p = (async () => {
-      await mls.ensureIdentity(userId)
+      const { deviceId, createdNow } = await mls.ensureIdentity(userId)
       await mls.topUpKeyPackages(userId)
+
+      // History doesn't come from MLS — forward secrecy means a device Added
+      // now can't read anything sent before it joined — so a brand-new device
+      // asks the user's other devices to hand theirs over. See
+      // mls/historyTransfer.ts.
+      if (createdNow) {
+        await mls.requestHistory(userId, deviceId).catch((err) =>
+          console.warn('[MLS] could not request history for this device:', err),
+        )
+      }
+
+      // Collect anything already waiting for us, then answer anyone waiting on
+      // us. Both run on every device on every load, not just new ones: the
+      // device that can serve a request may only come online later, and the
+      // requester may only come back later still, so whoever loads next moves
+      // the transfer along. Both are no-ops when there's nothing to do.
+      const imported = await mls
+        .collectHistory(userId, deviceId)
+        .catch((err) => {
+          console.warn('[MLS] could not import history for this device:', err)
+          return 0
+        })
+      if (imported > 0) console.info(`[MLS] recovered ${imported} messages from another device`)
+
+      await mls.servePendingHistoryRequests(deviceId).catch((err) =>
+        console.warn('[MLS] could not serve history to other devices:', err),
+      )
     })()
     _bootstrapPromises.set(userId, p)
     p.finally(() => _bootstrapPromises.delete(userId))

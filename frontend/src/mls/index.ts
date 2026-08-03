@@ -29,6 +29,16 @@ export {
   isEpochTooOld,
 } from './session'
 
+// Link-time history transfer between a user's own devices. MLS forward
+// secrecy means a newly-linked device can't derive keys for anything sent
+// before it joined, so history is handed over by a device that already holds
+// it — see historyTransfer.ts.
+export {
+  requestHistory,
+  servePendingHistoryRequests,
+  collectHistory,
+} from './historyTransfer'
+
 // Byte<->base64 conversion for callers that need to carry ciphertext over
 // JSON (e.g. the `messages.content` field): the same encoding api.ts uses
 // on the wire, re-exported here so nothing outside src/mls has to reach

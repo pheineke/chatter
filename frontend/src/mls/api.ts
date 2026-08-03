@@ -137,4 +137,78 @@ export async function fetchGroupEvents(
   }))
 }
 
+// ─── Link-time history transfer ────────────────────────────────────────────
+// One of the user's devices handing readable history to another. The server
+// relays ciphertext it has no key for and drops it on collection.
+
+export interface HistoryRequest {
+  id: string
+  deviceId: string
+  /** Base64 SPKI ECDH public key to encrypt the bundle to. */
+  publicKey: string
+}
+
+export interface HistoryBundle {
+  id: string
+  senderDeviceId: string
+  /** Ephemeral ECDH public key to derive this bundle's shared secret from. */
+  senderPublicKey: string
+  ciphertext: string
+  nonce: string
+}
+
+export async function requestHistory(deviceId: string, publicKey: string): Promise<void> {
+  await client.post('/mls/history-requests', { device_id: deviceId, public_key: publicKey })
+}
+
+/** This user's own devices currently waiting for history. */
+export async function fetchHistoryRequests(): Promise<HistoryRequest[]> {
+  const { data } = await client.get('/mls/history-requests')
+  return (data as { id: string; device_id: string; public_key: string }[]).map((r) => ({
+    id: r.id,
+    deviceId: r.device_id,
+    publicKey: r.public_key,
+  }))
+}
+
+export async function uploadHistoryBundle(payload: {
+  targetDeviceId: string
+  senderDeviceId: string
+  senderPublicKey: string
+  ciphertext: string
+  nonce: string
+}): Promise<void> {
+  await client.post('/mls/history-bundles', {
+    target_device_id: payload.targetDeviceId,
+    sender_device_id: payload.senderDeviceId,
+    sender_public_key: payload.senderPublicKey,
+    ciphertext: payload.ciphertext,
+    nonce: payload.nonce,
+  })
+}
+
+export async function fetchHistoryBundles(deviceId: string): Promise<HistoryBundle[]> {
+  const { data } = await client.get('/mls/history-bundles', { params: { device_id: deviceId } })
+  return (
+    data as {
+      id: string
+      sender_device_id: string
+      sender_public_key: string
+      ciphertext: string
+      nonce: string
+    }[]
+  ).map((b) => ({
+    id: b.id,
+    senderDeviceId: b.sender_device_id,
+    senderPublicKey: b.sender_public_key,
+    ciphertext: b.ciphertext,
+    nonce: b.nonce,
+  }))
+}
+
+/** Delete a bundle after importing it; also clears the served request. */
+export async function consumeHistoryBundle(bundleId: string): Promise<void> {
+  await client.delete(`/mls/history-bundles/${bundleId}`)
+}
+
 export { toB64, fromB64 }

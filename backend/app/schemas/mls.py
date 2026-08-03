@@ -96,6 +96,10 @@ class HistoryBundleCreate(BaseModel):
     """History encrypted by one of the user's devices for another."""
     target_device_id: str = Field(min_length=1, max_length=MAX_DEVICE_ID)
     sender_device_id: str = Field(min_length=1, max_length=MAX_DEVICE_ID)
+    # Ephemeral ECDH public key the recipient derives the shared secret from.
+    # Its own field rather than packed into sender_device_id, which is a device
+    # identifier and far too short to hold a key.
+    sender_public_key: str = Field(min_length=1, max_length=MAX_TRANSFER_PUBLIC_KEY_B64)
     ciphertext: str = Field(min_length=1, max_length=MAX_HISTORY_BUNDLE_B64)
     nonce: str = Field(min_length=1, max_length=MAX_NONCE_B64)
 
@@ -103,6 +107,7 @@ class HistoryBundleCreate(BaseModel):
 class HistoryBundleRead(BaseModel):
     id: uuid.UUID
     sender_device_id: str
+    sender_public_key: str
     ciphertext: str
     nonce: str
     created_at: datetime

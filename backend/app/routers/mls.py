@@ -316,6 +316,7 @@ async def upload_history_bundle(
         user_id=current_user.id,
         target_device_id=body.target_device_id,
         sender_device_id=body.sender_device_id,
+        sender_public_key=body.sender_public_key,
         ciphertext=_b64_to_bytes(body.ciphertext, "ciphertext"),
         nonce=_b64_to_bytes(body.nonce, "nonce"),
     ))
@@ -340,6 +341,7 @@ async def list_history_bundles(
     return [
         HistoryBundleRead(
             id=b.id, sender_device_id=b.sender_device_id,
+            sender_public_key=b.sender_public_key,
             ciphertext=_bytes_to_b64(b.ciphertext),
             nonce=_bytes_to_b64(b.nonce),
             created_at=b.created_at,

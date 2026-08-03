@@ -129,9 +129,12 @@ async function loadLive(channelId: string): Promise<{ state: ClientState; lastPr
  * Add. Generated once, cached in IndexedDB. */
 export async function ensureIdentity(
   userId: string,
-): Promise<{ signKey: Uint8Array; publicKey: Uint8Array; deviceId: string }> {
+): Promise<{ signKey: Uint8Array; publicKey: Uint8Array; deviceId: string; createdNow: boolean }> {
   const existing = await store.loadIdentity(userId)
-  if (existing) return existing
+  // `createdNow` tells callers this device has just come into existence, so
+  // it holds no message history and should ask the user's other devices for
+  // theirs (see requestHistory in historyTransfer.ts).
+  if (existing) return { ...existing, createdNow: false }
 
   // No local identity => a device we've never seen before for this user: a
   // second device being linked, or the same one after its site data was
@@ -158,7 +161,7 @@ export async function ensureIdentity(
     console.warn('[MLS] Could not purge stale key packages for this device:', err)
   }
 
-  return { signKey, publicKey, deviceId }
+  return { signKey, publicKey, deviceId, createdNow: true }
 }
 
 // ─── KeyPackages ────────────────────────────────────────────────────────────

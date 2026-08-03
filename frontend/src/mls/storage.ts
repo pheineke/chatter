@@ -42,6 +42,12 @@ interface StoredIdentity {
    * clearing site data yields a genuinely new device, which is the correct
    * interpretation: the old device's private keys are gone. */
   deviceId: string
+  /** Private half of the ephemeral ECDH keypair this device published when it
+   * asked its siblings for message history (base64 PKCS#8, see
+   * crypto/index.ts). Present only between raising a history request and
+   * importing the bundle that answers it, then cleared — it exists solely to
+   * decrypt that one transfer. */
+  transferPrivateKey?: string
 }
 
 interface StoredGroup {
@@ -227,6 +233,50 @@ export async function savePlaintext(ciphertext: string, plaintext: string): Prom
 export async function loadPlaintext(ciphertext: string): Promise<string | null> {
   const row = await db.plaintextCache.get(ciphertext)
   return row?.plaintext ?? null
+}
+
+/** Every cached (ciphertext, plaintext) pair on this device.
+ *
+ * This is what gets handed to a newly-linked device: it's the only readable
+ * copy of history that exists anywhere, since MLS won't let the new device
+ * derive keys for anything sent before it joined. */
+export async function allPlaintext(): Promise<{ ciphertext: string; plaintext: string }[]> {
+  const rows = await db.plaintextCache.toArray()
+  return rows.map((r) => ({ ciphertext: r.ciphertext, plaintext: r.plaintext }))
+}
+
+/** Bulk-import plaintext received from another of the user's devices.
+ * `put` semantics, so re-importing is harmless and anything already decrypted
+ * locally is simply overwritten with the same value. */
+export async function importPlaintext(
+  entries: { ciphertext: string; plaintext: string }[],
+): Promise<void> {
+  const now = new Date()
+  await db.plaintextCache.bulkPut(
+    entries.map((e) => ({ ciphertext: e.ciphertext, plaintext: e.plaintext, createdAt: now })),
+  )
+}
+
+// ─── History-transfer key ──────────────────────────────────────────────────
+
+export async function saveTransferPrivateKey(userId: string, pkcs8B64: string): Promise<void> {
+  const existing = await db.identity.get(userId)
+  if (!existing) throw new Error('No local identity; cannot store a transfer key')
+  await db.identity.put({ ...existing, transferPrivateKey: pkcs8B64 })
+}
+
+export async function loadTransferPrivateKey(userId: string): Promise<string | null> {
+  return (await db.identity.get(userId))?.transferPrivateKey ?? null
+}
+
+/** Drop the transfer key once the history it was created for has arrived.
+ * Keeping it around would leave a private key on disk that can decrypt a
+ * bundle for no further benefit. */
+export async function clearTransferPrivateKey(userId: string): Promise<void> {
+  const existing = await db.identity.get(userId)
+  if (!existing) return
+  const { transferPrivateKey: _drop, ...rest } = existing
+  await db.identity.put(rest)
 }
 
 export type { StoredKeyPackage }

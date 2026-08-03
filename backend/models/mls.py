@@ -199,6 +199,11 @@ class MLSHistoryBundle(Base):
     target_device_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     # Which device produced it, for display ("restored from your laptop").
     sender_device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Base64 SPKI ECDH public key of the ephemeral keypair the sender used.
+    # The recipient needs it to derive the same shared secret, and it can't be
+    # looked up anywhere else — it's generated per transfer and never stored by
+    # the sender.
+    sender_public_key: Mapped[str] = mapped_column(Text, nullable=False)
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
