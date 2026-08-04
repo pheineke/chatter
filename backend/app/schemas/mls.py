@@ -117,6 +117,42 @@ class HistoryBundleRead(BaseModel):
     created_at: datetime
 
 
+# ---- Recovery-code archive ------------------------------------------------
+MAX_KDF_SALT_B64 = 128
+MAX_VERIFIER_B64 = 1_024
+MAX_CHUNK_KEY = 128
+
+
+class RecoveryArchiveMetaWrite(BaseModel):
+    """KDF parameters, written once when the recovery code is first created."""
+    kdf_salt: str = Field(min_length=1, max_length=MAX_KDF_SALT_B64)
+    verifier_ciphertext: str = Field(min_length=1, max_length=MAX_VERIFIER_B64)
+    verifier_nonce: str = Field(min_length=1, max_length=MAX_NONCE_B64)
+
+
+class RecoveryArchiveMetaRead(BaseModel):
+    kdf_salt: str
+    verifier_ciphertext: str
+    verifier_nonce: str
+    chunk_count: int
+    updated_at: datetime
+
+
+class RecoveryArchiveChunkWrite(BaseModel):
+    # Derived client-side from the range this chunk covers, so two devices
+    # archiving the same messages upsert rather than duplicating.
+    chunk_key: str = Field(min_length=1, max_length=MAX_CHUNK_KEY)
+    ciphertext: str = Field(min_length=1, max_length=MAX_HISTORY_BUNDLE_B64)
+    nonce: str = Field(min_length=1, max_length=MAX_NONCE_B64)
+
+
+class RecoveryArchiveChunkRead(BaseModel):
+    id: uuid.UUID
+    chunk_key: str
+    ciphertext: str
+    nonce: str
+
+
 class WelcomeRecipient(BaseModel):
     recipient_user_id: uuid.UUID
     # base64, individually HPKE-encrypted to the recipient's init key

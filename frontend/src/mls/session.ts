@@ -597,3 +597,8 @@ export async function cachePlaintext(ciphertext: string, plaintext: string): Pro
 export async function getCachedPlaintext(ciphertext: string): Promise<string | null> {
   return store.loadPlaintext(ciphertext)
 }
+
+/** How many messages this device can currently read. */
+export async function cachedMessageCount(): Promise<number> {
+  return store.cachedMessageCount()
+}

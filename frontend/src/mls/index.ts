@@ -26,6 +26,7 @@ export {
   decryptFromChannel,
   cachePlaintext,
   getCachedPlaintext,
+  cachedMessageCount,
   isEpochTooOld,
 } from './session'
 
@@ -38,6 +39,19 @@ export {
   servePendingHistoryRequests,
   collectHistory,
 } from './historyTransfer'
+
+// Recovery-code archive: the "lost every device" fallback. Unlike everything
+// above it trades forward secrecy for recoverability, deliberately and only
+// for the archive — see recoveryArchive.ts.
+export {
+  generateRecoveryCode,
+  setUpRecoveryCode,
+  checkRecoveryCode,
+  archiveHistory,
+  restoreFromArchive,
+  hasRecoveryArchive,
+  deleteRecoveryArchive,
+} from './recoveryArchive'
 
 // Byte<->base64 conversion for callers that need to carry ciphertext over
 // JSON (e.g. the `messages.content` field): the same encoding api.ts uses

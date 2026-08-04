@@ -40,6 +40,9 @@ from app.schemas.mls import (
     CommitSubmit, GroupEventRead, CommitResult,
     HistoryRequestCreate, HistoryRequestRead,
     HistoryBundleCreate, HistoryBundleRead,
+    RecoveryArchiveMetaWrite, RecoveryArchiveMetaRead,
+    RecoveryArchiveChunkWrite, RecoveryArchiveChunkRead,
+    MAX_CHUNK_KEY,
 )
 from app.ws_manager import manager
 from models.channel import ChannelType
@@ -47,6 +50,7 @@ from models.dm_channel import DMChannel
 from models.mls import (
     MLSKeyPackage, MLSGroup, MLSGroupEvent, MLSEventType,
     MLSHistoryRequest, MLSHistoryBundle,
+    MLSRecoveryArchiveMeta, MLSRecoveryArchiveChunk,
 )
 from models.server import ServerMember
 
@@ -429,6 +433,201 @@ async def consume_history_bundle(
         MLSHistoryRequest.__table__.delete().where(
             MLSHistoryRequest.user_id == current_user.id,
             MLSHistoryRequest.device_id == target_device_id,
+        )
+    )
+    await db.commit()
+
+
+# ─── Recovery-code archive ──────────────────────────────────────────────────
+#
+# The "I lost every device" fallback. Everyday multi-device linking hands
+# history over device-to-device with no lasting secret (see above); this
+# covers the one case that can't — having nothing left to hand it over from.
+#
+# Recovering history with no device left necessarily requires a secret that
+# outlives your devices, so the archive is encrypted under a key derived from
+# a recovery code shown once at sign-up. The server never receives the code
+# and cannot derive the key: it stores a salt (public by design — it only
+# stops precomputation being shared across users), a verifier blob, and
+# ciphertext.
+#
+# Unlike history bundles, these rows persist. That is the deliberate cost of
+# the feature and the reason it's positioned as disaster recovery rather than
+# the normal path.
+
+
+@router.put("/recovery-archive/meta", response_model=RecoveryArchiveMetaRead)
+async def put_recovery_archive_meta(
+    body: RecoveryArchiveMetaWrite,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_mls_history_transfer),
+):
+    """Create or replace the caller's archive parameters.
+
+    Replacing them means a new recovery code, which makes every existing chunk
+    undecryptable — so they're deleted here rather than left as ballast the
+    user can never read.
+    """
+    result = await db.execute(
+        select(MLSRecoveryArchiveMeta).where(MLSRecoveryArchiveMeta.user_id == current_user.id)
+    )
+    meta = result.scalar_one_or_none()
+
+    if meta is None:
+        meta = MLSRecoveryArchiveMeta(
+            user_id=current_user.id,
+            kdf_salt=body.kdf_salt,
+            verifier_ciphertext=body.verifier_ciphertext,
+            verifier_nonce=body.verifier_nonce,
+        )
+        db.add(meta)
+    else:
+        # New salt => new key => nothing already stored can still be read.
+        if meta.kdf_salt != body.kdf_salt:
+            await db.execute(
+                MLSRecoveryArchiveChunk.__table__.delete().where(
+                    MLSRecoveryArchiveChunk.user_id == current_user.id
+                )
+            )
+        meta.kdf_salt = body.kdf_salt
+        meta.verifier_ciphertext = body.verifier_ciphertext
+        meta.verifier_nonce = body.verifier_nonce
+
+    await db.commit()
+    await db.refresh(meta)
+
+    count = await db.execute(
+        select(func.count()).select_from(MLSRecoveryArchiveChunk).where(
+            MLSRecoveryArchiveChunk.user_id == current_user.id
+        )
+    )
+    return RecoveryArchiveMetaRead(
+        kdf_salt=meta.kdf_salt,
+        verifier_ciphertext=meta.verifier_ciphertext,
+        verifier_nonce=meta.verifier_nonce,
+        chunk_count=count.scalar_one(),
+        updated_at=meta.updated_at,
+    )
+
+
+@router.get("/recovery-archive/meta", response_model=RecoveryArchiveMetaRead)
+async def get_recovery_archive_meta(current_user: CurrentUser, db: DB):
+    """Archive parameters for the caller, so a fresh device can derive the key
+    from an entered recovery code and check it before restoring."""
+    result = await db.execute(
+        select(MLSRecoveryArchiveMeta).where(MLSRecoveryArchiveMeta.user_id == current_user.id)
+    )
+    meta = result.scalar_one_or_none()
+    if meta is None:
+        raise HTTPException(status_code=404, detail="No recovery archive for this account")
+
+    count = await db.execute(
+        select(func.count()).select_from(MLSRecoveryArchiveChunk).where(
+            MLSRecoveryArchiveChunk.user_id == current_user.id
+        )
+    )
+    return RecoveryArchiveMetaRead(
+        kdf_salt=meta.kdf_salt,
+        verifier_ciphertext=meta.verifier_ciphertext,
+        verifier_nonce=meta.verifier_nonce,
+        chunk_count=count.scalar_one(),
+        updated_at=meta.updated_at,
+    )
+
+
+@router.put("/recovery-archive/chunks", status_code=status.HTTP_204_NO_CONTENT)
+async def put_recovery_archive_chunk(
+    body: RecoveryArchiveChunkWrite,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_mls_history_transfer),
+):
+    """Store or replace one encrypted slice of the caller's history.
+
+    Upsert on (user, chunk_key) so two devices archiving the same range
+    converge on one row instead of accumulating duplicates.
+    """
+    meta = await db.execute(
+        select(MLSRecoveryArchiveMeta.user_id).where(
+            MLSRecoveryArchiveMeta.user_id == current_user.id
+        )
+    )
+    if meta.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Set up a recovery code before archiving history.",
+        )
+
+    existing = await db.execute(
+        select(MLSRecoveryArchiveChunk).where(
+            MLSRecoveryArchiveChunk.user_id == current_user.id,
+            MLSRecoveryArchiveChunk.chunk_key == body.chunk_key,
+        )
+    )
+    chunk = existing.scalar_one_or_none()
+    ciphertext = _b64_to_bytes(body.ciphertext, "ciphertext")
+    nonce = _b64_to_bytes(body.nonce, "nonce")
+
+    if chunk is None:
+        db.add(MLSRecoveryArchiveChunk(
+            user_id=current_user.id,
+            chunk_key=body.chunk_key,
+            ciphertext=ciphertext,
+            nonce=nonce,
+        ))
+    else:
+        chunk.ciphertext = ciphertext
+        chunk.nonce = nonce
+
+    await db.commit()
+
+
+@router.get("/recovery-archive/chunks", response_model=list[RecoveryArchiveChunkRead])
+async def list_recovery_archive_chunks(
+    current_user: CurrentUser,
+    db: DB,
+    since_key: str | None = Query(default=None, max_length=MAX_CHUNK_KEY),
+):
+    """The caller's archived chunks, oldest key first.
+
+    `since_key` lets a restoring device page through a large archive rather
+    than pulling it all into memory at once; chunk keys sort in the order they
+    were produced.
+    """
+    stmt = select(MLSRecoveryArchiveChunk).where(
+        MLSRecoveryArchiveChunk.user_id == current_user.id
+    )
+    if since_key is not None:
+        stmt = stmt.where(MLSRecoveryArchiveChunk.chunk_key > since_key)
+    stmt = stmt.order_by(MLSRecoveryArchiveChunk.chunk_key.asc()).limit(_MAX_EVENTS_PAGE)
+
+    result = await db.execute(stmt)
+    return [
+        RecoveryArchiveChunkRead(
+            id=c.id, chunk_key=c.chunk_key,
+            ciphertext=_bytes_to_b64(c.ciphertext),
+            nonce=_bytes_to_b64(c.nonce),
+        )
+        for c in result.scalars().all()
+    ]
+
+
+@router.delete("/recovery-archive", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_recovery_archive(current_user: CurrentUser, db: DB):
+    """Delete the caller's archive and its parameters.
+
+    For a user who decides they'd rather not have a decryptable copy of their
+    history stored at all — the feature's whole tradeoff, opted out of.
+    """
+    await db.execute(
+        MLSRecoveryArchiveChunk.__table__.delete().where(
+            MLSRecoveryArchiveChunk.user_id == current_user.id
+        )
+    )
+    await db.execute(
+        MLSRecoveryArchiveMeta.__table__.delete().where(
+            MLSRecoveryArchiveMeta.user_id == current_user.id
         )
     )
     await db.commit()

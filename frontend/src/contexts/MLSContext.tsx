@@ -111,6 +111,15 @@ function bootstrap(userId: string): Promise<void> {
       await mls.servePendingHistoryRequests(deviceId).catch((err) =>
         console.warn('[MLS] could not serve history to other devices:', err),
       )
+
+      // Top up the recovery archive with anything new since last time. A
+      // no-op unless a recovery code has been set up on this device, and
+      // incremental when it has, so the usual cost is one chunk. Runs on
+      // every load because an archive only written at setup would be frozen
+      // at "empty" — which is exactly what it was before this call existed.
+      await mls.archiveHistory(userId).catch((err) =>
+        console.warn('[MLS] could not update the recovery archive:', err),
+      )
     })()
     _bootstrapPromises.set(userId, p)
     p.finally(() => _bootstrapPromises.delete(userId))

@@ -231,4 +231,80 @@ export async function consumeHistoryBundle(bundleId: string): Promise<void> {
   await client.delete(`/mls/history-bundles/${bundleId}`)
 }
 
+// ─── Recovery-code archive ─────────────────────────────────────────────────
+// Persistent, unlike history bundles: this is the "lost every device" path.
+// The server holds a salt, a verifier and ciphertext, and can read none of it.
+
+export interface RecoveryArchiveMeta {
+  kdfSalt: string
+  verifierCiphertext: string
+  verifierNonce: string
+  chunkCount: number
+}
+
+export interface RecoveryArchiveChunk {
+  id: string
+  chunkKey: string
+  ciphertext: string
+  nonce: string
+}
+
+export async function putRecoveryArchiveMeta(payload: {
+  kdfSalt: string
+  verifierCiphertext: string
+  verifierNonce: string
+}): Promise<void> {
+  await client.put('/mls/recovery-archive/meta', {
+    kdf_salt: payload.kdfSalt,
+    verifier_ciphertext: payload.verifierCiphertext,
+    verifier_nonce: payload.verifierNonce,
+  })
+}
+
+/** Null when the account has no archive configured. */
+export async function fetchRecoveryArchiveMeta(): Promise<RecoveryArchiveMeta | null> {
+  try {
+    const { data } = await client.get('/mls/recovery-archive/meta')
+    return {
+      kdfSalt: data.kdf_salt,
+      verifierCiphertext: data.verifier_ciphertext,
+      verifierNonce: data.verifier_nonce,
+      chunkCount: data.chunk_count,
+    }
+  } catch (err: any) {
+    if (err?.response?.status === 404) return null
+    throw err
+  }
+}
+
+export async function putRecoveryArchiveChunk(payload: {
+  chunkKey: string
+  ciphertext: string
+  nonce: string
+}): Promise<void> {
+  await client.put('/mls/recovery-archive/chunks', {
+    chunk_key: payload.chunkKey,
+    ciphertext: payload.ciphertext,
+    nonce: payload.nonce,
+  })
+}
+
+export async function fetchRecoveryArchiveChunks(
+  sinceKey: string | null,
+): Promise<RecoveryArchiveChunk[]> {
+  const { data } = await client.get('/mls/recovery-archive/chunks', {
+    params: sinceKey === null ? undefined : { since_key: sinceKey },
+  })
+  return (data as { id: string; chunk_key: string; ciphertext: string; nonce: string }[]).map((c) => ({
+    id: c.id,
+    chunkKey: c.chunk_key,
+    ciphertext: c.ciphertext,
+    nonce: c.nonce,
+  }))
+}
+
+export async function deleteRecoveryArchive(): Promise<void> {
+  await client.delete('/mls/recovery-archive')
+}
+
 export { toB64, fromB64 }

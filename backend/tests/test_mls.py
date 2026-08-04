@@ -500,3 +500,135 @@ async def test_history_request_retire_is_scoped_to_the_owner(client: AsyncClient
 
     still = (await client.get("/mls/history-requests", headers=alice)).json()
     assert [p["device_id"] for p in still] == ["shared-name"]
+
+
+# ---- Recovery-code archive ------------------------------------------------
+
+
+async def test_recovery_archive_round_trip(client: AsyncClient):
+    """Store archive parameters and chunks, then read them back."""
+    alice = await register_and_login(client, "mls_arch_a", "pass1234")
+
+    r = await client.put(
+        "/mls/recovery-archive/meta",
+        json={"kdf_salt": "SALT1", "verifier_ciphertext": "VC", "verifier_nonce": "VN"},
+        headers=alice,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["chunk_count"] == 0
+
+    for key, blob in (("0001", b"chunk-one"), ("0002", b"chunk-two")):
+        r = await client.put(
+            "/mls/recovery-archive/chunks",
+            json={"chunk_key": key, "ciphertext": _b64(blob), "nonce": _b64(b"n")},
+            headers=alice,
+        )
+        assert r.status_code == 204, r.text
+
+    chunks = (await client.get("/mls/recovery-archive/chunks", headers=alice)).json()
+    assert [c["chunk_key"] for c in chunks] == ["0001", "0002"]
+    assert base64.b64decode(chunks[0]["ciphertext"]) == b"chunk-one"
+
+    meta = (await client.get("/mls/recovery-archive/meta", headers=alice)).json()
+    assert meta["kdf_salt"] == "SALT1"
+    assert meta["chunk_count"] == 2
+
+
+async def test_recovery_archive_chunks_upsert(client: AsyncClient):
+    """Two devices archiving the same range converge on one row."""
+    alice = await register_and_login(client, "mls_arch_up", "pass1234")
+    await client.put(
+        "/mls/recovery-archive/meta",
+        json={"kdf_salt": "S", "verifier_ciphertext": "VC", "verifier_nonce": "VN"},
+        headers=alice,
+    )
+
+    for blob in (b"first-write", b"second-write"):
+        await client.put(
+            "/mls/recovery-archive/chunks",
+            json={"chunk_key": "same-range", "ciphertext": _b64(blob), "nonce": _b64(b"n")},
+            headers=alice,
+        )
+
+    chunks = (await client.get("/mls/recovery-archive/chunks", headers=alice)).json()
+    assert len(chunks) == 1
+    assert base64.b64decode(chunks[0]["ciphertext"]) == b"second-write"
+
+
+async def test_new_recovery_code_discards_unreadable_chunks(client: AsyncClient):
+    """A new salt means a new key, so everything already stored becomes
+    undecryptable — keeping it would be ballast the user can never read."""
+    alice = await register_and_login(client, "mls_arch_reset", "pass1234")
+    await client.put(
+        "/mls/recovery-archive/meta",
+        json={"kdf_salt": "OLD", "verifier_ciphertext": "VC", "verifier_nonce": "VN"},
+        headers=alice,
+    )
+    await client.put(
+        "/mls/recovery-archive/chunks",
+        json={"chunk_key": "0001", "ciphertext": _b64(b"x"), "nonce": _b64(b"n")},
+        headers=alice,
+    )
+
+    r = await client.put(
+        "/mls/recovery-archive/meta",
+        json={"kdf_salt": "NEW", "verifier_ciphertext": "VC2", "verifier_nonce": "VN2"},
+        headers=alice,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["chunk_count"] == 0
+    assert (await client.get("/mls/recovery-archive/chunks", headers=alice)).json() == []
+
+
+async def test_archiving_requires_setup_first(client: AsyncClient):
+    alice = await register_and_login(client, "mls_arch_nosetup", "pass1234")
+    r = await client.put(
+        "/mls/recovery-archive/chunks",
+        json={"chunk_key": "0001", "ciphertext": _b64(b"x"), "nonce": _b64(b"n")},
+        headers=alice,
+    )
+    assert r.status_code == 409, r.text
+
+
+async def test_recovery_archive_is_private_to_its_owner(client: AsyncClient):
+    """The archive is a decryptable-by-someone copy of a user's history, so
+    scoping matters more here than anywhere else in this module."""
+    alice = await register_and_login(client, "mls_arch_priv_a", "pass1234")
+    bob = await register_and_login(client, "mls_arch_priv_b", "pass1234")
+
+    await client.put(
+        "/mls/recovery-archive/meta",
+        json={"kdf_salt": "ALICE", "verifier_ciphertext": "VC", "verifier_nonce": "VN"},
+        headers=alice,
+    )
+    await client.put(
+        "/mls/recovery-archive/chunks",
+        json={"chunk_key": "0001", "ciphertext": _b64(b"alice-history"), "nonce": _b64(b"n")},
+        headers=alice,
+    )
+
+    assert (await client.get("/mls/recovery-archive/meta", headers=bob)).status_code == 404
+    assert (await client.get("/mls/recovery-archive/chunks", headers=bob)).json() == []
+
+    # Bob deleting "his" archive must not touch Alice's.
+    assert (await client.delete("/mls/recovery-archive", headers=bob)).status_code == 204
+    assert len((await client.get("/mls/recovery-archive/chunks", headers=alice)).json()) == 1
+
+
+async def test_recovery_archive_can_be_deleted(client: AsyncClient):
+    """Opting out of the tradeoff entirely."""
+    alice = await register_and_login(client, "mls_arch_del", "pass1234")
+    await client.put(
+        "/mls/recovery-archive/meta",
+        json={"kdf_salt": "S", "verifier_ciphertext": "VC", "verifier_nonce": "VN"},
+        headers=alice,
+    )
+    await client.put(
+        "/mls/recovery-archive/chunks",
+        json={"chunk_key": "0001", "ciphertext": _b64(b"x"), "nonce": _b64(b"n")},
+        headers=alice,
+    )
+
+    assert (await client.delete("/mls/recovery-archive", headers=alice)).status_code == 204
+    assert (await client.get("/mls/recovery-archive/meta", headers=alice)).status_code == 404
+    assert (await client.get("/mls/recovery-archive/chunks", headers=alice)).json() == []

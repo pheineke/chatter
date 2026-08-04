@@ -55,6 +55,22 @@ interface StoredIdentity {
    * they exist solely to receive that history. */
   transferPrivateKey?: string
   transferPublicKey?: string
+  /** AES-GCM key for the recovery archive, derived from the recovery code.
+   *
+   * Kept so the archive can be topped up as messages arrive without asking
+   * for the code every time — otherwise it would only ever contain whatever
+   * existed the moment it was set up, which is nothing.
+   *
+   * Storing it here costs nothing locally: it encrypts the plaintext cache,
+   * which sits unencrypted in this same database, so anyone who can read the
+   * key can already read the messages. What it protects is the copy held by
+   * the server, and the key is never sent there. Stored as a non-extractable
+   * CryptoKey (structured-clone preserves that), so script running in the page
+   * can use it but cannot read it out and exfiltrate it. */
+  archiveKey?: CryptoKey
+  /** Newest cache entry already written to the archive, so each pass only
+   * encrypts what's new rather than re-uploading everything. */
+  archivedThrough?: Date
 }
 
 interface StoredGroup {
@@ -246,6 +262,12 @@ export async function savePlaintext(ciphertext: string, plaintext: string): Prom
   await db.plaintextCache.put({ ciphertext, plaintext, createdAt: new Date() })
 }
 
+/** How many messages this device can currently read. Used to decide whether
+ * a recovery restore is worth offering at all. */
+export async function cachedMessageCount(): Promise<number> {
+  return db.plaintextCache.count()
+}
+
 export async function loadPlaintext(ciphertext: string): Promise<string | null> {
   const row = await db.plaintextCache.get(ciphertext)
   return row?.plaintext ?? null
@@ -274,6 +296,24 @@ export async function plaintextOlderThan(
 ): Promise<PlaintextEntry[]> {
   const rows = await db.plaintextCache.orderBy('createdAt').reverse().toArray()
   const filtered = before === null ? rows : rows.filter((r) => r.createdAt < before)
+  return filtered.slice(0, limit).map((r) => ({
+    ciphertext: r.ciphertext,
+    plaintext: r.plaintext,
+    createdAt: r.createdAt,
+  }))
+}
+
+/** Cached plaintext newer than `after`, oldest first, at most `limit`.
+ *
+ * The complement of plaintextOlderThan, for topping up the recovery archive:
+ * that walks forwards from the last thing archived rather than backwards from
+ * the newest. Pass `after = null` to take everything. */
+export async function plaintextNewerThan(
+  after: Date | null,
+  limit: number,
+): Promise<PlaintextEntry[]> {
+  const rows = await db.plaintextCache.orderBy('createdAt').toArray()
+  const filtered = after === null ? rows : rows.filter((r) => r.createdAt > after)
   return filtered.slice(0, limit).map((r) => ({
     ciphertext: r.ciphertext,
     plaintext: r.plaintext,
@@ -321,6 +361,37 @@ export async function clearTransferKeyPair(userId: string): Promise<void> {
   const existing = await db.identity.get(userId)
   if (!existing) return
   const { transferPrivateKey: _priv, transferPublicKey: _pub, ...rest } = existing
+  await db.identity.put(rest)
+}
+
+// ─── Recovery-archive key ──────────────────────────────────────────────────
+
+export async function saveArchiveKey(userId: string, key: CryptoKey): Promise<void> {
+  const existing = await db.identity.get(userId)
+  if (!existing) throw new Error('No local identity; cannot store an archive key')
+  await db.identity.put({ ...existing, archiveKey: key })
+}
+
+export async function loadArchiveKey(userId: string): Promise<CryptoKey | null> {
+  return (await db.identity.get(userId))?.archiveKey ?? null
+}
+
+export async function loadArchivedThrough(userId: string): Promise<Date | null> {
+  return (await db.identity.get(userId))?.archivedThrough ?? null
+}
+
+export async function saveArchivedThrough(userId: string, through: Date): Promise<void> {
+  const existing = await db.identity.get(userId)
+  if (!existing) return
+  await db.identity.put({ ...existing, archivedThrough: through })
+}
+
+/** Forget the archive key and progress marker — used when the archive is
+ * deleted, so nothing is left pointing at data that no longer exists. */
+export async function clearArchiveKey(userId: string): Promise<void> {
+  const existing = await db.identity.get(userId)
+  if (!existing) return
+  const { archiveKey: _k, archivedThrough: _t, ...rest } = existing
   await db.identity.put(rest)
 }
 

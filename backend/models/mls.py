@@ -190,6 +190,81 @@ class MLSHistoryRequest(Base):
     user: Mapped["User"] = relationship("User")
 
 
+class MLSRecoveryArchiveMeta(Base):
+    """Per-user parameters for the recovery-code encrypted history archive.
+
+    This is the "I lost every device" fallback, and it is deliberately not how
+    multi-device normally works: linking a device hands history over
+    device-to-device (see MLSHistoryRequest) with no lasting secret anywhere.
+    That covers every case except having nothing left to hand it over from,
+    which is what this exists for.
+
+    The tradeoff is explicit and unavoidable: recovering history after losing
+    all your devices requires a secret that outlives them, so the archive is
+    encrypted under a key derived from a recovery code shown once at sign-up
+    and never sent to the server. Forward secrecy is preserved for MLS traffic
+    itself; it is given up for the archive, and only for the archive.
+
+    Stored here: the KDF salt (not secret — it only stops precomputation
+    shared across users) and a short verifier blob so a client can tell a
+    mistyped code from a corrupt archive before attempting a full restore.
+    The server holds no part of the code and cannot derive the key.
+    """
+
+    __tablename__ = "mls_recovery_archive_meta"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    kdf_salt: Mapped[str] = mapped_column(Text, nullable=False)
+    # Fixed known plaintext encrypted under the derived key. Decrypting it is
+    # a cheap check that the entered code is right.
+    verifier_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    verifier_nonce: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    user: Mapped["User"] = relationship("User")
+
+
+class MLSRecoveryArchiveChunk(Base):
+    """A slice of a user's message history, encrypted under their recovery key.
+
+    Chunked so archiving is incremental rather than re-uploading everything
+    whenever a message arrives. `chunk_key` is derived by the client from the
+    range a chunk covers, so two devices archiving the same messages produce
+    the same key and upsert instead of accumulating duplicates.
+
+    The server sees ciphertext, a chunk key and a size. It cannot read any of
+    it: the key exists only where the recovery code has been entered.
+    """
+
+    __tablename__ = "mls_recovery_archive_chunks"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chunk_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "chunk_key", name="uq_mls_archive_chunk_user_key"),
+    )
+
+    user: Mapped["User"] = relationship("User")
+
+
 class MLSHistoryBundle(Base):
     """Encrypted message history handed from one of a user's devices to
     another, in transit.
