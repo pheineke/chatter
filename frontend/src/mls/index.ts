@@ -50,6 +50,8 @@ export {
   archiveHistory,
   restoreFromArchive,
   hasRecoveryArchive,
+  fetchRecoveryArchiveMeta,
+  resetArchiveProgress,
   deleteRecoveryArchive,
 } from './recoveryArchive'
 

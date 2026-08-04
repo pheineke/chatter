@@ -15,6 +15,7 @@ import { getTokens, createToken, revokeToken, type ApiToken, type ApiTokenCreate
 import { AVATAR_FRAMES } from '../utils/avatarFrames'
 import { getMyDecorations, redeemDecorationCode } from '../api/decorations'
 import { useE2EE } from '../contexts/E2EEContext'
+import { RecoveryCodeSettings } from '../components/RecoveryCodeSettings'
 import { QRScanner } from '../components/QRScanner'
 import { clearDMCache } from '../db/dmCache'
 import { SettingsLayout, type SettingsGroup } from '../components/SettingsLayout'
@@ -1112,6 +1113,12 @@ function PrivacyTab() {
           </div>
         )}
       </div>
+
+      {/* Recovery code for the message-history archive. Distinct from the
+          notes key below: messages are protected by MLS and need no
+          user-managed key, and history normally follows you across devices on
+          its own. This is only for losing every device at once. */}
+      <RecoveryCodeSettings />
 
       {/* Personal notes encryption section. DMs and server channels are now
           end-to-end encrypted separately via MLS (see MLSContext) — this key

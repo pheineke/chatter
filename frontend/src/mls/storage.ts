@@ -386,6 +386,16 @@ export async function saveArchivedThrough(userId: string, through: Date): Promis
   await db.identity.put({ ...existing, archivedThrough: through })
 }
 
+/** Forget only how far we've archived, keeping the key. Used after a code is
+ * regenerated: the server has dropped the chunks written under the old key,
+ * so this device must re-upload from the beginning. */
+export async function clearArchivedThrough(userId: string): Promise<void> {
+  const existing = await db.identity.get(userId)
+  if (!existing) return
+  const { archivedThrough: _t, ...rest } = existing
+  await db.identity.put(rest)
+}
+
 /** Forget the archive key and progress marker — used when the archive is
  * deleted, so nothing is left pointing at data that no longer exists. */
 export async function clearArchiveKey(userId: string): Promise<void> {

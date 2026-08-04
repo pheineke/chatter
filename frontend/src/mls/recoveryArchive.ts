@@ -269,6 +269,20 @@ export async function hasRecoveryArchive(): Promise<boolean> {
   return (await api.fetchRecoveryArchiveMeta()) !== null
 }
 
+/** Archive parameters and size, for Settings to report what's stored. */
+export async function fetchRecoveryArchiveMeta() {
+  return api.fetchRecoveryArchiveMeta()
+}
+
+/** Forget how far this device has archived, so the next pass re-uploads
+ * everything. Needed after regenerating a code: the server drops the old
+ * chunks (they're unreadable under the new key), so a progress marker
+ * pointing past them would leave the archive permanently short of history
+ * this device is holding. */
+export async function resetArchiveProgress(userId: string): Promise<void> {
+  await store.clearArchivedThrough(userId)
+}
+
 /** Delete the archive — opting out of the tradeoff entirely. Also drops the
  * local key, so nothing is left pointing at data that no longer exists. */
 export async function deleteRecoveryArchive(userId: string): Promise<void> {
