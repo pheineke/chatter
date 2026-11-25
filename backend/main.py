@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -30,6 +31,28 @@ app = FastAPI(
 
 # Static files (avatars, attachments, server images …)
 os.makedirs(settings.static_dir, exist_ok=True)
+
+
+@app.middleware("http")
+async def limit_request_body(request: Request, call_next):
+    """Reject oversized bodies by Content-Length before anything parses them.
+
+    Starlette spools a multipart body to memory/disk *before* the endpoint
+    runs, so the per-file caps in app/utils/file_validation.py alone would
+    still let a client push nginx's whole client_max_body_size through.
+    (Bodies without Content-Length are bounded by nginx and by the per-file
+    chunked reads.)
+    """
+    length = request.headers.get("content-length")
+    if length is not None:
+        try:
+            too_big = int(length) > settings.max_request_body
+        except ValueError:
+            return JSONResponse({"detail": "Invalid Content-Length"}, status_code=400)
+        if too_big:
+            mb = settings.max_upload_size // (1024 * 1024)
+            return JSONResponse({"detail": f"Request is too large (files up to {mb} MB)."}, status_code=413)
+    return await call_next(request)
 
 
 @app.middleware("http")

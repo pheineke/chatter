@@ -33,7 +33,15 @@ class Settings(BaseSettings):
 
     # File uploads
     static_dir: str = "static"
-    max_upload_size: int = 8 * 1024 * 1024  # 8 MB
+    max_upload_size: int = 8 * 1024 * 1024  # 8 MB — per attachment / image upload
+    # Requests whose Content-Length exceeds this are rejected before the body
+    # is read (multipart overhead on top of max_upload_size).
+    max_request_body: int = 9 * 1024 * 1024
+    max_attachments_per_message: int = 10
+    # Total attachment bytes a user may store; 0 disables the quota.
+    user_storage_quota_mb: int = 500
+    # Refuse uploads when the static volume has less free space than this.
+    min_free_disk_mb: int = 1024
 
     # Rate limiting (message spam protection)
     ratelimit_enabled: bool = True

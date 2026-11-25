@@ -4,13 +4,14 @@ import uuid
 from collections import defaultdict
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.rate_limiter import rate_limit_uploads
 from app.config import settings
 from app.dependencies import CurrentUser, DB
-from app.utils.file_validation import verify_image_magic_with_dims, SERVER_IMAGE_MAX
+from app.utils.file_validation import SERVER_IMAGE_MAX, read_limited, verify_image_magic_with_dims
 from app.schemas.server import (
     ServerCreate,
     ServerUpdate,
@@ -42,6 +43,8 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 CUSTOM_EMOJI_MAX = (256, 256)
 CUSTOM_EMOJI_NAME_RE = re.compile(r"^[a-z0-9_]{2,32}$")
 ALLOWED_FONT_EXTENSIONS = {"woff", "woff2", "ttf", "otf"}
+# Leading bytes of WOFF, WOFF2, TrueType (and Apple 'true'), OpenType/CFF.
+_FONT_SIGNATURES = (b"wOFF", b"wOF2", b"\x00\x01\x00\x00", b"true", b"OTTO")
 SERVER_FONT_NAME_RE = re.compile(r"^[A-Za-z0-9 _.-]{2,80}$")
 
 
@@ -169,11 +172,11 @@ async def _upload_server_font(server_id: uuid.UUID, file: UploadFile) -> str:
     if ext not in ALLOWED_FONT_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Unsupported font file type")
 
-    content = await file.read()
+    content = await read_limited(file, 5 * 1024 * 1024)
     if not content:
         raise HTTPException(status_code=400, detail="Empty font file")
-    if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="Font file too large (max 5MB)")
+    if not content.startswith(_FONT_SIGNATURES):
+        raise HTTPException(status_code=400, detail="File is not a valid WOFF/WOFF2/TTF/OTF font")
 
     filename = f"servers/{server_id}/fonts/{uuid.uuid4()}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
@@ -185,7 +188,7 @@ async def _upload_server_font(server_id: uuid.UUID, file: UploadFile) -> str:
 
 async def _upload_custom_emoji_image(server_id: uuid.UUID, emoji_id: uuid.UUID, file: UploadFile) -> str:
     content, ext = await verify_image_magic_with_dims(
-        file, CUSTOM_EMOJI_MAX, label="Custom emoji"
+        file, CUSTOM_EMOJI_MAX, label="Custom emoji", max_bytes=1024 * 1024
     )
     filename = f"servers/{server_id}/emojis/{emoji_id}.{ext}"
     dest = os.path.join(settings.static_dir, filename)
@@ -197,7 +200,11 @@ async def _upload_custom_emoji_image(server_id: uuid.UUID, emoji_id: uuid.UUID, 
 
 @router.post("/{server_id}/image", response_model=ServerRead)
 async def upload_server_image(
-    server_id: uuid.UUID, current_user: CurrentUser, db: DB, file: UploadFile = File(...)
+    server_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+    file: UploadFile = File(...),
+    _rl: None = Depends(rate_limit_uploads),
 ):
     server = await _get_server_or_404(server_id, db)
     await _require_admin(server, current_user.id, db)
@@ -213,7 +220,11 @@ async def upload_server_image(
 
 @router.post("/{server_id}/banner", response_model=ServerRead)
 async def upload_server_banner(
-    server_id: uuid.UUID, current_user: CurrentUser, db: DB, file: UploadFile = File(...)
+    server_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+    file: UploadFile = File(...),
+    _rl: None = Depends(rate_limit_uploads),
 ):
     server = await _get_server_or_404(server_id, db)
     await _require_admin(server, current_user.id, db)
@@ -234,6 +245,7 @@ async def upload_server_font(
     db: DB,
     name: str = Form(...),
     file: UploadFile = File(...),
+    _rl: None = Depends(rate_limit_uploads),
 ):
     server = await _get_server_or_404(server_id, db)
     await _require_admin(server, current_user.id, db)
@@ -778,6 +790,7 @@ async def create_custom_emoji(
     db: DB,
     name: str = Form(...),
     file: UploadFile = File(...),
+    _rl: None = Depends(rate_limit_uploads),
 ):
     server = await _get_server_or_404(server_id, db)
     await _require_admin(server, current_user.id, db)

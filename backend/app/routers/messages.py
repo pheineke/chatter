@@ -3,6 +3,7 @@ import fnmatch
 import io
 import os
 import re
+import shutil
 import uuid
 from datetime import datetime, timezone
 from typing import List
@@ -18,9 +19,9 @@ from app.authz import channel_viewer_ids, require_channel_perms
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.dependencies import DB, CurrentUser
-from app.rate_limiter import check_and_set_slowmode, rate_limit_messages, rate_limit_reactions
+from app.rate_limiter import check_and_set_slowmode, rate_limit_messages, rate_limit_reactions, rate_limit_uploads
 from app.schemas.message import MessageCreate, MessageRead, MessageUpdate, PinnedMessageRead
-from app.utils.file_validation import verify_attachment_magic
+from app.utils.file_validation import check_pixel_count, storage_extension, verify_attachment_magic
 from app import ws_enforcement
 from app.ws_manager import manager
 from models.channel import Channel, ChannelPerm, ChannelType
@@ -503,6 +504,40 @@ async def delete_message(
 
 # ---- Attachments ------------------------------------------------------------
 
+def file_size_would_exceed_quota(used_bytes: int, new_bytes: int) -> bool:
+    return used_bytes + new_bytes > settings.user_storage_quota_mb * 1024 * 1024
+
+
+async def _user_storage_bytes(user_id: uuid.UUID, db) -> int:
+    """Total size of attachments the user has uploaded (files of deleted
+    messages are still on disk, so they count too)."""
+    total = await db.execute(
+        select(func.coalesce(func.sum(Attachment.file_size), 0))
+        .join(Message, Message.id == Attachment.message_id)
+        .where(Message.author_id == user_id)
+    )
+    return int(total.scalar_one())
+
+
+async def _check_upload_capacity(message_id: uuid.UUID, user_id: uuid.UUID, db) -> None:
+    """Cheap checks before reading the body: attachments-per-message cap and
+    a free-disk floor so uploads can't fill the volume."""
+    count = await db.execute(
+        select(func.count(Attachment.id)).where(Attachment.message_id == message_id)
+    )
+    if count.scalar_one() >= settings.max_attachments_per_message:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A message can have at most {settings.max_attachments_per_message} attachments.",
+        )
+    try:
+        free = shutil.disk_usage(settings.static_dir).free
+    except OSError:
+        free = None
+    if free is not None and free < settings.min_free_disk_mb * 1024 * 1024:
+        raise HTTPException(status_code=507, detail="The server is low on storage; uploads are paused.")
+
+
 @router.post("/messages/{message_id}/attachments", response_model=MessageRead)
 async def upload_attachment(
     channel_id: uuid.UUID,
@@ -510,6 +545,7 @@ async def upload_attachment(
     current_user: CurrentUser,
     db: DB,
     file: UploadFile = File(...),
+    _rl: None = Depends(rate_limit_uploads),
 ):
     msg = await _get_message_or_404(message_id, db)
     if msg.channel_id != channel_id or msg.author_id != current_user.id:
@@ -520,13 +556,26 @@ async def upload_attachment(
         channel, current_user.id, db, ChannelPerm.SEND_MESSAGES, ChannelPerm.ATTACH_FILES
     )
 
-    # Capture original filename before reading (sanitise path separators)
+    await _check_upload_capacity(message_id, current_user.id, db)
+
+    # Original filename is kept for display only (path separators stripped,
+    # trimmed to the column size). It never decides the stored extension.
     original_name: str | None = None
     if file.filename:
         original_name = file.filename.replace('\\', '/').split('/')[-1] or None
+        if original_name and len(original_name) > 255:
+            stem, dot, suffix = original_name.rpartition('.')
+            original_name = (stem[: 254 - len(suffix)] + dot + suffix) if dot and len(suffix) < 16 else original_name[:255]
 
-    # Validate magic bytes (ignores spoofed Content-Type headers)
+    # Validate magic bytes (ignores spoofed Content-Type headers); size-capped read
     content = await verify_attachment_magic(file)
+    if settings.user_storage_quota_mb and file_size_would_exceed_quota(
+        await _user_storage_bytes(current_user.id, db), len(content)
+    ):
+        raise HTTPException(
+            status_code=413,
+            detail=f"Storage quota reached ({settings.user_storage_quota_mb} MB). Delete some attachments first.",
+        )
 
     kind = filetype.guess(content)
     if kind is not None:
@@ -546,11 +595,14 @@ async def upload_attachment(
         try:
             from PIL import Image as _Image
             with _Image.open(io.BytesIO(content)) as _img:
+                check_pixel_count(_img, "Image")
                 img_width, img_height = _img.size
+        except HTTPException:
+            raise
         except Exception:
             pass
 
-    ext = (original_name.rsplit(".", 1)[-1] if original_name and "." in original_name else None) or (kind.extension if kind else "bin")
+    ext = storage_extension(content, file.content_type)
     storage_path = f"attachments/{message_id}/{uuid.uuid4()}.{ext}"
     dest = os.path.join(settings.static_dir, storage_path)
     os.makedirs(os.path.dirname(dest), exist_ok=True)

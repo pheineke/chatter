@@ -229,6 +229,16 @@ async def rate_limit_dm_channel(current_user: CurrentUser) -> None:
     )
 
 
+async def rate_limit_uploads(current_user: CurrentUser) -> None:
+    """File uploads (attachments, server images/fonts/emojis): 20 per minute per user."""
+    await _enforce_limit(
+        key=f"upload:{current_user.id}",
+        limit=20,
+        window_seconds=60.0,
+        detail="You're uploading files too quickly. Please wait {retry_after} seconds.",
+    )
+
+
 async def rate_limit_link_preview(current_user: CurrentUser) -> None:
     """Server-side URL fetches for link embeds: 30 per minute per user."""
     await _enforce_limit(

@@ -14,7 +14,10 @@ Legend: 🔴 do first · 🟠 high value · 🟡 worthwhile · 🟢 polish · (S
 - [x] 🔴 S4: remove/gate `POST /servers/{id}/join`
 - [x] S5, S6, S9, S10, S13, S14: proxy IPs for rate limiting, token TTL, edit path, reply leak, voice presence, usernames
 - [x] S11: open WebSockets follow revocation, kicks/bans and permission changes
-- [ ] 🟠 S7, S8, S12: refresh race, upload caps, TLS
+- [x] S8: upload size caps, rate limit, per-message cap, quota, disk floor, decompression bombs
+- [ ] 🟠 S7, S12: refresh race, TLS
+- [ ] Client-side size check for avatar/banner/server image/emoji/font uploads too (only the message composer has it).
+- [ ] Delete attachment files when their message is deleted (they count against the quota and stay reachable by URL).
 
 ---
 

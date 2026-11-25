@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useLayoutEffect, type Keyboar
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 import { sendMessage, uploadAttachment } from '../api/messages'
+import { uploadSizeError } from '../utils/uploads'
 import { getMembers, getCustomEmojis } from '../api/servers'
 import { getCommands, createInteraction } from '../api/interactions'
 import { Icon } from './Icon'
@@ -501,11 +502,17 @@ export function MessageInput({ channelId, serverId, partnerId, placeholder = 'Se
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) {
-      const content = text.trim() || null
-      uploadMut.mutate({ file, content })
-    }
     e.target.value = ''
+    if (!file) return
+    // Check before sending: the text message is posted first, so a file the
+    // server would reject would otherwise leave an orphan message behind.
+    const tooBig = uploadSizeError(file)
+    if (tooBig) {
+      setUploadError(tooBig)
+      return
+    }
+    const content = text.trim() || null
+    uploadMut.mutate({ file, content })
   }
 
   function insertEmoji(emoji: string) {
