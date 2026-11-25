@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Access tokens are short-lived; rotating refresh tokens extend sessions securely
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+    # A rotated refresh token replayed within this many seconds is rejected
+    # without wiping the user's other sessions (two tabs refreshing at once,
+    # a response lost in transit). Later replays are treated as theft.
+    refresh_reuse_grace_seconds: int = 30
 
     # Comma-separated list of user IDs that can generate decoration codes.
     # Default "*" allows any authenticated user (dev mode).

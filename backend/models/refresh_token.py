@@ -23,6 +23,12 @@ class RefreshToken(Base):
         DateTime(timezone=True), nullable=False
     )
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Set when the token was exchanged via /auth/refresh (as opposed to being
+    # revoked by logout / session revocation). Only a replay of a *rotated*
+    # token is treated as theft, and only after a short grace window.
+    rotated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

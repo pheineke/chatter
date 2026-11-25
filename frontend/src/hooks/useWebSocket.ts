@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
+import { forceLogout, refreshAccessToken } from '../api/refresh'
 
 const WS_BASE = import.meta.env.VITE_WS_URL ?? ''  // empty = use vite proxy
-const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
 export type WSMessage = { type: string; data?: unknown } & Record<string, unknown>
 
@@ -11,26 +11,6 @@ interface Options {
   /** Server closed with 4003/4004: we're not allowed here (any more). No reconnect. */
   onRejected?: (code: number) => void
   enabled?: boolean
-}
-
-/** Attempt a silent token refresh. Returns true if successful. */
-async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem('refreshToken')
-  if (!refreshToken) return false
-  try {
-    const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    })
-    if (!res.ok) return false
-    const data = await res.json()
-    localStorage.setItem('token', data.access_token)
-    localStorage.setItem('refreshToken', data.refresh_token)
-    return true
-  } catch {
-    return false
-  }
 }
 
 /**
@@ -113,16 +93,13 @@ export function useWebSocket(path: string, { onMessage, onOpen, onRejected, enab
 
       if (event.code === 4001) {
         // Token rejected — try to refresh before reconnecting
-        tryRefreshToken().then((ok) => {
-          if (!ok) {
-            // Refresh failed: clear auth and redirect to login
-            localStorage.removeItem('token')
-            localStorage.removeItem('refreshToken')
-            if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-              window.location.href = '/login'
-            }
+        refreshAccessToken().then((result) => {
+          if (generation.current !== gen) return
+          if (!result.ok && result.reason === 'invalid') {
+            forceLogout()
             return
           }
+          // On a network error, back off and retry; the next 4001 refreshes again.
           setTimeout(() => connect(gen), delay)
         })
       } else {

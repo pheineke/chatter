@@ -15,7 +15,8 @@ Legend: 🔴 do first · 🟠 high value · 🟡 worthwhile · 🟢 polish · (S
 - [x] S5, S6, S9, S10, S13, S14: proxy IPs for rate limiting, token TTL, edit path, reply leak, voice presence, usernames
 - [x] S11: open WebSockets follow revocation, kicks/bans and permission changes
 - [x] S8: upload size caps, rate limit, per-message cap, quota, disk floor, decompression bombs
-- [ ] 🟠 S7, S12: refresh race, TLS
+- [x] 🟠 S7: refresh race (see security_pass.md)
+- [ ] 🟠 S12: TLS
 - [ ] Client-side size check for avatar/banner/server image/emoji/font uploads too (only the message composer has it).
 - [ ] Delete attachment files when their message is deleted (they count against the quota and stay reachable by URL).
 
@@ -79,8 +80,8 @@ Routers mix HTTP, authorization, DB queries and WS fan-out. For example, `messag
 | `components/MessageInput.tsx` | 715 | `useComposer` (draft/reply/edit state), `AttachmentTray`, `SlashCommandMenu`, `MentionAutocomplete`. |
 
 ### 2.2 One auth/token module 🟠
-Token refresh is implemented twice (`api/client.ts` and `hooks/useWebSocket.ts`). That's the root cause of S7.
-- [ ] Create `auth/tokenStore.ts` with `getAccessToken()`, `refreshOnce()` (single-flight + `navigator.locks` across tabs) and `onLogout`. axios, WS and fetch all use it.
+Token refresh was implemented twice (`api/client.ts` and `hooks/useWebSocket.ts`), the root cause of S7.
+- [x] ~~Create `auth/tokenStore.ts`~~ Done as `api/refresh.ts` (`refreshAccessToken`, `forceLogout`). Still open: a `storage` listener so a logout in one tab logs out the others.
 - [ ] Replace `window.location.href = '/login'` with a router navigation plus a "session expired" toast, so in-progress drafts aren't lost.
 
 ### 2.3 One WebSocket connection instead of N 🟡

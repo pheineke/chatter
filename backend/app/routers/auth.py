@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 
 from app.auth import (
     create_access_token,
@@ -98,38 +98,63 @@ class RefreshRequest(BaseModel):
 async def refresh_token(request: Request, body: RefreshRequest, db: DB):
     """Exchange a valid refresh token for a new access + refresh token pair.
 
-    The submitted token is immediately revoked (rotation) regardless of
-    outcome so replay attacks are detected and all sessions can be invalidated.
+    Rotation: each refresh token works once. Rotation is a single conditional
+    UPDATE, so of two concurrent requests with the same token exactly one wins
+    (security_pass S7); the loser gets a 401 like any other reuse.
+
+    Replaying a token that was rotated more than ``refresh_reuse_grace_seconds``
+    ago signals theft and revokes every session of the user. Inside the grace
+    window (tabs racing, lost response) and for tokens revoked by logout or
+    session revocation, the request is just rejected.
     """
     rt_hash = hash_refresh_token(body.refresh_token)
     result = await db.execute(
-        select(RefreshToken).where(RefreshToken.token_hash == rt_hash)
+        select(RefreshToken).where(RefreshToken.token_hash == rt_hash).with_for_update()
     )
     token_row = result.scalar_one_or_none()
-
-    if token_row is None or token_row.revoked:
-        # Possible token reuse – revoke all tokens for this user if we found the row
-        if token_row is not None:
-            await db.execute(
-                delete(RefreshToken).where(RefreshToken.user_id == token_row.user_id)
-            )
-            await db.commit()
-            await ws_enforcement.close_user_sessions(token_row.user_id)
+    if token_row is None:
         raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
 
-    expires_at = token_row.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at < datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    if token_row.revoked:
+        await _handle_reuse(token_row, now, db)
+        raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
+
+    expires_at = _aware(token_row.expires_at)
+    if expires_at < now:
         token_row.revoked = True
         await db.commit()
         raise HTTPException(status_code=401, detail="Refresh token has expired")
 
-    # Revoke the used token (rotation: one-time use)
-    token_row.revoked = True
+    rotated = await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.id == token_row.id, RefreshToken.revoked.is_(False))
+        .values(revoked=True, rotated_at=now)
+        .execution_options(synchronize_session=False)
+    )
     await db.commit()
+    if rotated.rowcount != 1:
+        # A concurrent request rotated it between our read and our update.
+        raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
 
     return await _issue_token_pair(token_row.user_id, db, user_agent=_ua(request))
+
+
+def _aware(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+async def _handle_reuse(token_row: RefreshToken, now: datetime, db) -> None:
+    """A revoked refresh token was presented again."""
+    if token_row.rotated_at is None:
+        return  # ended by logout / session revocation: nothing more to do
+    age = (now - _aware(token_row.rotated_at)).total_seconds()
+    if age <= settings.refresh_reuse_grace_seconds:
+        return  # benign race; the client picks up the winner's tokens
+    user_id = token_row.user_id
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
+    await db.commit()
+    await ws_enforcement.close_user_sessions(user_id)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

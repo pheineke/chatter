@@ -216,11 +216,12 @@ async def test_garbage_refresh_token_rejected(client: AsyncClient):
 # 4. Refresh-token replay → full session wipe
 # ===========================================================================
 
-async def test_replay_of_revoked_token_wipes_all_sessions(client: AsyncClient):
+async def test_replay_of_revoked_token_wipes_all_sessions(client: AsyncClient, monkeypatch):
     """
-    Using a token that has already been rotated/revoked indicates a potential
-    replay attack. The server must revoke ALL active sessions for that user.
+    Replaying a token that was rotated (outside the grace window) indicates a
+    potential replay attack. The server must revoke ALL sessions for that user.
     """
+    monkeypatch.setattr(settings, "refresh_reuse_grace_seconds", 0)
     await client.post("/auth/register", json={"username": "replay_user", "password": "password1"})
 
     # Login twice to establish two separate sessions
