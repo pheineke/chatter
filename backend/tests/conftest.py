@@ -8,7 +8,7 @@ FastAPI app with the real database dependency replaced by the per-test session.
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 # Ensure backend/ is on sys.path whether pytest is run from backend/ or the
 # repo root.
@@ -35,27 +35,88 @@ import main  # noqa: E402,F401  (imported for its import side effects)
 # Database fixture
 # ---------------------------------------------------------------------------
 
-DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Default: a fresh in-memory SQLite DB per test. Set TEST_DATABASE_URL to run
+# the whole suite against Postgres instead (CI does), e.g.
+#   TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:55432/chat_test
+# The tables are created and dropped around every test either way.
+DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
+
+
+def make_test_engine(threaded: bool = False):
+    """Engine for the test DB.
+
+    SQLite :memory: needs StaticPool so every session shares the one
+    connection (and therefore the one database). That breaks when several
+    event loops touch it at once, which is what starlette's TestClient does
+    for WebSockets (each runs on its own portal thread/loop). So
+    ``threaded=True`` uses a throwaway SQLite *file* with a connection per
+    session instead.
+    """
+    if IS_SQLITE and threaded:
+        import atexit
+        import shutil
+        import tempfile
+
+        tmp = tempfile.mkdtemp(prefix="chat-test-")
+        atexit.register(shutil.rmtree, tmp, ignore_errors=True)
+        return create_async_engine(
+            f"sqlite+aiosqlite:///{tmp}/test.db",
+            connect_args={"check_same_thread": False, "timeout": 30},
+            poolclass=NullPool,
+        )
+    if IS_SQLITE:
+        return create_async_engine(
+            DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+    # NullPool: TestClient-based fixtures hop between event loops, and pooled
+    # asyncpg connections are bound to the loop that created them.
+    return create_async_engine(DATABASE_URL, poolclass=NullPool)
+
+
+def install_session_factory(factory) -> "callable":
+    """Point every direct user of app.database.AsyncSessionLocal at *factory*.
+
+    Overriding get_db only covers request-scoped sessions. WebSocket auth,
+    the WS routers and background notifiers open their own sessions via
+    AsyncSessionLocal, which (before this) silently went to the real
+    DATABASE_URL — that's why WS tests needed a live Postgres on :5432.
+    Returns a callable that restores the originals.
+    """
+    import app.database as database
+
+    original = database.AsyncSessionLocal
+    patched = []
+    for mod in list(sys.modules.values()):
+        if mod is not None and getattr(mod, "AsyncSessionLocal", None) is original:
+            setattr(mod, "AsyncSessionLocal", factory)
+            patched.append(mod)
+
+    def restore():
+        for mod in patched:
+            setattr(mod, "AsyncSessionLocal", original)
+
+    return restore
 
 
 @pytest_asyncio.fixture()
 async def db() -> AsyncSession:
-    """A fresh in-memory SQLite session for one test function."""
-    engine = create_async_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    """A fresh database session for one test function."""
+    engine = make_test_engine()
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+    restore = install_session_factory(session_factory)
+    try:
+        async with session_factory() as session:
+            yield session
+    finally:
+        restore()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await engine.dispose()
 
 
 # ---------------------------------------------------------------------------

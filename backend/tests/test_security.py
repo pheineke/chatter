@@ -285,18 +285,31 @@ async def test_list_sessions_returns_own_sessions(client: AsyncClient, alice_hea
 async def test_revoke_specific_own_session(client: AsyncClient):
     await client.post("/auth/register", json={"username": "sess_user", "password": "password1"})
     r = await client.post("/auth/login", data={"username": "sess_user", "password": "password1"})
-    tokens = r.json()
-    hdrs = {"Authorization": f"Bearer {tokens['access_token']}"}
+    hdrs = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    # A second device
+    r2 = await client.post("/auth/login", data={"username": "sess_user", "password": "password1"})
+    other_hdrs = {"Authorization": f"Bearer {r2.json()['access_token']}"}
 
     sessions = (await client.get("/auth/sessions", headers=hdrs)).json()
-    sid = sessions[0]["id"]
+    other_sid = next(s["id"] for s in sessions if not s["is_current"])
 
-    r_del = await client.delete(f"/auth/sessions/{sid}", headers=hdrs)
+    r_del = await client.delete(f"/auth/sessions/{other_sid}", headers=hdrs)
     assert r_del.status_code == 204
 
-    # Token should now be gone from session list
+    # Gone from the list, and that device's access token stops working at once
     sessions_after = (await client.get("/auth/sessions", headers=hdrs)).json()
-    assert all(s["id"] != sid for s in sessions_after)
+    assert all(s["id"] != other_sid for s in sessions_after)
+    assert (await client.get("/users/me", headers=other_hdrs)).status_code == 401
+
+
+async def test_revoking_current_session_invalidates_its_token(client: AsyncClient):
+    await client.post("/auth/register", json={"username": "sess_self", "password": "password1"})
+    r = await client.post("/auth/login", data={"username": "sess_self", "password": "password1"})
+    hdrs = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    sid = next(s["id"] for s in (await client.get("/auth/sessions", headers=hdrs)).json() if s["is_current"])
+
+    assert (await client.delete(f"/auth/sessions/{sid}", headers=hdrs)).status_code == 204
+    assert (await client.get("/auth/sessions", headers=hdrs)).status_code == 401
 
 
 async def test_cannot_revoke_another_users_session(client: AsyncClient, alice_headers, bob_headers):

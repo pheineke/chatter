@@ -42,10 +42,14 @@ Routers mix HTTP, authorization, DB queries and WS fan-out. For example, `messag
 - [ ] Squash migrations. There are about 40, with mixed naming (`add_x.py` vs hash-prefixed) and a hand-written merge. A clean baseline before going public makes fresh installs reliable.
 
 ### 1.5 Testing & CI 🟠
-- [ ] Tests run on **SQLite** (`conftest.py:38`) while prod is Postgres (UUID server defaults, enums, `gen_random_uuid()`, `ILIKE`). Run CI against a Postgres service container.
-- [ ] CI frontend job runs only `npm test`. Add `npx tsc --noEmit`, `eslint`, and `npm run build`.
-- [ ] Add `pip-audit` / `npm audit` (S29) and a `ruff format --check`.
-- [ ] Add one regression test per security-pass item.
+- [x] WebSocket tests used to need a live Postgres on :5432: WS auth/routers open sessions via `AsyncSessionLocal`, bypassing the `get_db` override. `conftest.install_session_factory` now routes every session to the test DB, and the TestClient fixtures use a file-backed SQLite (one connection per session) so WebSocket threads don't share a single in-memory connection.
+- [x] `TEST_DATABASE_URL` runs the whole suite on Postgres; CI does this with a `postgres:15-alpine` service, applies all migrations from scratch and round-trips the latest two.
+- [x] CI frontend job now runs `npm run build` (includes `tsc`).
+- [x] `pytest-timeout` (120 s default) so a WebSocket left open fails instead of hanging the run.
+- [ ] **Lint debt**: `ruff check .` reports ~225 findings (import order, PEP 604 hints, 52 F821 from SQLAlchemy string forward refs → add `TYPE_CHECKING` imports). CI blocks only on E9/F63/F7 until this is cleaned up, then make full `ruff check` blocking again.
+- [ ] Old migration `f7a8b9c0d1e2` can't be downgraded on Postgres (writes integers into boolean columns). Fix or document migrations as forward-only, then squash (see 1.4).
+- [ ] Add `pip-audit` / `npm audit` (S29) and `ruff format --check`.
+- [ ] Postgres runs are ~4× slower (tables created/dropped per test); switch to one schema per session + per-test transaction rollback if CI time becomes a problem.
 
 ### 1.6 Small backend cleanups 🟢
 - [ ] Delete `app/utils/rate_limiter.py` (a stub that only raises) and `scripts/debug_query.py` if it's unused.

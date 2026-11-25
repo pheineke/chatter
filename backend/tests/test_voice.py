@@ -192,13 +192,15 @@ def voice_app():
     from app.database import get_db
     from models.base import Base
 
-    engine = create_async_engine(
-        DB_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+    from tests.conftest import install_session_factory, make_test_engine
+
+    engine = make_test_engine(threaded=True)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    restore_sessions = install_session_factory(session_factory)
 
     async def _setup():
         async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
     asyncio.run(_setup())
@@ -213,6 +215,7 @@ def voice_app():
         yield client
 
     app.dependency_overrides.clear()
+    restore_sessions()
 
     async def _teardown():
         async with engine.begin() as conn:

@@ -12,6 +12,7 @@ from datetime import datetime
 
 import pytest
 from starlette.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -122,18 +123,17 @@ def ws_app():
     from app.database import get_db
     from models.base import Base
 
-    engine = create_async_engine(
-        DB_URL_SYNC,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    from tests.conftest import install_session_factory, make_test_engine
+
+    engine = make_test_engine(threaded=True)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    restore_sessions = install_session_factory(session_factory)
 
     async def _setup():
         async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
-    asyncio.run(_setup())
     asyncio.run(_setup())
 
     async def _override_get_db():
@@ -146,6 +146,7 @@ def ws_app():
         yield client
 
     app.dependency_overrides.clear()
+    restore_sessions()
 
     async def _teardown():
         async with engine.begin() as conn:
@@ -305,11 +306,70 @@ def test_ws_me_receives_dm_read_updated_event(ws_app):
         t = threading.Thread(target=_mark_read)
         t.start()
 
-        event = ws.receive_json()
-        event_holder.append(event)
+        # The personal socket also carries presence (user.status_changed on
+        # connect), so skip unrelated frames until the one under test arrives.
+        for _ in range(10):
+            event = ws.receive_json()
+            if event["type"] == "dm.read_updated":
+                event_holder.append(event)
+                break
         t.join()
 
     assert len(event_holder) == 1
     assert event_holder[0]["type"] == "dm.read_updated"
     assert event_holder[0]["data"]["channel_id"] == channel_id
     assert datetime.fromisoformat(event_holder[0]["data"]["last_read_at"].replace("Z", "+00:00")) == datetime.fromisoformat(read_at)
+
+
+
+# ---------------------------------------------------------------------------
+# Channel permission enforcement on WebSockets (S3 / @everyone)
+# ---------------------------------------------------------------------------
+
+def _private_channel_setup(ws_app, prefix: str, kind: str = "text"):
+    """Owner makes a channel private (@everyone denied View Channel), then
+    invites a member who holds no role that re-allows it."""
+    owner = _get_token(ws_app, f"{prefix}_owner")
+    member = _get_token(ws_app, f"{prefix}_member")
+    oh = {"Authorization": f"Bearer {owner}"}
+    mh = {"Authorization": f"Bearer {member}"}
+    server_id = ws_app.post("/servers/", json={"title": f"{prefix}"}, headers=oh).json()["id"]
+    channel_id = ws_app.post(
+        f"/servers/{server_id}/channels", json={"title": "hidden", "type": kind}, headers=oh
+    ).json()["id"]
+    code = ws_app.post(f"/servers/{server_id}/invites", json={}, headers=oh).json()["code"]
+    assert ws_app.post(f"/invites/{code}/join", headers=mh).status_code == 200
+    everyone = next(r for r in ws_app.get(f"/servers/{server_id}/roles", headers=oh).json() if r["is_default"])
+    r = ws_app.put(
+        f"/servers/{server_id}/channels/{channel_id}/permissions/{everyone['id']}",
+        json={"allow_bits": 0, "deny_bits": 1},  # VIEW_CHANNEL
+        headers=oh,
+    )
+    assert r.status_code == 200, r.text
+    return owner, member, channel_id
+
+
+def _assert_rejected(ws_app, path: str, token: str, code: int = 4003):
+    """Auth succeeds, then the server must close with *code*. If the check is
+    missing the socket stays open and this blocks; the pytest-timeout marker
+    on the calling tests turns that into a failure instead of a hung suite."""
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with ws_app.websocket_connect(path) as ws:
+            assert _ws_authenticate(ws, token)["type"] == "auth.ok"
+            ws.receive_json()
+    assert exc.value.code == code
+
+
+@pytest.mark.timeout(15)
+def test_ws_private_channel_rejects_member_without_view(ws_app):
+    owner, member, channel_id = _private_channel_setup(ws_app, "wspriv")
+    _assert_rejected(ws_app, f"/ws/channels/{channel_id}", member)
+    # The owner still gets in.
+    with ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws:
+        assert _ws_authenticate(ws, owner)["type"] == "auth.ok"
+
+
+@pytest.mark.timeout(15)
+def test_ws_private_voice_channel_rejects_member_without_view(ws_app):
+    _, member, channel_id = _private_channel_setup(ws_app, "wsvpriv", kind="voice")
+    _assert_rejected(ws_app, f"/ws/voice/{channel_id}", member)

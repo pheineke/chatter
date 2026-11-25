@@ -80,7 +80,7 @@ async def test_mark_dm_read_persists_to_conversations(client: AsyncClient, alice
     channel_id = dm.json()["channel_id"]
 
     sent = await client.post(
-        f"/messages?channel_id={channel_id}",
+        f"/channels/{channel_id}/messages",
         json={"content": "hello bob"},
         headers=alice_headers,
     )
