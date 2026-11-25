@@ -487,7 +487,7 @@ export const MessageBubble = memo(function MessageBubble({ message: msg, channel
         {/* Attachments */}
         {msg.attachments?.map((att) => {
           const displayName = att.filename ?? att.file_path.split('/').pop() ?? att.file_path
-          const url = `/api/static/${att.file_path}`
+          const url = `/api${att.url}`
           return (
             <div key={att.id} className="mt-1">
               {att.file_type === 'image' ? (

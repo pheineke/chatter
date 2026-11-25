@@ -1,4 +1,5 @@
 import os
+import posixpath
 import sys
 
 # Ensure the backend directory is on the Python path so that `app` and `models`
@@ -10,6 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.utils.signed_urls import verify_static_signature
 from app.routers import auth, users, servers, channels, messages, dms, friends, invites
 from app.routers import blocks as blocks_router
 from app.routers import ws as ws_router
@@ -75,11 +77,29 @@ async def force_attachment_download(request: Request, call_next):
     magic-byte-verified images and are rendered via <img>, which is
     unaffected by Content-Disposition.
     """
-    response = await call_next(request)
-    if request.url.path.startswith("/static/attachments/"):
-        filename = request.url.path.rsplit("/", 1)[-1]
+    path = request.url.path
+    rel = _static_relpath(path)
+    if rel is not None and (rel == "attachments" or rel.startswith("attachments/")):
+        # S22: attachments need the signed URL the API hands out.
+        q = request.query_params
+        if not verify_static_signature(rel, q.get("exp"), q.get("sig")):
+            return JSONResponse({"detail": "This link has expired or is invalid"}, status_code=403)
+        response = await call_next(request)
+        filename = rel.rsplit("/", 1)[-1]
         response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return response
+        response.headers["Cache-Control"] = "private, max-age=86400"
+        return response
+    return await call_next(request)
+
+
+def _static_relpath(path: str) -> str | None:
+    """The file path StaticFiles will resolve for *path*, or None if *path*
+    isn't under /static. Normalised the same way, so /static//attachments/x
+    or /static/./attachments/x can't skip the signature check."""
+    if path != "/static" and not path.startswith("/static/"):
+        return None
+    rel = posixpath.normpath(path[len("/static"):].lstrip("/") or ".")
+    return "" if rel == "." else rel
 
 
 # Headers on every backend response, so a deploy that exposes :8000 directly

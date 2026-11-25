@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, computed_field, field_validator
 
 from app.schemas.user import UserRead, UserPublicRead
+from app.utils.signed_urls import signed_static_url
 
 
 class AttachmentRead(BaseModel):
@@ -16,6 +17,12 @@ class AttachmentRead(BaseModel):
     file_size: int | None = None
     width: int | None = None
     height: int | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def url(self) -> str:
+        """Signed download URL, relative to the API root (S22)."""
+        return signed_static_url(self.file_path)
 
 
 class ReactionRead(BaseModel):

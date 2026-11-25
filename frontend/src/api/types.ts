@@ -198,6 +198,8 @@ export interface InteractionResponse {
 export interface Attachment {
   id: string
   file_path: string
+  /** Signed, expiring download URL relative to the API root (backend S22). */
+  url: string
   file_type: string
   filename: string | null
   file_size: number | null

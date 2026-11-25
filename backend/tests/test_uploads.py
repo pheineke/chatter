@@ -134,3 +134,56 @@ async def test_font_must_be_a_font(client, alice_headers, chan):
     )
     assert r.status_code == 400
     assert "not a valid" in r.json()["detail"]
+
+
+# ---- S22: attachments only via signed URLs ----------------------------------
+
+async def _uploaded(client, headers, chan):
+    r = await _upload(client, headers, chan[1], "note.txt", b"secret contents")
+    assert r.status_code == 200, r.text
+    return r.json()["attachments"][0]
+
+
+async def test_attachment_served_via_signed_url(client, alice_headers, chan):
+    att = await _uploaded(client, alice_headers, chan)
+    assert att["url"].startswith(f"/static/{att['file_path']}?exp=")
+    r = await client.get(att["url"])  # no auth header needed: the signature is the capability
+    assert r.status_code == 200
+    assert r.content == b"secret contents"
+    assert r.headers["content-disposition"].startswith("attachment")
+
+
+@pytest.mark.parametrize("mangle", [
+    lambda a: f"/static/{a['file_path']}",                                   # bare path
+    lambda a: a["url"].replace("sig=", "sig=0"),                             # tampered
+    lambda a: a["url"].split("&sig=")[0] + "&sig=" + "0" * 32,               # forged
+    lambda a: f"/static//{a['file_path']}",                                  # path tricks
+    lambda a: f"/static/./{a['file_path']}",
+    lambda a: f"/static/avatars/../{a['file_path']}",
+])
+async def test_attachment_without_valid_signature_refused(client, alice_headers, chan, mangle):
+    att = await _uploaded(client, alice_headers, chan)
+    r = await client.get(mangle(att))
+    assert r.status_code == 403, (mangle(att), r.status_code)
+
+
+def test_signed_url_expires():
+    from app.utils.signed_urls import ATTACHMENT_URL_TTL, signed_static_url, verify_static_signature
+
+    t0 = 1_800_000_000
+    url = signed_static_url("attachments/x/y.txt", now=t0)
+    exp = url.split("exp=")[1].split("&")[0]
+    sig = url.split("sig=")[1]
+    assert int(exp) >= t0 + ATTACHMENT_URL_TTL
+    assert verify_static_signature("attachments/x/y.txt", exp, sig, now=t0 + 3600)
+    assert not verify_static_signature("attachments/x/y.txt", exp, sig, now=int(exp) + 1)
+    assert not verify_static_signature("attachments/x/other.txt", exp, sig, now=t0)
+    # Same URL for the whole day, so caches keep working.
+    assert signed_static_url("attachments/x/y.txt", now=t0 + 60) == url
+
+
+async def test_avatars_stay_public(client, alice_headers):
+    r = await client.post("/users/me/avatar", files={"file": ("a.png", _png(16, 16), "image/png")}, headers=alice_headers)
+    assert r.status_code == 200, r.text
+    path = r.json()["avatar"]
+    assert (await client.get(f"/static/{path}")).status_code == 200

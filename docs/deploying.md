@@ -92,6 +92,5 @@ docker compose up -d --build              # migrations run on backend start
 ## Not covered yet
 
 See `docs/security_pass.md` for open items. The ones that matter most for a
-public instance: attachment URLs are reachable without login (S22), WebSocket
-messages aren't rate-limited (S25), invite use counting isn't atomic (S26),
-and there is no role hierarchy among admins (S28).
+public instance: there is no role hierarchy among admins (S28), no
+dependency scanning (S29), and the remaining low-severity items.
