@@ -146,3 +146,52 @@ async def test_db_enforces_case_insensitive_uniqueness(db):
     with pytest.raises(IntegrityError):
         await db.commit()
     await db.rollback()
+
+
+# ---- S26: invite max_uses under concurrency ---------------------------------
+
+async def test_concurrent_joins_respect_max_uses(client, db):
+    """Five users race for a 2-use invite: exactly two get in."""
+    import asyncio
+
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.database import get_db
+    from main import app
+    from models.invite import ServerInvite
+    from tests.conftest import create_server, register_and_login
+
+    owner = await register_and_login(client, "inv_owner")
+    server = await create_server(client, owner)
+    r = await client.post(f"/servers/{server['id']}/invites", json={"max_uses": 2}, headers=owner)
+    code = r.json()["code"]
+    joiners = [await register_and_login(client, f"joiner{i}") for i in range(5)]
+
+    factory = async_sessionmaker(db.bind, expire_on_commit=False)
+
+    async def per_request_db():
+        async with factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = per_request_db
+    results = await asyncio.gather(*[client.post(f"/invites/{code}/join", headers=h) for h in joiners])
+    codes = sorted(r.status_code for r in results)
+    assert codes == [200, 200, 410, 410, 410], codes
+
+    async with factory() as s:
+        uses = (await s.execute(select(ServerInvite.uses).where(ServerInvite.code == code))).scalar_one()
+    assert uses == 2
+    members = await client.get(f"/servers/{server['id']}/members", headers=owner)
+    assert len(members.json()) == 3  # owner + 2
+
+
+async def test_rejoin_does_not_use_up_invite(client):
+    from tests.conftest import create_server, register_and_login
+
+    owner = await register_and_login(client, "inv_owner2")
+    bob = await register_and_login(client, "inv_bob")
+    server = await create_server(client, owner)
+    code = (await client.post(f"/servers/{server['id']}/invites", json={"max_uses": 1}, headers=owner)).json()["code"]
+    assert (await client.post(f"/invites/{code}/join", headers=bob)).status_code == 200
+    assert (await client.post(f"/invites/{code}/join", headers=bob)).status_code == 410  # used up, even for a member

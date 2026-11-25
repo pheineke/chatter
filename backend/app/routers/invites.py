@@ -4,7 +4,8 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import CurrentUser, DB
@@ -148,30 +149,53 @@ async def join_via_invite(code: str, current_user: CurrentUser, db: DB):
     if invite.max_uses and invite.uses >= invite.max_uses:
         raise HTTPException(status_code=410, detail="Invite has reached max uses")
 
+    server_id, invite_code = invite.server_id, invite.code  # survive rollbacks below
+
     # Check ban
-    await _check_not_banned(invite.server_id, current_user.id, db)
+    await _check_not_banned(server_id, current_user.id, db)
 
     # Check already a member
     existing = await db.execute(
         select(ServerMember).where(
-            ServerMember.server_id == invite.server_id,
+            ServerMember.server_id == server_id,
             ServerMember.user_id == current_user.id,
         )
     )
     newly_joined = False
     if not existing.scalar_one_or_none():
-        db.add(ServerMember(server_id=invite.server_id, user_id=current_user.id))
-        invite.uses += 1
-        await db.commit()
-        newly_joined = True
+        # Count the use atomically (S26): read-then-increment let concurrent
+        # joins all pass the max_uses check above and overshoot it.
+        counted = await db.execute(
+            update(ServerInvite)
+            .where(
+                ServerInvite.code == invite_code,
+                or_(
+                    ServerInvite.max_uses.is_(None),
+                    ServerInvite.max_uses == 0,
+                    ServerInvite.uses < ServerInvite.max_uses,
+                ),
+            )
+            .values(uses=ServerInvite.uses + 1)
+            .execution_options(synchronize_session=False)
+        )
+        if counted.rowcount != 1:
+            await db.rollback()
+            raise HTTPException(status_code=410, detail="Invite has reached max uses")
+        db.add(ServerMember(server_id=server_id, user_id=current_user.id))
+        try:
+            await db.commit()
+            newly_joined = True
+        except IntegrityError:
+            # The same user joined in a parallel request; this use doesn't count.
+            await db.rollback()
 
     if newly_joined:
         await manager.broadcast_server(
-            invite.server_id,
-            {"type": "server.member_joined", "data": {"server_id": str(invite.server_id), "user_id": str(current_user.id)}},
+            server_id,
+            {"type": "server.member_joined", "data": {"server_id": str(server_id), "user_id": str(current_user.id)}},
         )
 
-    return {"server_id": str(invite.server_id)}
+    return {"server_id": str(server_id)}
 
 
 @router.get("/servers/{server_id}/invites", response_model=list[InviteRead])
