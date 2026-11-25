@@ -96,6 +96,14 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
           qc.setQueryData(['server', serverId], updated)
           break
         }
+        case 'channel.permissions_updated': {
+          // Visibility may have changed for us: the server filters the channel
+          // list per user, so refetch instead of patching locally.
+          const { channel_id } = msg.data as { channel_id: string }
+          qc.invalidateQueries({ queryKey: ['channels', serverId] })
+          qc.invalidateQueries({ queryKey: ['channelPerms', channel_id] })
+          break
+        }
         case 'channel.deleted': {
           const { channel_id } = msg.data as { channel_id: string }
           qc.setQueryData<Channel[]>(['channels', serverId], (old = []) =>

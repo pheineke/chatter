@@ -1,26 +1,31 @@
 import uuid
 from typing import List
 
-from fastapi import APIRouter, HTTPException, status, Depends
-from sqlalchemy import select, delete
+from fastapi import APIRouter, HTTPException, Depends
 
+from app.authz import require_channel_perms
 from app.dependencies import CurrentUser, DB
-from app.routers.messages import enrich_message_read
+from app.rate_limiter import rate_limit_messages
+from app.routers.messages import (
+    _apply_word_filters,
+    _get_channel_or_404,
+    _message_load_options,
+    enrich_message_read,
+)
 from app.ws_manager import manager
+from models.channel import ChannelPerm
 from models.message import Message
 from app.schemas.interaction import (
     ApplicationCommandCreate,
     ApplicationCommandRead,
     InteractionCreate,
-    InteractionData,
-    InteractionDataOption,
     InteractionResponse,
     InteractionResponseData,
     InteractionCallbackType,
 )
-from models.interaction import ApplicationCommand, ApplicationCommandType
-from models.server import Server, ServerMember
+from models.interaction import ApplicationCommand
 from models.user import User
+from sqlalchemy import select
 
 router = APIRouter(tags=["interactions"])
 
@@ -34,15 +39,18 @@ async def create_global_command(
     current_user: CurrentUser,
     db: DB,
 ):
-    """Register a new global slash command for an application (bot)."""
-    # Verify ownership of the application (bot user)
-    app = await db.get(User, application_id)
-    if not app:
-        raise HTTPException(status_code=404, detail="Application not found")
-    # For now, allow regular users to own commands too for testing/demos
-    # if not app.is_bot:
-    #     raise HTTPException(status_code=400, detail="User is not a bot")
-    
+    """Register a new global slash command for an application (bot).
+
+    Only the bot account itself (authenticated with its own API token) may
+    register commands under its ID. Otherwise anyone could attach commands to
+    another user's ID and make messages appear authored by them.
+    """
+    if application_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only register commands for your own application")
+    if not current_user.is_bot:
+        raise HTTPException(status_code=403, detail="Only bot accounts can register application commands")
+    app = current_user
+
     cmd = ApplicationCommand(
         application_id=app.id,
         name=body.name,
@@ -59,6 +67,7 @@ async def create_global_command(
 @router.get("/applications/{application_id}/commands", response_model=List[ApplicationCommandRead])
 async def get_application_commands(
     application_id: uuid.UUID,
+    current_user: CurrentUser,
     db: DB,
 ):
     result = await db.execute(
@@ -70,6 +79,7 @@ async def get_application_commands(
 
 @router.get("/commands", response_model=List[ApplicationCommandRead])
 async def list_commands(
+    current_user: CurrentUser,
     db: DB,
     server_id: uuid.UUID | None = None,
 ):
@@ -94,6 +104,7 @@ async def create_interaction(
     interaction: InteractionCreate,
     current_user: CurrentUser,
     db: DB,
+    _rl: None = Depends(rate_limit_messages),
 ):
     """
     Handle slash command execution (Interaction).
@@ -137,19 +148,38 @@ async def create_interaction(
 
     # 3. Execute: Create Message + Broadcast
     if response_content and interaction.channel_id and not is_ephemeral:
+        # The invoking user must be allowed to post in the target channel; the
+        # message then appears there authored by the (bot) application.
+        channel = await _get_channel_or_404(interaction.channel_id, db)
+        await require_channel_perms(channel, current_user.id, db, ChannelPerm.SEND_MESSAGES)
+        if cmd.server_id is not None and cmd.server_id != channel.server_id:
+            raise HTTPException(status_code=404, detail="Command not found")
+        app_user = await db.get(User, cmd.application_id)
+        if app_user is None or not app_user.is_bot:
+            # Never let a command post as a regular (human) account.
+            raise HTTPException(status_code=403, detail="Command application is not a bot")
+        if channel.server_id:
+            await _apply_word_filters(response_content, channel.server_id, current_user.id, db)
+        if len(response_content) > 2000:
+            raise HTTPException(status_code=400, detail="Message content cannot exceed 2000 characters")
+
         bot_msg = Message(
-            channel_id=interaction.channel_id,
-            author_id=cmd.application_id,
+            channel_id=channel.id,
+            author_id=app_user.id,
             content=response_content,
         )
         db.add(bot_msg)
         await db.commit()
-        await db.refresh(bot_msg)
-        
+        bot_msg = (
+            await db.execute(
+                select(Message).options(*_message_load_options()).where(Message.id == bot_msg.id)
+            )
+        ).scalar_one()
+
         # Broadcast via WebSocket so clients see it immediately
-        msg_read = await enrich_message_read(bot_msg, interaction.server_id, db)
-        await manager.broadcast_channel(interaction.channel_id, {
-            "type": "message.created", 
+        msg_read = await enrich_message_read(bot_msg, channel.server_id, db)
+        await manager.broadcast_channel(channel.id, {
+            "type": "message.created",
             "data": msg_read.model_dump(mode='json')
         })
 

@@ -141,3 +141,13 @@ async def send_message(
     )
     assert r.status_code == 201, r.text
     return r.json()
+
+
+async def join_server(
+    client: AsyncClient, server_id: str, owner_headers: dict, joiner_headers: dict
+) -> None:
+    """Join *server_id* the only supported way: owner creates an invite, joiner uses it."""
+    r = await client.post(f"/servers/{server_id}/invites", json={}, headers=owner_headers)
+    assert r.status_code == 201, r.text
+    r = await client.post(f"/invites/{r.json()['code']}/join", headers=joiner_headers)
+    assert r.status_code == 200, r.text

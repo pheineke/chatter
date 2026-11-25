@@ -22,27 +22,29 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, update, func, or_
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
-from app.dependencies import CurrentUser, DB
+from app.authz import channel_viewer_ids
+from app.dependencies import DB, CurrentUser
 from app.rate_limiter import (
-    rate_limit_mls_key_package_publish,
-    rate_limit_mls_key_package_claim,
-    rate_limit_mls_key_package_purge,
     rate_limit_mls_commit,
+    rate_limit_mls_key_package_claim,
+    rate_limit_mls_key_package_publish,
+    rate_limit_mls_key_package_purge,
 )
 from app.routers.messages import _get_channel_or_404, _require_channel_access
-from app.routers.servers import _require_member
 from app.schemas.mls import (
-    KeyPackagePublish, KeyPackageRead, GroupInit, GroupRead,
-    CommitSubmit, GroupEventRead, CommitResult,
+    CommitResult,
+    CommitSubmit,
+    GroupEventRead,
+    GroupInit,
+    GroupRead,
+    KeyPackagePublish,
+    KeyPackageRead,
 )
 from app.ws_manager import manager
-from models.channel import ChannelType
-from models.dm_channel import DMChannel
-from models.mls import MLSKeyPackage, MLSGroup, MLSGroupEvent, MLSEventType
-from models.server import ServerMember
+from models.mls import MLSEventType, MLSGroup, MLSGroupEvent, MLSKeyPackage
 
 router = APIRouter(prefix="/mls", tags=["mls"])
 
@@ -62,19 +64,9 @@ def _bytes_to_b64(b: bytes) -> str:
 
 async def _channel_member_ids(channel, db) -> list[uuid.UUID]:
     """All users who should receive real-time MLS group events for this
-    channel — server members (matches the fan-out already used for
-    message.created/channel.message notifications) or the two DM participants.
+    channel: server members who can view it, or the two DM participants.
     """
-    if channel.type == ChannelType.dm:
-        result = await db.execute(select(DMChannel).where(DMChannel.channel_id == channel.id))
-        dmc = result.scalar_one_or_none()
-        return [dmc.user_a_id, dmc.user_b_id] if dmc else []
-    if channel.server_id:
-        result = await db.execute(
-            select(ServerMember.user_id).where(ServerMember.server_id == channel.server_id)
-        )
-        return list(result.scalars().all())
-    return []
+    return await channel_viewer_ids(channel, db)
 
 
 # ─── KeyPackages ────────────────────────────────────────────────────────────

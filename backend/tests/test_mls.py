@@ -20,7 +20,7 @@ import base64
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import register_and_login, create_server, create_channel
+from tests.conftest import register_and_login, create_server, create_channel, join_server
 
 pytestmark = pytest.mark.asyncio
 
@@ -95,7 +95,7 @@ async def test_commit_advances_epoch_and_delivers_scoped_welcome(client: AsyncCl
     # _require_channel_access gates on membership. This mirrors the real
     # flow, where a user joins the server and is then Added to each text
     # channel's MLS group.
-    await client.post(f"/servers/{server['id']}/join", headers=bob)
+    await join_server(client, server['id'], alice, bob)
 
     # Carol never joins — she's the negative case for event visibility.
     carol = await register_and_login(client, "mls_carol5", "pass1234")

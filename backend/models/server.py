@@ -1,10 +1,12 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer, Uuid
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Index, Integer, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
+
+EVERYONE_ROLE_NAME = "@everyone"
 
 
 class Server(Base):
@@ -75,6 +77,16 @@ class ServerMember(Base):
 
 class Role(Base):
     __tablename__ = "roles"
+    __table_args__ = (
+        # At most one @everyone role per server.
+        Index(
+            "uq_roles_one_default_per_server",
+            "server_id",
+            unique=True,
+            postgresql_where=text("is_default"),
+            sqlite_where=text("is_default"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     server_id: Mapped[uuid.UUID] = mapped_column(
@@ -86,6 +98,11 @@ class Role(Base):
     hoist: Mapped[bool] = mapped_column(Boolean, default=False)         # show as separate group in member list
     mentionable: Mapped[bool] = mapped_column(Boolean, default=False)   # anyone can @mention this role
     position: Mapped[int] = mapped_column(Integer, default=0)
+    # The implicit @everyone role: every member holds it without a UserRole
+    # row. Its channel overwrites apply to all members (before role overwrites).
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
 
     server: Mapped["Server"] = relationship("Server", back_populates="roles")
     user_roles: Mapped[list["UserRole"]] = relationship(

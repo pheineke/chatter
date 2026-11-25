@@ -30,7 +30,7 @@ from app.schemas.user import UserRead, UserPublicRead
 from app.ws_manager import manager
 from app.services.audit_log_service import create_audit_log
 from models.audit_log import AuditLogAction
-from models.server import Server, ServerMember, Role, UserRole
+from models.server import EVERYONE_ROLE_NAME, Server, ServerMember, Role, UserRole
 from models.custom_emoji import CustomEmoji
 from models.user import User, UserStatus
 from models.word_filter import WordFilter, ServerBan
@@ -87,8 +87,10 @@ async def create_server(body: ServerCreate, current_user: CurrentUser, db: DB):
 
     # Auto-add owner as member
     db.add(ServerMember(server_id=server.id, user_id=current_user.id))
-    # Create default Admin role
+    # Create default Admin role, plus the implicit @everyone role whose channel
+    # overwrites apply to every member (used to make channels private).
     db.add(Role(server_id=server.id, name="Admin", is_admin=True, position=0))
+    db.add(Role(server_id=server.id, name=EVERYONE_ROLE_NAME, is_default=True, position=0))
 
     await db.commit()
     await db.refresh(server)
@@ -325,26 +327,10 @@ async def list_members(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
     ]
 
 
-@router.post("/{server_id}/join", response_model=MemberRead)
-async def join_server(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
-    await _get_server_or_404(server_id, db)
-    await _check_not_banned(server_id, current_user.id, db)
-    existing = await db.execute(
-        select(ServerMember).where(
-            ServerMember.server_id == server_id, ServerMember.user_id == current_user.id
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Already a member")
-    member = ServerMember(server_id=server_id, user_id=current_user.id)
-    db.add(member)
-    await db.commit()
-    await db.refresh(member)
-    await manager.broadcast_server(
-        server_id,
-        {"type": "server.member_joined", "data": {"server_id": str(server_id), "user_id": str(current_user.id)}},
-    )
-    return member
+# NOTE: there is deliberately no invite-less `POST /servers/{id}/join`.
+# Server IDs are not secret (they appear in URLs, invite previews and WS
+# events), so joining must always go through /invites/{code}/join, which
+# enforces expiry, max-uses and revocation.
 
 
 @router.delete("/{server_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -458,7 +444,11 @@ async def update_my_settings(
 @router.get("/{server_id}/roles", response_model=list[RoleRead])
 async def list_roles(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
     await _require_member(server_id, current_user.id, db)
-    result = await db.execute(select(Role).where(Role.server_id == server_id).order_by(Role.position))
+    result = await db.execute(
+        select(Role)
+        .where(Role.server_id == server_id)
+        .order_by(Role.is_default, Role.position)  # @everyone last, like Discord
+    )
     return result.scalars().all()
 
 
@@ -504,6 +494,19 @@ async def update_role(
     role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
+    if role.is_default:
+        changed = body.model_dump(exclude_unset=True)
+        if (
+            ("name" in changed and changed["name"] != role.name)
+            or changed.get("is_admin")
+            or changed.get("hoist")
+            or changed.get("mentionable")
+            or ("position" in changed and changed["position"] != role.position)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="The @everyone role can't be renamed, reordered, hoisted, mentioned or made admin",
+            )
     if body.name is not None:
         role.name = body.name
     if body.color is not None:
@@ -545,6 +548,8 @@ async def delete_role(
     role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
+    if role.is_default:
+        raise HTTPException(status_code=400, detail="The @everyone role can't be deleted")
     
     await create_audit_log(
         session=db,
@@ -571,8 +576,11 @@ async def assign_role(
     await _require_admin(server, current_user.id, db)
     await _require_member(server_id, user_id, db)
     result = await db.execute(select(Role).where(Role.id == role_id, Role.server_id == server_id))
-    if not result.scalar_one_or_none():
+    role = result.scalar_one_or_none()
+    if not role:
         raise HTTPException(status_code=404, detail="Role not found")
+    if role.is_default:
+        raise HTTPException(status_code=400, detail="Every member already has the @everyone role")
     existing = await db.execute(
         select(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
     )
@@ -604,13 +612,13 @@ async def remove_role(
     server = await _get_server_or_404(server_id, db)
     await _require_admin(server, current_user.id, db)
     result = await db.execute(
-        select(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
+        select(UserRole)
+        .join(Role, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == user_id, UserRole.role_id == role_id, Role.server_id == server_id)
     )
     user_role = result.scalar_one_or_none()
     if user_role:
         await db.delete(user_role)
-        # Audit Log
-        from app.routers.audit_logs import create_audit_log, AuditLogAction
         await create_audit_log(
             session=db,
             server_id=server_id,

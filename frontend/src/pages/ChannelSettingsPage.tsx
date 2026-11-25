@@ -261,10 +261,13 @@ function PermissionsTab({ serverId, channel }: { serverId: string; channel: Chan
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const { data: roles = [] } = useQuery({
+  const { data: rawRoles = [] } = useQuery({
     queryKey: ['roles', serverId],
     queryFn: () => getRoles(serverId),
   })
+  // @everyone first: it's the baseline every other row overrides.
+  const roles = [...rawRoles].sort((a, b) => Number(b.is_default) - Number(a.is_default))
+  const everyone = roles.find(r => r.is_default)
 
   // We need to fetch channel-specific overrides
   const { data: existingPerms = [], isSuccess: permsLoaded } = useQuery<ChannelPermission[]>({
@@ -295,6 +298,23 @@ function PermissionsTab({ serverId, channel }: { serverId: string; channel: Chan
       return {
         ...prev,
         [roleId]: applyPermState(cur.allow_bits, cur.deny_bits, bit, next),
+      }
+    })
+  }
+
+  const isPrivate = !!(everyone && draft?.[everyone.id] &&
+    getPermState(draft[everyone.id].allow_bits, draft[everyone.id].deny_bits, ChannelPerm.VIEW_CHANNEL) === 'deny')
+  const rolesWithAccess = roles.filter(r => !r.is_default && (r.is_admin ||
+    (draft?.[r.id] && getPermState(draft[r.id].allow_bits, draft[r.id].deny_bits, ChannelPerm.VIEW_CHANNEL) === 'allow')))
+
+  function setPrivate(next: boolean) {
+    if (!everyone) return
+    setDraft(prev => {
+      if (!prev) return prev
+      const cur = prev[everyone.id] ?? { allow_bits: 0, deny_bits: 0 }
+      return {
+        ...prev,
+        [everyone.id]: applyPermState(cur.allow_bits, cur.deny_bits, ChannelPerm.VIEW_CHANNEL, next ? 'deny' : 'inherit'),
       }
     })
   }
@@ -337,6 +357,37 @@ function PermissionsTab({ serverId, channel }: { serverId: string; channel: Chan
         </div>
       </div>
 
+      {everyone && (
+        <div className="mb-6 p-4 rounded-lg border border-sp-divider/30 bg-sp-surface">
+          <label className="flex items-center justify-between gap-4 cursor-pointer select-none">
+            <span>
+              <span className="flex items-center gap-2 font-semibold text-sp-text">
+                <Icon name="lock" size={16} /> Private channel
+              </span>
+              <span className="block text-xs text-sp-muted mt-1">
+                Only admins and roles allowed <em>View Channel</em> below can see this channel.
+              </span>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isPrivate}
+              aria-label="Private channel"
+              onClick={() => setPrivate(!isPrivate)}
+              className={`w-10 h-5 shrink-0 rounded-full transition-colors flex items-center px-0.5 ${isPrivate ? 'bg-sp-mention' : 'bg-sp-input'}`}
+            >
+              <span className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${isPrivate ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </label>
+          {isPrivate && (
+            <p className="text-xs mt-3 text-sp-muted">
+              Who can see it: <span className="text-sp-text">{rolesWithAccess.length ? rolesWithAccess.map(r => r.name).join(', ') : 'only the owner and admins'}</span>
+              {' · '}Save Permissions to apply.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="overflow-x-auto border border-sp-divider/30 rounded-lg bg-sp-surface">
         <table className="w-full text-sm border-collapse">
           <thead>
@@ -356,7 +407,7 @@ function PermissionsTab({ serverId, channel }: { serverId: string; channel: Chan
                 <tr key={role.id} className={`transition-colors hover:bg-white/5 ${i % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.02]'}`}>
                   <td className="px-4 py-3 font-medium flex items-center gap-2 sticky left-0 bg-inherit z-10 backdrop-blur-md">
                     <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: role.color || '#999' }} />
-                    <span className={role.is_admin ? 'text-sp-primary font-bold' : 'text-sp-text'}>{role.name}</span>
+                    <span className={role.is_admin ? 'text-sp-primary font-bold' : role.is_default ? 'text-sp-muted font-semibold' : 'text-sp-text'}>{role.name}</span>
                     {role.is_admin && <Icon name="shield" size={12} className="text-sp-primary" />}
                   </td>
                   {PERM_COLUMNS.map(col => {

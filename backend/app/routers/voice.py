@@ -38,11 +38,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.authz import get_channel_permissions
 from app.schemas.voice import VoiceParticipantRead
 from app.voice_manager import voice_manager
 from app.ws_auth import accept_and_authenticate
 from app.ws_manager import manager as ws_manager
-from models.channel import Channel, ChannelType
+from models.channel import ChannelPerm, Channel, ChannelType
 from models.server import ServerMember
 
 logger = logging.getLogger(__name__)
@@ -164,6 +165,9 @@ async def voice_ws(
     member = mem_result.scalar_one_or_none()
     if member is None:
         await ws.close(code=4003, reason="Not a member of this server")
+        return
+    if not await get_channel_permissions(channel, user_id, db) & ChannelPerm.VIEW_CHANNEL:
+        await ws.close(code=4003, reason="Missing permission: View Channel")
         return
 
     # --- Connect (accepts the WebSocket) ------------------------------------

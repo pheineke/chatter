@@ -32,7 +32,7 @@ const mockDelete = client.delete as Mock
 
 const fakeServer = { id: 'srv-1', title: 'My Server', owner_id: 'u1', description: '', icon: null, banner: null, member_count: 1 }
 const fakeMember = { user_id: 'u1', server_id: 'srv-1', nickname: null, joined_at: '2024-01-01T00:00:00Z', username: 'alice', avatar: null, status: 'online', roles: [] }
-const fakeRole = { id: 'role-1', server_id: 'srv-1', name: 'Admin', color: '#ff0000', is_admin: true, hoist: false, mentionable: false, position: 0 }
+const fakeRole = { id: 'role-1', server_id: 'srv-1', name: 'Admin', color: '#ff0000', is_admin: true, hoist: false, mentionable: false, position: 0, is_default: false }
 
 beforeEach(() => {
   vi.clearAllMocks()

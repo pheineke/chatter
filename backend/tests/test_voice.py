@@ -249,6 +249,14 @@ def _setup_voice_channel(tc: TestClient, owner_token: str) -> tuple[str, str]:
     return server_id, channel_id
 
 
+def _join_server(tc: TestClient, server_id: str, owner_token: str, joiner_token: str) -> None:
+    """Join via invite — there is no invite-less join endpoint."""
+    r = tc.post(f"/servers/{server_id}/invites", json={}, headers={"Authorization": f"Bearer {owner_token}"})
+    assert r.status_code == 201, r.text
+    r = tc.post(f"/invites/{r.json()['code']}/join", headers={"Authorization": f"Bearer {joiner_token}"})
+    assert r.status_code == 200, r.text
+
+
 # --- REST endpoint ----------------------------------------------------------
 
 def test_rest_voice_members_empty(voice_app):
@@ -448,10 +456,7 @@ def test_voice_ws_offer_relay(voice_app):
 
     server_id, channel_id = _setup_voice_channel(voice_app, token_a)
     # B joins the server
-    voice_app.post(
-        f"/servers/{server_id}/join",
-        headers={"Authorization": f"Bearer {token_b}"},
-    )
+    _join_server(voice_app, server_id, token_a, token_b)
 
     # Get A's user_id
     r_a = voice_app.get("/users/me", headers={"Authorization": f"Bearer {token_a}"})
@@ -501,10 +506,7 @@ def test_voice_ws_user_left_on_disconnect(voice_app):
     token_a = _token(voice_app, "vleft_a")
     token_b = _token(voice_app, "vleft_b")
     server_id, channel_id = _setup_voice_channel(voice_app, token_a)
-    voice_app.post(
-        f"/servers/{server_id}/join",
-        headers={"Authorization": f"Bearer {token_b}"},
-    )
+    _join_server(voice_app, server_id, token_a, token_b)
     r_b = voice_app.get("/users/me", headers={"Authorization": f"Bearer {token_b}"})
     b_user_id = r_b.json()["id"]
 
@@ -552,7 +554,7 @@ def test_server_ws_receives_voice_user_joined(voice_app):
     token_a = _token(voice_app, "xws_a")
     token_b = _token(voice_app, "xws_b")
     server_id, channel_id = _setup_voice_channel(voice_app, token_a)
-    voice_app.post(f"/servers/{server_id}/join", headers={"Authorization": f"Bearer {token_b}"})
+    _join_server(voice_app, server_id, token_a, token_b)
 
     r_a = voice_app.get("/users/me", headers={"Authorization": f"Bearer {token_a}"})
     a_user_id = r_a.json()["id"]
@@ -595,7 +597,7 @@ def test_server_ws_receives_voice_user_left(voice_app):
     token_a = _token(voice_app, "xwsl_a")
     token_b = _token(voice_app, "xwsl_b")
     server_id, channel_id = _setup_voice_channel(voice_app, token_a)
-    voice_app.post(f"/servers/{server_id}/join", headers={"Authorization": f"Bearer {token_b}"})
+    _join_server(voice_app, server_id, token_a, token_b)
 
     r_a = voice_app.get("/users/me", headers={"Authorization": f"Bearer {token_a}"})
     a_user_id = r_a.json()["id"]

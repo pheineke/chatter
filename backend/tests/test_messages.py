@@ -3,7 +3,7 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import create_server, create_channel, send_message
+from tests.conftest import create_server, create_channel, send_message, join_server
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ async def test_edit_other_users_message_forbidden(
     ch = await create_channel(client, alice_headers, s["id"])
     msg = await send_message(client, alice_headers, ch["id"])
 
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.patch(
         f"/channels/{ch['id']}/messages/{msg['id']}",
         json={"content": "hijacked"},
@@ -119,7 +119,7 @@ async def test_delete_own_message(client: AsyncClient, alice_headers):
 async def test_admin_can_delete_any_message(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
     ch = await create_channel(client, alice_headers, s["id"])
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     msg = await send_message(client, bob_headers, ch["id"], "bob's msg")
 
     r = await client.delete(
@@ -183,7 +183,7 @@ async def test_add_reaction_idempotent(client: AsyncClient, alice_headers):
 async def test_multiple_users_can_react(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
     ch = await create_channel(client, alice_headers, s["id"])
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     msg = await send_message(client, alice_headers, ch["id"])
 
     await client.post(

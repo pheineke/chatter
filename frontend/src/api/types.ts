@@ -62,6 +62,8 @@ export interface Role {
   hoist: boolean
   mentionable: boolean
   position: number
+  /** The implicit @everyone role: every member has it, it can't be assigned or deleted. */
+  is_default: boolean
 }
 
 export interface Member {

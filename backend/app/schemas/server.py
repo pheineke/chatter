@@ -89,6 +89,7 @@ class RoleRead(RoleBase):
 
     id: uuid.UUID
     server_id: uuid.UUID
+    is_default: bool = False  # the implicit @everyone role
 
 
 class MemberRead(BaseModel):

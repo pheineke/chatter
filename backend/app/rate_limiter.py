@@ -229,6 +229,16 @@ async def rate_limit_dm_channel(current_user: CurrentUser) -> None:
     )
 
 
+async def rate_limit_link_preview(current_user: CurrentUser) -> None:
+    """Server-side URL fetches for link embeds: 30 per minute per user."""
+    await _enforce_limit(
+        key=f"link-preview:{current_user.id}",
+        limit=30,
+        window_seconds=60.0,
+        detail="Too many link previews requested. Please slow down!",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Profile / avatar / banner / decoration limits
 #

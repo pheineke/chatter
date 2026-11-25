@@ -3,7 +3,7 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import create_server
+from tests.conftest import create_server, join_server
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ async def test_update_server_by_owner(client: AsyncClient, alice_headers):
 
 async def test_update_server_by_non_admin(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.patch(
         f"/servers/{s['id']}", json={"title": "Hijacked"}, headers=bob_headers
     )
@@ -73,7 +73,7 @@ async def test_delete_server_by_owner(client: AsyncClient, alice_headers):
 
 async def test_delete_server_by_non_owner(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.delete(f"/servers/{s['id']}", headers=bob_headers)
     assert r.status_code == 403
 
@@ -89,24 +89,35 @@ async def test_get_nonexistent_server(client: AsyncClient, alice_headers):
 
 async def test_join_server(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    r = await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
-    assert r.status_code == 200
+    await join_server(client, s['id'], alice_headers, bob_headers)
 
     r = await client.get(f"/servers/{s['id']}/members", headers=alice_headers)
     usernames = [m["user"]["username"] for m in r.json()]
     assert "bob" in usernames
 
 
-async def test_join_server_twice(client: AsyncClient, alice_headers, bob_headers):
+async def test_join_server_twice_is_idempotent(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
+
+    r = await client.get(f"/servers/{s['id']}/members", headers=alice_headers)
+    assert [m["user"]["username"] for m in r.json()].count("bob") == 1
+
+
+async def test_cannot_join_server_without_invite(client: AsyncClient, alice_headers, bob_headers):
+    """Server IDs aren't secret, so knowing one must not be enough to join (S4)."""
+    s = await create_server(client, alice_headers)
     r = await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
-    assert r.status_code == 400
+    assert r.status_code in (404, 405)
+
+    r = await client.get(f"/servers/{s['id']}", headers=bob_headers)
+    assert r.status_code == 403
 
 
 async def test_leave_server(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
 
     bob_id = (await client.get("/users/me", headers=bob_headers)).json()["id"]
     r = await client.delete(f"/servers/{s['id']}/members/{bob_id}", headers=bob_headers)
@@ -115,7 +126,7 @@ async def test_leave_server(client: AsyncClient, alice_headers, bob_headers):
 
 async def test_owner_cannot_be_kicked(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
 
     # Give bob admin role first
     roles_r = await client.get(f"/servers/{s['id']}/roles", headers=alice_headers)
@@ -154,7 +165,7 @@ async def test_create_role(client: AsyncClient, alice_headers):
 
 async def test_create_role_non_admin_forbidden(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.post(
         f"/servers/{s['id']}/roles", json={"name": "Hacker"}, headers=bob_headers
     )
@@ -186,7 +197,7 @@ async def test_delete_role(client: AsyncClient, alice_headers):
 
 async def test_assign_and_remove_role(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
 
     role_r = await client.post(
         f"/servers/{s['id']}/roles", json={"name": "Member"}, headers=alice_headers

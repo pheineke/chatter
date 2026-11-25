@@ -33,7 +33,7 @@ from app.auth import (
     hash_api_token,
 )
 from app.config import settings
-from tests.conftest import register_and_login, create_server, create_channel, send_message
+from tests.conftest import register_and_login, create_server, create_channel, send_message, join_server
 
 
 # ===========================================================================
@@ -407,7 +407,7 @@ async def test_non_member_cannot_post_message(client: AsyncClient, alice_headers
 
 async def test_non_admin_cannot_create_category(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.post(
         f"/servers/{s['id']}/categories",
         json={"title": "Stealth category"},
@@ -419,7 +419,7 @@ async def test_non_admin_cannot_create_category(client: AsyncClient, alice_heade
 async def test_non_admin_cannot_kick_member(client: AsyncClient, alice_headers, bob_headers):
     """Bob joins Alice's server; Bob tries to kick Alice — must be denied."""
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
 
     alice_id_r = await client.get("/users/me", headers=alice_headers)
     alice_id = alice_id_r.json()["id"]
@@ -430,7 +430,7 @@ async def test_non_admin_cannot_kick_member(client: AsyncClient, alice_headers, 
 
 async def test_non_owner_cannot_delete_server(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.delete(f"/servers/{s['id']}", headers=bob_headers)
     assert r.status_code == 403
 
@@ -438,7 +438,7 @@ async def test_non_owner_cannot_delete_server(client: AsyncClient, alice_headers
 async def test_owner_cannot_be_kicked_by_admin(client: AsyncClient, alice_headers, bob_headers):
     """Even an admin role should not be able to remove the owner."""
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
 
     # Grant Bob the default Admin role
     roles_r = await client.get(f"/servers/{s['id']}/roles", headers=alice_headers)
@@ -458,7 +458,7 @@ async def test_owner_cannot_be_kicked_by_admin(client: AsyncClient, alice_header
 
 async def test_cannot_edit_another_users_message(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     ch = await create_channel(client, alice_headers, s["id"])
     msg = await send_message(client, alice_headers, ch["id"], "Alice's message")
 
@@ -474,7 +474,7 @@ async def test_cannot_delete_another_users_message_without_admin(
     client: AsyncClient, alice_headers, bob_headers
 ):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     ch = await create_channel(client, alice_headers, s["id"])
     msg = await send_message(client, alice_headers, ch["id"], "Alice's message")
 

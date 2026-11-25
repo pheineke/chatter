@@ -34,11 +34,6 @@ export async function deleteServer(id: string): Promise<void> {
   await client.delete(`/servers/${id}`)
 }
 
-export async function joinServer(id: string): Promise<Member> {
-  const { data } = await client.post<Member>(`/servers/${id}/join`)
-  return data
-}
-
 export async function leaveServer(serverId: string, userId: string): Promise<void> {
   await client.delete(`/servers/${serverId}/members/${userId}`)
 }

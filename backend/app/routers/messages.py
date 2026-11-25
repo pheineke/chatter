@@ -1,34 +1,35 @@
 import asyncio
 import fnmatch
 import io
+import os
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import List, Dict
+from typing import List
 
 import aiofiles
 import filetype
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
-from sqlalchemy import select, delete, or_, exists
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import delete, exists, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
+from app.authz import require_channel_perms
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.dependencies import CurrentUser, DB
-from app.rate_limiter import rate_limit_messages, rate_limit_reactions, check_and_set_slowmode
-from app.routers.servers import _require_member, _require_admin, _get_server_or_404
-from app.schemas.message import MessageCreate, MessageUpdate, MessageRead, PinnedMessageRead
+from app.dependencies import DB, CurrentUser
+from app.rate_limiter import check_and_set_slowmode, rate_limit_messages, rate_limit_reactions
+from app.schemas.message import MessageCreate, MessageRead, MessageUpdate, PinnedMessageRead
 from app.utils.file_validation import verify_attachment_magic
 from app.ws_manager import manager
-from models.channel import Channel, ChannelType
-from models.dm_channel import DMChannel
+from models.channel import Channel, ChannelPerm, ChannelType
 from models.custom_emoji import CustomEmoji
-from models.message import Message, Attachment, Reaction, Mention
+from models.dm_channel import DMChannel
+from models.message import Attachment, Mention, Message, Reaction
 from models.pinned_message import PinnedMessage
 from models.server import Role, ServerMember
 from models.user import User
-from models.word_filter import WordFilter, ServerBan
+from models.word_filter import ServerBan, WordFilter
 
 router = APIRouter(prefix="/channels/{channel_id}", tags=["messages"])
 
@@ -176,19 +177,11 @@ async def _get_channel_or_404(channel_id: uuid.UUID, db) -> Channel:
     return ch
 
 
-async def _require_channel_access(channel: Channel, user_id: uuid.UUID, db) -> None:
-    """Verify user can access the channel (server member or DM participant)."""
-    if channel.type == ChannelType.dm:
-        result = await db.execute(
-            select(DMChannel).where(
-                DMChannel.channel_id == channel.id,
-                or_(DMChannel.user_a_id == user_id, DMChannel.user_b_id == user_id),
-            )
-        )
-        if not result.scalar_one_or_none():
-            raise HTTPException(status_code=403, detail="Not a participant of this DM")
-    else:
-        await _require_member(channel.server_id, user_id, db)
+async def _require_channel_access(channel: Channel, user_id: uuid.UUID, db, *perms: int) -> int:
+    """Verify the user can view the channel (DM participant, or server member
+    whose roles aren't denied VIEW_CHANNEL) and holds every bit in *perms*.
+    Returns the effective permission bitfield."""
+    return await require_channel_perms(channel, user_id, db, *perms)
 
 
 async def _get_dm_participants(channel_id: uuid.UUID, db) -> tuple[uuid.UUID, uuid.UUID]:
@@ -338,7 +331,7 @@ async def send_message(
     _rl: None = Depends(rate_limit_messages),
 ):
     channel = await _get_channel_or_404(channel_id, db)
-    await _require_channel_access(channel, current_user.id, db)
+    await _require_channel_access(channel, current_user.id, db, ChannelPerm.SEND_MESSAGES)
 
     # Enforce per-channel slowmode (skip for voice/dm channels which have no slowmode)
     if getattr(channel, 'slowmode_delay', 0) and channel.slowmode_delay > 0:
@@ -439,12 +432,13 @@ async def edit_message(
         raise HTTPException(status_code=404, detail="Message not found")
     if msg.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Cannot edit another user's message")
+    channel = await _get_channel_or_404(channel_id, db)
+    await _require_channel_access(channel, current_user.id, db, ChannelPerm.SEND_MESSAGES)
     msg.content = body.content
     msg.is_edited = True
     msg.edited_at = datetime.now(timezone.utc)
     # Re-parse mentions: delete old ones then insert new ones
     await db.execute(delete(Mention).where(Mention.message_id == message_id))
-    channel = await _get_channel_or_404(channel_id, db)
     server_id = channel.server_id  # capture before expire_all() clears it
     if server_id:
         await _parse_and_save_mentions(body.content, message_id, server_id, db)
@@ -468,13 +462,15 @@ async def delete_message(
         raise HTTPException(status_code=404, detail="Message not found")
 
     channel = await _get_channel_or_404(channel_id, db)
+    perms = await _require_channel_access(channel, current_user.id, db)
 
-    # Author can delete their own; for server channels admin can delete any
+    # Author can delete their own; in server channels, admins and roles granted
+    # MANAGE_MESSAGES on this channel can delete anyone's.
     if msg.author_id != current_user.id:
         if channel.type == ChannelType.dm:
             raise HTTPException(status_code=403, detail="Cannot delete another user's message")
-        server = await _get_server_or_404(channel.server_id, db)
-        await _require_admin(server, current_user.id, db)
+        if not perms & ChannelPerm.MANAGE_MESSAGES:
+            raise HTTPException(status_code=403, detail="Missing permission: Manage Messages")
 
     msg.is_deleted = True
     msg.content = "[deleted]"
@@ -500,6 +496,9 @@ async def upload_attachment(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     channel = await _get_channel_or_404(channel_id, db)
+    await _require_channel_access(
+        channel, current_user.id, db, ChannelPerm.SEND_MESSAGES, ChannelPerm.ATTACH_FILES
+    )
 
     # Capture original filename before reading (sanitise path separators)
     original_name: str | None = None
@@ -573,7 +572,7 @@ async def add_reaction(
     _rl: None = Depends(rate_limit_reactions),
 ):
     channel = await _get_channel_or_404(channel_id, db)
-    await _require_channel_access(channel, current_user.id, db)
+    await _require_channel_access(channel, current_user.id, db, ChannelPerm.ADD_REACTIONS)
     msg = await _get_message_or_404(message_id, db)
     if msg.channel_id != channel_id:
         raise HTTPException(status_code=404, detail="Message not found")

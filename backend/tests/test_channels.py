@@ -3,7 +3,7 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import create_server, create_channel
+from tests.conftest import create_server, create_channel, join_server
 
 
 # ---------------------------------------------------------------------------
@@ -23,7 +23,7 @@ async def test_create_category(client: AsyncClient, alice_headers):
 
 async def test_create_category_non_admin_forbidden(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.post(
         f"/servers/{s['id']}/categories", json={"title": "Unauthorized"}, headers=bob_headers
     )
@@ -38,7 +38,7 @@ async def test_list_categories(client: AsyncClient, alice_headers, bob_headers):
     await client.post(
         f"/servers/{s['id']}/categories", json={"title": "Cat B"}, headers=alice_headers
     )
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.get(f"/servers/{s['id']}/categories", headers=bob_headers)
     assert r.status_code == 200
     titles = [c["title"] for c in r.json()]
@@ -125,7 +125,7 @@ async def test_create_channel_with_category(client: AsyncClient, alice_headers):
 
 async def test_create_channel_non_admin_forbidden(client: AsyncClient, alice_headers, bob_headers):
     s = await create_server(client, alice_headers)
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
     r = await client.post(
         f"/servers/{s['id']}/channels", json={"title": "hack"}, headers=bob_headers
     )
@@ -136,7 +136,7 @@ async def test_list_channels_as_member(client: AsyncClient, alice_headers, bob_h
     s = await create_server(client, alice_headers)
     await create_channel(client, alice_headers, s["id"], "alpha")
     await create_channel(client, alice_headers, s["id"], "beta")
-    await client.post(f"/servers/{s['id']}/join", headers=bob_headers)
+    await join_server(client, s['id'], alice_headers, bob_headers)
 
     r = await client.get(f"/servers/{s['id']}/channels", headers=bob_headers)
     assert r.status_code == 200

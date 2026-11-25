@@ -2,7 +2,7 @@
 Tests for @mention parsing in channel messages.
 """
 import pytest
-from tests.conftest import create_server, register_and_login
+from tests.conftest import create_server, register_and_login, join_server
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +43,7 @@ async def test_user_mention_parsed(client, alice_headers, bob_headers):
     channel_id = await _create_channel(client, server_id, alice_headers)
 
     # Bob joins the server
-    r = await client.post(f"/servers/{server_id}/join", headers=bob_headers)
-    assert r.status_code == 200, r.text
+    await join_server(client, server_id, alice_headers, bob_headers)
 
     # Get bob's user ID
     r = await client.get("/users/me", headers=bob_headers)
@@ -115,7 +114,7 @@ async def test_edit_message_reparses_mentions(client, alice_headers, bob_headers
     channel_id = await _create_channel(client, server_id, alice_headers)
 
     # Bob joins
-    await client.post(f"/servers/{server_id}/join", headers=bob_headers)
+    await join_server(client, server_id, alice_headers, bob_headers)
 
     # Send message with no mention
     r = await client.post(
@@ -155,7 +154,7 @@ async def test_multiple_mentions(client, alice_headers, bob_headers):
     channel_id = await _create_channel(client, server_id, alice_headers)
 
     # Bob joins
-    await client.post(f"/servers/{server_id}/join", headers=bob_headers)
+    await join_server(client, server_id, alice_headers, bob_headers)
 
     r = await client.get("/users/me", headers=bob_headers)
     bob_id = r.json()["id"]

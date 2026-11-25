@@ -504,8 +504,10 @@ function MembersTab({ serverId, members, ownerId, currentUserId, onChanged }: {
   )
 }
 
-function MemberRolePicker({ serverId, member, allRoles }: { serverId: string; member: Member; allRoles: Role[] }) {
+function MemberRolePicker({ serverId, member, allRoles: roles }: { serverId: string; member: Member; allRoles: Role[] }) {
   const qc = useQueryClient()
+  // @everyone is implicit for every member — never offer it for assignment.
+  const allRoles = roles.filter(r => !r.is_default)
   if (allRoles.length === 0) return <span className="text-sp-muted text-xs">—</span>
   const assignedIds = new Set(member.roles.map(r => r.id))
   return (
@@ -568,6 +570,13 @@ function RolesTab({ serverId }: { serverId: string }) {
 
   async function handleSaveRole() {
     if (!selected) return
+    if (selected.is_default) {
+      // @everyone: only the colour is editable; the backend rejects the rest.
+      await updateRole(serverId, selected.id, { color: editColor })
+      qc.invalidateQueries({ queryKey: ['roles', serverId] })
+      setSelected(s => s ? { ...s, color: editColor } : s)
+      return
+    }
     await updateRole(serverId, selected.id, { name: editName.trim() || selected.name, color: editColor, is_admin: editAdmin, hoist: editHoist, mentionable: editMentionable })
     qc.invalidateQueries({ queryKey: ['roles', serverId] })
     setSelected(s => s ? { ...s, name: editName, color: editColor, is_admin: editAdmin, hoist: editHoist, mentionable: editMentionable } : s)
@@ -607,7 +616,7 @@ function RolesTab({ serverId }: { serverId: string }) {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: role.color ?? '#99aab5' }} />
-                <span className="text-sm font-medium truncate">{role.name}</span>
+                <span className={`text-sm font-medium truncate ${role.is_default ? 'text-sp-muted' : ''}`}>{role.name}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {role.hoist && <Icon name="users" size={12} className="text-blue-400" title="Hoisted" />}
@@ -623,17 +632,26 @@ function RolesTab({ serverId }: { serverId: string }) {
           <div className="flex-1 bg-sp-sidebar rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-bold">Edit Role</h3>
-              <button
-                onClick={() => handleDeleteRole(selected)}
-                className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
-              >
-                <Icon name="trash-2" size={13} /> Delete
-              </button>
+              {!selected.is_default && (
+                <button
+                  onClick={() => handleDeleteRole(selected)}
+                  className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                >
+                  <Icon name="trash-2" size={13} /> Delete
+                </button>
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Role Name</label>
-              <input className="input w-full" value={editName} onChange={e => setEditName(e.target.value)} />
-            </div>
+            {selected.is_default ? (
+              <div className="text-sm text-sp-muted bg-sp-input/40 rounded p-3 space-y-1">
+                <p><span className="font-semibold text-sp-text">@everyone</span> applies to every member of the server.</p>
+                <p>To make a channel private, open its settings → Permissions and deny <em>View Channel</em> for @everyone, then allow it for the roles that should see it.</p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Role Name</label>
+                <input className="input w-full" value={editName} onChange={e => setEditName(e.target.value)} />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold uppercase text-sp-muted mb-1.5">Color</label>
               <div className="flex items-center gap-3">
@@ -644,42 +662,46 @@ function RolesTab({ serverId }: { serverId: string }) {
                 <span className="text-sm text-sp-muted font-mono">{editColor}</span>
               </div>
             </div>
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <div
-                  onClick={() => setEditAdmin(v => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editAdmin ? 'bg-sp-mention' : 'bg-sp-input'}`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editAdmin ? 'translate-x-5' : 'translate-x-0'}`} />
-                </div>
-                <span className="text-sm font-medium">Administrator</span>
-              </label>
-              <p className="text-xs text-sp-muted mt-1 ml-12">Members with this role can manage the server.</p>
-            </div>
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <div
-                  onClick={() => setEditHoist(v => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editHoist ? 'bg-sp-mention' : 'bg-sp-input'}`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editHoist ? 'translate-x-5' : 'translate-x-0'}`} />
-                </div>
-                <span className="text-sm font-medium">Display role members separately</span>
-              </label>
-              <p className="text-xs text-sp-muted mt-1 ml-12">Members with this role appear in their own section in the member list.</p>
-            </div>
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <div
-                  onClick={() => setEditMentionable(v => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editMentionable ? 'bg-sp-mention' : 'bg-sp-input'}`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editMentionable ? 'translate-x-5' : 'translate-x-0'}`} />
-                </div>
-                <span className="text-sm font-medium">Allow anyone to @mention this role</span>
-              </label>
-              <p className="text-xs text-sp-muted mt-1 ml-12">Anyone can ping all members of this role.</p>
-            </div>
+            {!selected.is_default && (
+              <>
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <div
+                    onClick={() => setEditAdmin(v => !v)}
+                    className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editAdmin ? 'bg-sp-mention' : 'bg-sp-input'}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editAdmin ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="text-sm font-medium">Administrator</span>
+                </label>
+                <p className="text-xs text-sp-muted mt-1 ml-12">Members with this role can manage the server.</p>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <div
+                    onClick={() => setEditHoist(v => !v)}
+                    className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editHoist ? 'bg-sp-mention' : 'bg-sp-input'}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editHoist ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="text-sm font-medium">Display role members separately</span>
+                </label>
+                <p className="text-xs text-sp-muted mt-1 ml-12">Members with this role appear in their own section in the member list.</p>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <div
+                    onClick={() => setEditMentionable(v => !v)}
+                    className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${editMentionable ? 'bg-sp-mention' : 'bg-sp-input'}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${editMentionable ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="text-sm font-medium">Allow anyone to @mention this role</span>
+                </label>
+                <p className="text-xs text-sp-muted mt-1 ml-12">Anyone can ping all members of this role.</p>
+              </div>
+              </>
+            )}
             <button className="btn" onClick={handleSaveRole}>Save Role</button>
           </div>
         ) : (

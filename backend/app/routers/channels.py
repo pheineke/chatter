@@ -4,6 +4,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
+from app.authz import visible_channel_ids
 from app.dependencies import CurrentUser, DB
 from app.routers.servers import _get_server_or_404, _require_member, _require_admin
 from app.ws_manager import manager
@@ -168,7 +169,9 @@ async def list_channels(server_id: uuid.UUID, current_user: CurrentUser, db: DB)
     result = await db.execute(
         select(Channel).where(Channel.server_id == server_id).order_by(Channel.position)
     )
-    return result.scalars().all()
+    channels = result.scalars().all()
+    visible = await visible_channel_ids(server_id, [c.id for c in channels], current_user.id, db)
+    return [c for c in channels if c.id in visible]
 
 
 @router.post("/channels", response_model=ChannelRead, status_code=status.HTTP_201_CREATED)
@@ -324,7 +327,9 @@ async def list_permissions(
 ):
     await _require_member(server_id, current_user.id, db)
     result = await db.execute(
-        select(ChannelPermission).where(ChannelPermission.channel_id == channel_id)
+        select(ChannelPermission)
+        .join(Channel, Channel.id == ChannelPermission.channel_id)
+        .where(ChannelPermission.channel_id == channel_id, Channel.server_id == server_id)
     )
     return result.scalars().all()
 
@@ -340,6 +345,12 @@ async def set_permission(
 ):
     server = await _get_server_or_404(server_id, db)
     await _require_admin(server, current_user.id, db)
+
+    ch = await db.execute(
+        select(Channel.id).where(Channel.id == channel_id, Channel.server_id == server_id)
+    )
+    if ch.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Channel not found")
 
     result = await db.execute(select(Role).where(Role.id == role_id, Role.server_id == server_id))
     if not result.scalar_one_or_none():
@@ -364,6 +375,15 @@ async def set_permission(
         db.add(perm)
     await db.commit()
     await db.refresh(perm)
+    # Visibility may have changed for some members: tell clients to refetch
+    # their (server-filtered) channel list rather than pushing channel data.
+    await manager.broadcast_server(
+        server_id,
+        {
+            "type": "channel.permissions_updated",
+            "data": {"server_id": str(server_id), "channel_id": str(channel_id)},
+        },
+    )
     return perm
 
 
