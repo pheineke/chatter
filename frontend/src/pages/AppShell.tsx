@@ -73,6 +73,16 @@ export default function AppShell() {
     currentPath: location.pathname,
   })
 
+  // The voice socket was closed by the server because we lost access.
+  useEffect(() => {
+    function onRevoked(e: Event) {
+      const { channelId } = (e as CustomEvent<{ channelId: string | null }>).detail
+      setVoiceSession(s => (s && s.channelId === channelId ? null : s))
+    }
+    window.addEventListener('voice-access-revoked', onRevoked)
+    return () => window.removeEventListener('voice-access-revoked', onRevoked)
+  }, [])
+
   function handleLeaveVoice() {
     setVoiceSession(null)
   }

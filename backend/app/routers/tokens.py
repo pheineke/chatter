@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import ws_enforcement
 from app.auth import generate_api_token
 from app.dependencies import CurrentUser, DB
 from models.api_token import ApiToken
@@ -125,3 +126,4 @@ async def revoke_token(
     api_token.revoked = True
     db.add(api_token)
     await db.commit()
+    await ws_enforcement.close_api_token(api_token.id)

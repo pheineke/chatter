@@ -27,6 +27,7 @@ from app.schemas.server import (
     CustomEmojiRead,
 )
 from app.schemas.user import UserRead, UserPublicRead
+from app import ws_enforcement
 from app.ws_manager import manager
 from app.services.audit_log_service import create_audit_log
 from models.audit_log import AuditLogAction
@@ -369,6 +370,8 @@ async def remove_member(
         server_id,
         {"type": event_type, "data": {"server_id": str(server_id), "user_id": str(user_id)}},
     )
+    # Their open sockets for this server must stop receiving events (S11).
+    await ws_enforcement.evict_from_server(server_id, user_id, db)
 
 
 @router.patch("/{server_id}/members/{user_id}/nick", response_model=MemberRead)
@@ -535,6 +538,7 @@ async def update_role(
         server_id,
         {"type": "role.updated", "data": RoleRead.model_validate(role).model_dump(mode="json")},
     )
+    await ws_enforcement.revalidate_server(server_id, db)
     return role
 
 
@@ -566,6 +570,7 @@ async def delete_role(
         server_id,
         {"type": "role.deleted", "data": {"server_id": str(server_id), "role_id": str(role_id)}},
     )
+    await ws_enforcement.revalidate_server(server_id, db)
 
 
 @router.post("/{server_id}/members/{user_id}/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -601,6 +606,7 @@ async def assign_role(
             server_id,
             {"type": "role.assigned", "data": {"server_id": str(server_id), "user_id": str(user_id), "role_id": str(role_id)}},
         )
+        await ws_enforcement.revalidate_server(server_id, db)
 
 
 @router.delete(
@@ -633,6 +639,7 @@ async def remove_role(
             server_id,
             {"type": "role.removed", "data": {"server_id": str(server_id), "user_id": str(user_id), "role_id": str(role_id)}},
         )
+        await ws_enforcement.revalidate_server(server_id, db)
 
 
 # ---- Word Filters -----------------------------------------------------------
@@ -716,6 +723,7 @@ async def ban_member(server_id: uuid.UUID, user_id: uuid.UUID, current_user: Cur
         server_id,
         {"type": "server.member_banned", "data": {"server_id": str(server_id), "user_id": str(user_id)}},
     )
+    await ws_enforcement.evict_from_server(server_id, user_id, db)
 
 
 @router.delete("/{server_id}/bans/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

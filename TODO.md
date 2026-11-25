@@ -13,7 +13,8 @@ Legend: 🔴 do first · 🟠 high value · 🟡 worthwhile · 🟢 polish · (S
 - [x] 🔴 S3: actually enforce channel permission bits (`VIEW_CHANNEL`, `SEND_MESSAGES`, …) Done, including an implicit `@everyone` role (`Role.is_default`) and a "Private channel" toggle in channel settings.
 - [x] 🔴 S4: remove/gate `POST /servers/{id}/join`
 - [x] S5, S6, S9, S10, S13, S14: proxy IPs for rate limiting, token TTL, edit path, reply leak, voice presence, usernames
-- [ ] 🟠 S7, S8, S11, S12: refresh race, upload caps, WS revocation, TLS
+- [x] S11: open WebSockets follow revocation, kicks/bans and permission changes
+- [ ] 🟠 S7, S8, S12: refresh race, upload caps, TLS
 
 ---
 
@@ -107,7 +108,8 @@ Each open channel, server and `/ws/me` opens its own socket and runs its own aut
 - [ ] Show a visible **lock icon / "encrypted" state** per channel and DM, plus a **safety-number-changed** warning (see privacy notes in the security pass).
 - [ ] QR-login approve screen: show the new device's browser/OS/IP and require an explicit confirmation (S18).
 - [x] "Private channel" toggle in channel settings (denies `VIEW_CHANNEL` for `@everyone`, shows who can still see it).
-- [ ] When a channel becomes hidden for someone who has it open, navigate them away (today they just start getting 403s). Pairs with S11 (close their channel WS).
+- [x] When a channel becomes hidden for someone who has it open, they're navigated away (channel list refetch) and their channel/voice socket is closed.
+- [ ] Close sockets when their JWT expires (today only on revoke), and when a server is deleted.
 
 ### 3.3 Accessibility 🟡
 Only **14** `aria-label`s across the app, and **19** clickable `<div>`/`<span>` elements.

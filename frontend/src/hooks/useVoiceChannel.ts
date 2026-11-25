@@ -112,6 +112,10 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     {
       enabled: channelId !== null && streamReady,
       onOpen: () => playSound('connectSound'),
+      // Kicked / lost View Channel mid-call: let the shell end the session.
+      onRejected: () => {
+        window.dispatchEvent(new CustomEvent('voice-access-revoked', { detail: { channelId } }))
+      },
       onMessage: (msg) => {
         switch (msg.type) {
           case 'voice.members': {

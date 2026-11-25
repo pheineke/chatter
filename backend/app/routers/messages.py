@@ -14,13 +14,14 @@ from sqlalchemy import delete, exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from app.authz import require_channel_perms
+from app.authz import channel_viewer_ids, require_channel_perms
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.dependencies import DB, CurrentUser
 from app.rate_limiter import check_and_set_slowmode, rate_limit_messages, rate_limit_reactions
 from app.schemas.message import MessageCreate, MessageRead, MessageUpdate, PinnedMessageRead
 from app.utils.file_validation import verify_attachment_magic
+from app import ws_enforcement
 from app.ws_manager import manager
 from models.channel import Channel, ChannelPerm, ChannelType
 from models.custom_emoji import CustomEmoji
@@ -108,6 +109,7 @@ async def _apply_word_filters(
                 server_id,
                 {"type": _event_type, "data": {"server_id": str(server_id), "user_id": str(author_id)}},
             )
+            await ws_enforcement.evict_from_server(server_id, author_id, db)
 
             detail = (
                 "You have been kicked from the server for violating content rules."
@@ -398,26 +400,22 @@ async def send_message(
         await manager.broadcast_channel(channel_id, _event)
 
         if _server_id:
-            # 2. Server-level "channel.message" for sidebar unread indicators
-            #    (hits every client connected to the server WS).
+            # 2. "channel.message" for sidebar unread indicators — only to
+            #    members who can view the channel, so a private channel's
+            #    activity isn't announced to everyone else.
+            #    Use a fresh session — the request session may be closed by now.
             notify_event = {
                 "type": "channel.message",
                 "data": {"channel_id": str(channel_id), "server_id": str(_server_id)},
             }
-            await manager.broadcast_server(_server_id, notify_event)
-
-            # 3. Push the same notification to each member's personal /ws/me
-            #    room so users on a different server or in DMs still see the badge.
-            #    Use a fresh session — the request session may be closed by now.
             async with AsyncSessionLocal() as new_db:
-                member_rows = await new_db.execute(
-                    select(ServerMember.user_id).where(
-                        ServerMember.server_id == _server_id,
-                        ServerMember.user_id != _sender_id,
-                    )
-                )
-                member_ids = member_rows.scalars().all()
-            await manager.broadcast_to_users(member_ids, notify_event)
+                ch = await new_db.get(Channel, channel_id)
+                viewers = set(await channel_viewer_ids(ch, new_db)) if ch else set()
+            await manager.broadcast_server_to(_server_id, viewers, notify_event)
+
+            # 3. Same notification to each viewer's personal /ws/me room so
+            #    users on a different server or in DMs still see the badge.
+            await manager.broadcast_to_users(list(viewers - {_sender_id}), notify_event)
 
         if _channel_type == ChannelType.dm:
             # Push the full message event to both participants' personal rooms

@@ -50,6 +50,46 @@ class ConnectionManager:
         logger.debug("WS disconnected room=%s", room)
 
     # ------------------------------------------------------------------
+    # Access enforcement
+    #
+    # Sockets carry their owner on ws.state.identity (set in
+    # app/ws_auth.py). These helpers let callers drop sockets after a
+    # session/API-token revoke, a kick/ban, or a permission change; see
+    # app/ws_enforcement.py for the policy that decides which ones.
+    # ------------------------------------------------------------------
+
+    def sockets_in(self, rooms: set[str] | None = None) -> list[tuple[str, WebSocket]]:
+        """(room, ws) pairs, optionally restricted to *rooms*."""
+        return [
+            (room, ws)
+            for room, members in list(self._rooms.items())
+            if rooms is None or room in rooms
+            for ws in list(members)
+        ]
+
+    async def drop(self, ws: WebSocket, code: int, reason: str) -> None:
+        """Remove *ws* from every room and close it."""
+        async with self._lock:
+            for room in [r for r, members in self._rooms.items() if ws in members]:
+                self._rooms[room].discard(ws)
+                if not self._rooms[room]:
+                    del self._rooms[room]
+        try:
+            await ws.close(code=code, reason=reason)
+        except Exception:
+            pass  # already closed
+
+    async def unsubscribe(self, ws: WebSocket, rooms: set[str]) -> None:
+        """Remove *ws* from *rooms* without closing it (multi-room sockets)."""
+        async with self._lock:
+            for room in rooms:
+                members = self._rooms.get(room)
+                if members is not None:
+                    members.discard(ws)
+                    if not members:
+                        del self._rooms[room]
+
+    # ------------------------------------------------------------------
     # Broadcast helpers (by room key)
     # ------------------------------------------------------------------
 
@@ -102,6 +142,25 @@ class ConnectionManager:
 
     async def broadcast_server(self, server_id: uuid.UUID, event: dict[str, Any]) -> None:
         await self.broadcast(self.server_room(server_id), event)
+
+    async def broadcast_server_to(
+        self, server_id: uuid.UUID, user_ids: set[uuid.UUID], event: dict[str, Any]
+    ) -> None:
+        """Broadcast to the server room, but only to sockets owned by *user_ids*
+        (e.g. activity in a channel some members can't see)."""
+        payload = json.dumps(event, default=str)
+        room = self.server_room(server_id)
+        dead: list[WebSocket] = []
+        for ws in list(self._rooms.get(room, [])):
+            identity = getattr(ws.state, "identity", None)
+            if identity is None or identity.user_id not in user_ids:
+                continue
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            await self.disconnect(room, ws)
 
     async def broadcast_user(self, user_id: uuid.UUID, event: dict[str, Any]) -> None:
         await self.broadcast(self.user_room(user_id), event)

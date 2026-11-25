@@ -187,6 +187,18 @@ class VoiceManager:
     # Query
     # ------------------------------------------------------------------
 
+    def participant_sockets(
+        self, channel_ids: set[uuid.UUID] | None = None
+    ) -> list[tuple[uuid.UUID, uuid.UUID, WebSocket]]:
+        """(channel_id, user_id, ws) for every live participant, optionally
+        limited to *channel_ids*. Used to drop participants who lost access."""
+        return [
+            (cid, uid, p.ws)
+            for cid, room in list(self._rooms.items())
+            if channel_ids is None or cid in channel_ids
+            for uid, p in list(room.items())
+        ]
+
     def get_participants(self, channel_id: uuid.UUID) -> list[dict[str, Any]]:
         return [p.to_dict() for p in self._rooms.get(channel_id, {}).values()]
 

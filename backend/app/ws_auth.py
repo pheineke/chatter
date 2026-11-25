@@ -36,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from dataclasses import dataclass
 
 from fastapi import WebSocket
 from sqlalchemy import select
@@ -50,10 +51,25 @@ from models.refresh_token import RefreshToken
 AUTH_TIMEOUT_SECONDS = 10
 
 
-async def _resolve_token(token: str) -> uuid.UUID | None:
-    """Validate a JWT access token or personal API token, return the owning
-    user_id, or None if invalid/revoked/expired. Mirrors the HTTP auth logic
-    in app/dependencies.py's get_current_user.
+@dataclass(frozen=True)
+class WSIdentity:
+    """Who a socket belongs to. Stored on ``ws.state.identity`` so the
+    connection manager can close the right sockets when a session or API
+    token is revoked, or a user loses access to a server or channel."""
+
+    user_id: uuid.UUID
+    session_id: uuid.UUID | None = None    # JWT logins (refresh_tokens.id)
+    api_token_id: uuid.UUID | None = None  # personal API / bot tokens
+
+
+def identity_of(ws) -> WSIdentity | None:
+    return getattr(ws.state, "identity", None)
+
+
+async def _resolve_token(token: str) -> WSIdentity | None:
+    """Validate a JWT access token or personal API token and return who it
+    belongs to, or None if invalid/revoked/expired. Mirrors the HTTP auth
+    logic in app/dependencies.py's get_current_user.
     """
     payload = decode_access_token(token)
     if payload is not None:
@@ -73,7 +89,7 @@ async def _resolve_token(token: str) -> uuid.UUID | None:
             rt = await db.execute(select(RefreshToken).where(RefreshToken.id == session_id))
             rt_row = rt.scalar_one_or_none()
         if rt_row and not rt_row.revoked:
-            return user_id
+            return WSIdentity(user_id=user_id, session_id=session_id)
         return None
 
     # Not a valid JWT — fall back to a personal API token
@@ -89,7 +105,7 @@ async def _resolve_token(token: str) -> uuid.UUID | None:
             )
             api_token = result.scalar_one_or_none()
         if api_token is not None:
-            return api_token.user_id
+            return WSIdentity(user_id=api_token.user_id, api_token_id=api_token.id)
 
     return None
 
@@ -123,10 +139,11 @@ async def accept_and_authenticate(ws: WebSocket) -> uuid.UUID | None:
         await ws.close(code=4001, reason='First message must be {"type": "auth", "token": "..."}')
         return None
 
-    user_id = await _resolve_token(token)
-    if user_id is None:
+    identity = await _resolve_token(token)
+    if identity is None:
         await ws.close(code=4001, reason="Invalid or expired token")
         return None
 
-    await ws.send_text(json.dumps({"type": "auth.ok", "data": {"user_id": str(user_id)}}))
-    return user_id
+    ws.state.identity = identity
+    await ws.send_text(json.dumps({"type": "auth.ok", "data": {"user_id": str(identity.user_id)}}))
+    return identity.user_id

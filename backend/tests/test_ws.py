@@ -373,3 +373,154 @@ def test_ws_private_channel_rejects_member_without_view(ws_app):
 def test_ws_private_voice_channel_rejects_member_without_view(ws_app):
     _, member, channel_id = _private_channel_setup(ws_app, "wsvpriv", kind="voice")
     _assert_rejected(ws_app, f"/ws/voice/{channel_id}", member)
+
+
+
+# ---------------------------------------------------------------------------
+# S11: open sockets follow access changes (app/ws_enforcement.py)
+# ---------------------------------------------------------------------------
+
+def _expect_close(ws, code: int, max_frames: int = 25):
+    """Read (and ignore) frames until the server closes the socket; assert the code."""
+    with pytest.raises(WebSocketDisconnect) as exc:
+        for _ in range(max_frames):
+            ws.receive_json()
+    assert exc.value.code == code
+
+
+def _h(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _server_with_member(ws_app, prefix: str, kind: str = "text"):
+    owner = _get_token(ws_app, f"{prefix}_own")
+    member = _get_token(ws_app, f"{prefix}_mem")
+    server_id = ws_app.post("/servers/", json={"title": prefix}, headers=_h(owner)).json()["id"]
+    channel_id = ws_app.post(
+        f"/servers/{server_id}/channels", json={"title": "c", "type": kind}, headers=_h(owner)
+    ).json()["id"]
+    code = ws_app.post(f"/servers/{server_id}/invites", json={}, headers=_h(owner)).json()["code"]
+    assert ws_app.post(f"/invites/{code}/join", headers=_h(member)).status_code == 200
+    member_id = ws_app.get("/users/me", headers=_h(member)).json()["id"]
+    return owner, member, member_id, server_id, channel_id
+
+
+def _everyone_id(ws_app, owner, server_id):
+    roles = ws_app.get(f"/servers/{server_id}/roles", headers=_h(owner)).json()
+    return next(r["id"] for r in roles if r["is_default"])
+
+
+@pytest.mark.timeout(20)
+def test_revoked_session_closes_its_sockets(ws_app):
+    _get_token(ws_app, "s11_sess")  # registers
+    a = ws_app.post("/auth/login", data={"username": "s11_sess", "password": "pass1234"}).json()
+    b = ws_app.post("/auth/login", data={"username": "s11_sess", "password": "pass1234"}).json()
+    sessions = ws_app.get("/auth/sessions", headers=_h(a["access_token"])).json()
+    b_sid = next(s["id"] for s in sessions if not s["is_current"])
+
+    with ws_app.websocket_connect("/ws/me") as ws_a, ws_app.websocket_connect("/ws/me") as ws_b:
+        assert _ws_authenticate(ws_a, a["access_token"])["type"] == "auth.ok"
+        assert _ws_authenticate(ws_b, b["access_token"])["type"] == "auth.ok"
+        assert ws_app.delete(f"/auth/sessions/{b_sid}", headers=_h(a["access_token"])).status_code == 204
+        _expect_close(ws_b, 4001)
+        # The other session's socket is untouched.
+        ws_a.send_json({"type": "ping"})
+
+
+@pytest.mark.timeout(20)
+def test_logout_closes_that_sessions_sockets(ws_app):
+    _get_token(ws_app, "s11_logout")
+    t = ws_app.post("/auth/login", data={"username": "s11_logout", "password": "pass1234"}).json()
+    with ws_app.websocket_connect("/ws/me") as ws:
+        assert _ws_authenticate(ws, t["access_token"])["type"] == "auth.ok"
+        assert ws_app.post("/auth/logout", json={"refresh_token": t["refresh_token"]}).status_code == 204
+        _expect_close(ws, 4001)
+
+
+@pytest.mark.timeout(20)
+def test_kick_closes_server_and_channel_sockets(ws_app):
+    owner, member, member_id, server_id, channel_id = _server_with_member(ws_app, "s11kick")
+    with ws_app.websocket_connect(f"/ws/servers/{server_id}") as ws_srv, \
+         ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws_ch:
+        assert _ws_authenticate(ws_srv, member)["type"] == "auth.ok"
+        assert _ws_authenticate(ws_ch, member)["type"] == "auth.ok"
+        r = ws_app.delete(f"/servers/{server_id}/members/{member_id}", headers=_h(owner))
+        assert r.status_code == 204
+        _expect_close(ws_srv, 4003)  # after receiving the member_kicked event
+        _expect_close(ws_ch, 4003)
+
+
+@pytest.mark.timeout(20)
+def test_ban_closes_voice_socket(ws_app):
+    owner, member, member_id, server_id, channel_id = _server_with_member(ws_app, "s11ban", kind="voice")
+    with ws_app.websocket_connect(f"/ws/voice/{channel_id}") as ws:
+        assert _ws_authenticate(ws, member)["type"] == "auth.ok"
+        assert ws_app.post(f"/servers/{server_id}/bans/{member_id}", headers=_h(owner)).status_code == 204
+        _expect_close(ws, 4003)
+
+
+@pytest.mark.timeout(20)
+def test_making_channel_private_closes_member_socket(ws_app):
+    owner, member, _mid, server_id, channel_id = _server_with_member(ws_app, "s11priv")
+    everyone = _everyone_id(ws_app, owner, server_id)
+    with ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws_mem, \
+         ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws_own:
+        assert _ws_authenticate(ws_mem, member)["type"] == "auth.ok"
+        assert _ws_authenticate(ws_own, owner)["type"] == "auth.ok"
+        r = ws_app.put(
+            f"/servers/{server_id}/channels/{channel_id}/permissions/{everyone}",
+            json={"allow_bits": 0, "deny_bits": 1},
+            headers=_h(owner),
+        )
+        assert r.status_code == 200
+        _expect_close(ws_mem, 4003)
+        # Owner keeps the stream: a new message still arrives.
+        ws_app.post(f"/channels/{channel_id}/messages", json={"content": "still here"}, headers=_h(owner))
+        for _ in range(10):
+            ev = ws_own.receive_json()
+            if ev["type"] == "message.created":
+                assert ev["data"]["content"] == "still here"
+                break
+        else:
+            pytest.fail("owner stopped receiving channel events")
+
+
+@pytest.mark.timeout(20)
+def test_losing_role_closes_socket_of_private_channel(ws_app):
+    owner, member, member_id, server_id, channel_id = _server_with_member(ws_app, "s11role")
+    everyone = _everyone_id(ws_app, owner, server_id)
+    vip = ws_app.post(f"/servers/{server_id}/roles", json={"name": "VIP"}, headers=_h(owner)).json()["id"]
+    ws_app.put(f"/servers/{server_id}/channels/{channel_id}/permissions/{everyone}",
+               json={"allow_bits": 0, "deny_bits": 1}, headers=_h(owner))
+    ws_app.put(f"/servers/{server_id}/channels/{channel_id}/permissions/{vip}",
+               json={"allow_bits": 1, "deny_bits": 0}, headers=_h(owner))
+    ws_app.post(f"/servers/{server_id}/members/{member_id}/roles/{vip}", headers=_h(owner))
+
+    with ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws:
+        assert _ws_authenticate(ws, member)["type"] == "auth.ok"
+        r = ws_app.delete(f"/servers/{server_id}/members/{member_id}/roles/{vip}", headers=_h(owner))
+        assert r.status_code == 204
+        _expect_close(ws, 4003)
+
+
+@pytest.mark.timeout(20)
+def test_private_channel_activity_not_announced_to_non_viewers(ws_app):
+    owner, member, _mid, server_id, hidden = _server_with_member(ws_app, "s11badge")
+    visible = ws_app.post(f"/servers/{server_id}/channels", json={"title": "open", "type": "text"},
+                          headers=_h(owner)).json()["id"]
+    everyone = _everyone_id(ws_app, owner, server_id)
+    ws_app.put(f"/servers/{server_id}/channels/{hidden}/permissions/{everyone}",
+               json={"allow_bits": 0, "deny_bits": 1}, headers=_h(owner))
+
+    with ws_app.websocket_connect(f"/ws/servers/{server_id}") as ws:
+        assert _ws_authenticate(ws, member)["type"] == "auth.ok"
+        ws_app.post(f"/channels/{hidden}/messages", json={"content": "secret"}, headers=_h(owner))
+        ws_app.post(f"/channels/{visible}/messages", json={"content": "hi"}, headers=_h(owner))
+        for _ in range(15):
+            ev = ws.receive_json()
+            if ev["type"] == "channel.message":
+                # The first badge the member sees must be for the visible channel.
+                assert ev["data"]["channel_id"] == visible
+                break
+        else:
+            pytest.fail("no channel.message received")

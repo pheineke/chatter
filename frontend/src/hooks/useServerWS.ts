@@ -243,8 +243,12 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
         case 'role.created':
         case 'role.updated':
         case 'role.deleted':
+        case 'role.assigned':
+        case 'role.removed':
           qc.invalidateQueries({ queryKey: ['roles', serverId] })
           qc.invalidateQueries({ queryKey: ['members', serverId] })
+          // Role changes can change which channels we may see.
+          qc.invalidateQueries({ queryKey: ['channels', serverId] })
           break
         default:
           break

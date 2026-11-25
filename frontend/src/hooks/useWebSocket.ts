@@ -8,6 +8,8 @@ export type WSMessage = { type: string; data?: unknown } & Record<string, unknow
 interface Options {
   onMessage: (msg: WSMessage) => void
   onOpen?: () => void
+  /** Server closed with 4003/4004: we're not allowed here (any more). No reconnect. */
+  onRejected?: (code: number) => void
   enabled?: boolean
 }
 
@@ -44,12 +46,13 @@ async function tryRefreshToken(): Promise<boolean> {
  * `onMessage` — is deferred until that ack arrives, so callers can treat
  * `onOpen` as "authenticated and ready" exactly like before.
  *
- * Close code 4001 (expired/invalid token) triggers a token refresh before
- * the next reconnect attempt. Code 4008 (server gave up waiting for the
+ * Close code 4001 (expired/invalid/revoked token) triggers a token refresh
+ * before the next reconnect attempt. 4003/4004 (no access / not found) stop
+ * reconnecting and call `onRejected`. Code 4008 (server gave up waiting for the
  * auth frame) is treated the same as any other drop — reconnect with
  * back-off.
  */
-export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }: Options) {
+export function useWebSocket(path: string, { onMessage, onOpen, onRejected, enabled = true }: Options) {
   const wsRef = useRef<WebSocket | null>(null)
   const authenticatedRef = useRef(false)   // gates send() until auth.ok is received
   const reconnectDelay = useRef(1000)
@@ -58,6 +61,8 @@ export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }
   onMessageRef.current = onMessage
   const onOpenRef = useRef(onOpen)
   onOpenRef.current = onOpen
+  const onRejectedRef = useRef(onRejected)
+  onRejectedRef.current = onRejected
 
   const connect = useCallback((gen: number) => {
     if (generation.current !== gen) return   // a newer generation took over
@@ -95,6 +100,13 @@ export function useWebSocket(path: string, { onMessage, onOpen, enabled = true }
 
     ws.onclose = (event) => {
       if (generation.current !== gen) return   // cleanup already ran — don't reconnect
+
+      // 4003 forbidden (kicked, banned, lost View Channel) / 4004 not found:
+      // reconnecting would just be rejected again, so stop here.
+      if (event.code === 4003 || event.code === 4004) {
+        onRejectedRef.current?.(event.code)
+        return
+      }
 
       const delay = reconnectDelay.current
       reconnectDelay.current = Math.min(delay * 2, 30_000)

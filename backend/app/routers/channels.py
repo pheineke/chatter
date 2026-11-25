@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.authz import visible_channel_ids
 from app.dependencies import CurrentUser, DB
 from app.routers.servers import _get_server_or_404, _require_member, _require_admin
+from app import ws_enforcement
 from app.ws_manager import manager
 from app.services.audit_log_service import create_audit_log
 from models.audit_log import AuditLogAction
@@ -384,6 +385,7 @@ async def set_permission(
             "data": {"server_id": str(server_id), "channel_id": str(channel_id)},
         },
     )
+    await ws_enforcement.revalidate_server(server_id, db)
     return perm
 
 

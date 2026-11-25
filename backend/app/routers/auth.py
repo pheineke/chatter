@@ -16,6 +16,7 @@ from app.auth import (
 )
 from app.config import settings
 from app.dependencies import CurrentUser, DB
+from app import ws_enforcement
 from app.rate_limiter import rate_limit_auth, rate_limit_auth_login
 from app.schemas.user import UserCreate, UserRead, Token
 from models.refresh_token import RefreshToken
@@ -113,6 +114,7 @@ async def refresh_token(request: Request, body: RefreshRequest, db: DB):
                 delete(RefreshToken).where(RefreshToken.user_id == token_row.user_id)
             )
             await db.commit()
+            await ws_enforcement.close_user_sessions(token_row.user_id)
         raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
 
     expires_at = token_row.expires_at
@@ -141,6 +143,7 @@ async def logout(body: RefreshRequest, db: DB):
     if token_row and not token_row.revoked:
         token_row.revoked = True
         await db.commit()
+        await ws_enforcement.close_session(token_row.id)
 
 
 # ── Session management endpoints ──────────────────────────────────────────────
@@ -198,6 +201,7 @@ async def revoke_session(session_id: str, current_user: CurrentUser, db: DB):
         raise HTTPException(status_code=404, detail="Session not found")
     row.revoked = True
     await db.commit()
+    await ws_enforcement.close_session(row.id)
 
 
 class RevokeOthersRequest(BaseModel):
@@ -218,12 +222,14 @@ async def revoke_all_other_sessions(
     )
     keep_row = result.scalar_one_or_none()
 
+    keep_id = None
     if keep_row is None or keep_row.user_id != current_user.id:
         # Revoke everything — either the token is wrong or user mismatch
         await db.execute(
             delete(RefreshToken).where(RefreshToken.user_id == current_user.id)
         )
     else:
+        keep_id = keep_row.id
         await db.execute(
             delete(RefreshToken).where(
                 RefreshToken.user_id == current_user.id,
@@ -231,3 +237,4 @@ async def revoke_all_other_sessions(
             )
         )
     await db.commit()
+    await ws_enforcement.close_user_sessions(current_user.id, keep_session=keep_id)

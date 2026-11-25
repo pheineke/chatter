@@ -264,6 +264,9 @@ async def bot_gateway_ws(
     user_id = await accept_and_authenticate(ws)
     if user_id is None:
         return
+    # One connection, many rooms: on kick/ban it's unsubscribed from that
+    # server's rooms instead of being closed (see app/ws_enforcement.py).
+    ws.state.multi_room = True
 
     # Gather all rooms: personal + all servers the user belongs to
     async with AsyncSessionLocal() as db:

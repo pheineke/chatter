@@ -8,7 +8,7 @@ FastAPI app with the real database dependency replaced by the per-test session.
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool, StaticPool
+from sqlalchemy.pool import NullPool
 
 # Ensure backend/ is on sys.path whether pytest is run from backend/ or the
 # repo root.
@@ -35,40 +35,47 @@ import main  # noqa: E402,F401  (imported for its import side effects)
 # Database fixture
 # ---------------------------------------------------------------------------
 
-# Default: a fresh in-memory SQLite DB per test. Set TEST_DATABASE_URL to run
+# Default: a fresh file-backed SQLite DB per test. Set TEST_DATABASE_URL to run
 # the whole suite against Postgres instead (CI does), e.g.
 #   TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:55432/chat_test
 # The tables are created and dropped around every test either way.
-DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite")
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 
 def make_test_engine(threaded: bool = False):
-    """Engine for the test DB.
+    """Engine for the test DB, with one connection per session — like production.
 
-    SQLite :memory: needs StaticPool so every session shares the one
-    connection (and therefore the one database). That breaks when several
-    event loops touch it at once, which is what starlette's TestClient does
-    for WebSockets (each runs on its own portal thread/loop). So
-    ``threaded=True`` uses a throwaway SQLite *file* with a connection per
-    session instead.
+    SQLite: a throwaway file in WAL mode (readers don't block the writer).
+    An in-memory DB would force every session onto a single shared
+    connection, and then concurrent sessions (e.g. the background notifier
+    spawned by send_message, or WebSocket handlers on TestClient's portal
+    thread) interfere with each other's transactions in ways production never
+    sees. *threaded* is kept for call-site readability; both paths are the same.
     """
-    if IS_SQLITE and threaded:
+    if IS_SQLITE:
         import atexit
         import shutil
         import tempfile
 
+        from sqlalchemy import event
+
         tmp = tempfile.mkdtemp(prefix="chat-test-")
         atexit.register(shutil.rmtree, tmp, ignore_errors=True)
-        return create_async_engine(
+        engine = create_async_engine(
             f"sqlite+aiosqlite:///{tmp}/test.db",
             connect_args={"check_same_thread": False, "timeout": 30},
             poolclass=NullPool,
         )
-    if IS_SQLITE:
-        return create_async_engine(
-            DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
-        )
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def _pragmas(dbapi_conn, _record):
+            cur = dbapi_conn.cursor()
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.close()
+
+        return engine
     # NullPool: TestClient-based fixtures hop between event loops, and pooled
     # asyncpg connections are bound to the loop that created them.
     return create_async_engine(DATABASE_URL, poolclass=NullPool)

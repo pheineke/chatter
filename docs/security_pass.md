@@ -82,6 +82,7 @@ The code defaults to 15 minutes and is designed around short-lived access tokens
 - **Fix:** reject a `reply_to_id` whose `channel_id` doesn't match, or null the preview when the viewer can't access it.
 
 ### S11. Revocation/kick doesn't apply to open WebSockets
+> **✅ Fixed (2026-11-25).** Sockets carry their owner (user, session, API token) from the auth handshake. `app/ws_enforcement.py` closes them with 4001 on session/token revoke, logout and refresh-token reuse, and with 4003 on kick/ban/leave and whenever permissions change (overwrites, role assign/remove/update/delete) for anyone who lost View Channel, voice included. The bot gateway is unsubscribed from the server instead of closed. Unread badges for a private channel now only go to its viewers. Frontend stops reconnecting on 4003/4004 and ends a voice call that was revoked. **Not covered:** a long-lived socket isn't closed when its access token *expires* (only when revoked); and deleting a server doesn't close sockets for its channels.
 WS auth happens once at connect (`ws_auth.py`). After a session is revoked, a password change, a kick or a ban, existing `/ws/channels`, `/ws/servers`, `/ws/voice` and `/ws/bot` connections **keep receiving events**. The bot gateway snapshots server membership at connect.
 - **Fix:** on revoke, kick or ban, call `manager.disconnect_user(user_id, server_id=…)` and close the affected sockets. Also re-validate the session every N minutes inside long-lived loops, or close sockets when the JWT `exp` passes.
 
