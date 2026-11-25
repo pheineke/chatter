@@ -82,7 +82,7 @@ export default function LoginPage() {
 
         <p className="mt-4 text-sm text-sp-muted">
           Need an account?{' '}
-          <Link to="/register" className="text-sp-mention hover:underline">
+          <Link to="/register" state={location.state} className="text-sp-mention hover:underline">
             Register
           </Link>
         </p>

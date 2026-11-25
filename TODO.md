@@ -16,7 +16,7 @@ Legend: 🔴 do first · 🟠 high value · 🟡 worthwhile · 🟢 polish · (S
 - [x] S11: open WebSockets follow revocation, kicks/bans and permission changes
 - [x] S8: upload size caps, rate limit, per-message cap, quota, disk floor, decompression bombs
 - [x] 🟠 S7: refresh race (see security_pass.md)
-- [ ] 🟠 S12: TLS
+- [x] 🟠 S12: TLS (`docker-compose.prod.yml` + Caddy, see docs/deploying.md)
 - [ ] Client-side size check for avatar/banner/server image/emoji/font uploads too (only the message composer has it).
 - [ ] Delete attachment files when their message is deleted (they count against the quota and stay reachable by URL).
 
@@ -143,11 +143,15 @@ Only **14** `aria-label`s across the app, and **19** clickable `<div>`/`<span>` 
 ---
 
 ## 4. Ops / deploy (to go public)
-- [ ] TLS reverse proxy (Caddy) in `docker-compose.prod.yml`, with HSTS (S12).
-- [ ] `uvicorn --proxy-headers --forwarded-allow-ips` (S5).
-- [ ] Non-root, multi-stage backend image (S24). Add a `healthcheck:` for each service and `depends_on: condition: service_healthy` for the DB.
-- [ ] Backups: a nightly `pg_dump` plus `static/` volume snapshot, and a documented restore.
+- [x] TLS reverse proxy (Caddy) in `docker-compose.prod.yml`, with HSTS (S12). Guide: `docs/deploying.md`.
+- [x] `uvicorn --proxy-headers --forwarded-allow-ips` (S5).
+- [x] Non-root, multi-stage backend image (S24); compose adds `read_only`, `cap_drop: [ALL]`, `no-new-privileges`.
+- [ ] Add a `healthcheck:` for each service and `depends_on: condition: service_healthy` for the DB.
+- [ ] Frontend: an unprivileged nginx image (`nginxinc/nginx-unprivileged`) and `cap_drop` there too.
+- [ ] The Caddy → nginx → backend chain was validated piece by piece (configs, the hardened backend container), not yet as a running stack with a real certificate. Do one trial deploy.
+- [x] Backups: `scripts/backup.sh` (pg_dump + static/, 14-day rotation), restore documented in `docs/deploying.md`. Test a restore once.
 - [ ] TURN server (coturn) for voice behind NAT and for IP privacy.
 - [ ] Basic observability: access logs without tokens, error tracking (self-hosted GlitchTip/Sentry), disk-usage alert (uploads on a Pi SD card).
-- [ ] Registration controls: invite-only / closed-registration switch, optional CAPTCHA (hCaptcha/Turnstile), and email verification if email is ever added.
+- [x] Registration switch: `REGISTRATION_MODE=open|invite|closed`.
+- [ ] Optional CAPTCHA (hCaptcha/Turnstile), and email verification if email is ever added.
 - [ ] A `SECURITY.md` with a vulnerability-reporting contact, plus Terms/Privacy pages.

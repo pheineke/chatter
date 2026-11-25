@@ -16,6 +16,16 @@ import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+# Uploads made by tests go to a throwaway directory, not backend/static (which
+# docker-compose bind-mounts into the running app). Must be set before
+# app.config is imported.
+import atexit  # noqa: E402
+import shutil  # noqa: E402
+import tempfile  # noqa: E402
+_TEST_STATIC = tempfile.mkdtemp(prefix="chatter-test-static-")
+os.environ["STATIC_DIR"] = _TEST_STATIC
+atexit.register(shutil.rmtree, _TEST_STATIC, ignore_errors=True)
+
 from app.database import get_db
 from models.base import Base
 

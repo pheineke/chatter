@@ -23,10 +23,17 @@ from app.routers import audit_logs as audit_logs_router
 from app.routers import interactions as interactions_router
 from app.routers import mls as mls_router
 
+_production = settings.environment.lower() == "production"
+
 app = FastAPI(
     title="Chat API",
     description="Discord-inspired real-time chat backend",
     version="0.1.0",
+    # The interactive docs and schema map out every endpoint for anyone who
+    # finds the server; keep them for local development only (S23).
+    docs_url=None if _production else "/docs",
+    redoc_url=None if _production else "/redoc",
+    openapi_url=None if _production else "/openapi.json",
 )
 
 # Static files (avatars, attachments, server images …)
@@ -72,6 +79,29 @@ async def force_attachment_download(request: Request, call_next):
     if request.url.path.startswith("/static/attachments/"):
         filename = request.url.path.rsplit("/", 1)[-1]
         response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+# Headers on every backend response, so a deploy that exposes :8000 directly
+# (no nginx in front) still gets them (S23). The API only returns JSON and
+# user-uploaded files, never pages, so the CSP can forbid everything: an
+# uploaded HTML/SVG opened directly can't run script or load anything.
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; sandbox",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for name, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    if request.url.path.startswith("/auth/"):  # token responses: never cache
+        response.headers.setdefault("Cache-Control", "no-store")
     return response
 
 

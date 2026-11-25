@@ -1,6 +1,6 @@
 import sys
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     # Access tokens are short-lived; rotating refresh tokens extend sessions securely
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+    # Who may create an account:
+    #   open    anyone (default, convenient for local development)
+    #   invite  only with a valid server invite code; the first account on an
+    #           empty instance is always allowed, so the owner can bootstrap
+    #   closed  nobody (existing accounts keep working)
+    registration_mode: Literal["open", "invite", "closed"] = "open"
     # A rotated refresh token replayed within this many seconds is rejected
     # without wiping the user's other sessions (two tabs refreshing at once,
     # a response lost in transit). Later replays are treated as theft.

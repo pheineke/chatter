@@ -95,3 +95,6 @@ frontend/output.css
 
 # ── Backend development data ─────────────────────────────────────────────────
 backend_data/
+
+# ── Backups (scripts/backup.sh) ──
+backups/

@@ -1,0 +1,37 @@
+# Public deployment overlay: HTTPS via Caddy in front of nginx.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# or put COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml in .env and
+# use plain `docker compose`. See docs/deploying.md.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      - DOMAIN=${DOMAIN:?Set DOMAIN in .env to your public hostname}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificates: keep this volume
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+  frontend:
+    # Only Caddy talks to nginx now; don't publish plain HTTP.
+    ports: !reset []
+    volumes:
+      - ./deploy/nginx-real-ip.conf:/etc/nginx/conf.d/00-real-ip.conf:ro
+
+  backend:
+    environment:
+      - ENVIRONMENT=production
+      - REGISTRATION_MODE=${REGISTRATION_MODE:-invite}
+
+volumes:
+  caddy_data:
+  caddy_config:

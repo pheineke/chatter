@@ -8,3 +8,6 @@ venv
 *.log
 static/attachments
 static/avatars
+static/*
+tests
+.pytest_cache

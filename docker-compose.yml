@@ -32,6 +32,16 @@ services:
       # silently mean "everybody is". With `-`, only a genuinely absent
       # variable falls back to the permissive dev default.
       - DECORATION_ADMIN_IDS=${DECORATION_ADMIN_IDS-*}
+      - REGISTRATION_MODE=${REGISTRATION_MODE:-open}
+    # Least privilege (S24): the image runs as a non-root user; on top of that
+    # the filesystem is read-only except static/ (the volume) and /tmp, and
+    # the container gets no Linux capabilities.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     # Deliberately no `ports:` here. The backend trusts X-Forwarded-For from
     # any sender (see backend/Dockerfile), which is only safe while nginx is
     # the sole way in.
@@ -44,7 +54,9 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "9090:80"
+      - "${HTTP_PORT:-9090}:80"
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - backend
 

@@ -3,7 +3,7 @@ import unicodedata
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from models.user import UserStatus, DMPermission
 from app.utils.sanitize import strip_html
@@ -25,6 +25,8 @@ USERNAME_RE = re.compile(r'[A-Za-z0-9_]{2,32}')
 class UserCreate(BaseModel):
     username: str
     password: str
+    # Required when REGISTRATION_MODE=invite (see auth.register).
+    invite_code: str | None = Field(default=None, max_length=64)
 
     @field_validator('username')
     @classmethod

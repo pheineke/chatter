@@ -1,0 +1,19 @@
+# TLS front for a public deployment (docs/security_pass.md S12).
+# Caddy gets and renews a Let's Encrypt certificate for $DOMAIN on its own;
+# port 80 only redirects to HTTPS. WebSockets (wss://) work through
+# reverse_proxy without extra config.
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		# Browsers remember to use HTTPS only for a year. Deliberately without
+		# includeSubDomains/preload: those affect every subdomain of $DOMAIN
+		# and are hard to undo.
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Caddy replaces X-Forwarded-For with the real client IP (it doesn't
+	# trust what clients send) and sets X-Forwarded-Proto: https.
+	reverse_proxy frontend:80
+}

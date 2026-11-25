@@ -126,6 +126,6 @@ describe('register()', () => {
     await waitFor(() => expect(screen.queryByTestId('loading')).toBeNull())
 
     await user.click(screen.getByText('register'))
-    expect(mockRegister).toHaveBeenCalledWith('alice', 'pw')
+    expect(mockRegister).toHaveBeenCalledWith('alice', 'pw', undefined)
   })
 })

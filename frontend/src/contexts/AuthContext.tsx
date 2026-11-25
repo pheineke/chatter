@@ -10,7 +10,7 @@ export interface AuthContextValue {
   login: (username: string, password: string) => Promise<void>
   /** Authenticate using a pre-issued token pair (e.g. from QR login). */
   loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>
-  register: (username: string, password: string) => Promise<void>
+  register: (username: string, password: string, inviteCode?: string) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
   /** Patch a subset of fields on the current user without a network round-trip. */
@@ -93,8 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refreshUser()
   }
 
-  const register = async (username: string, password: string) => {
-    await apiRegister(username, password)
+  const register = async (username: string, password: string, inviteCode?: string) => {
+    await apiRegister(username, password, inviteCode)
   }
 
   const logout = () => {

@@ -1,9 +1,18 @@
 import client from './client'
 import type { User } from './types'
 
-export async function register(username: string, password: string): Promise<User> {
-  const { data } = await client.post<User>('/auth/register', { username, password })
+export async function register(username: string, password: string, inviteCode?: string): Promise<User> {
+  const body = inviteCode ? { username, password, invite_code: inviteCode } : { username, password }
+  const { data } = await client.post<User>('/auth/register', body)
   return data
+}
+
+export type RegistrationMode = 'open' | 'invite' | 'closed'
+
+/** Public: who may sign up on this instance (backend REGISTRATION_MODE). */
+export async function getRegistrationMode(): Promise<RegistrationMode> {
+  const { data } = await client.get<{ registration_mode: RegistrationMode }>('/auth/config')
+  return data.registration_mode
 }
 
 export async function login(username: string, password: string): Promise<{ access_token: string; refresh_token: string }> {

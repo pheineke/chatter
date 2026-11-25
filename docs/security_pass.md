@@ -89,6 +89,7 @@ WS auth happens once at connect (`ws_auth.py`). After a session is revoked, a pa
 - **Fix:** on revoke, kick or ban, call `manager.disconnect_user(user_id, server_id=…)` and close the affected sockets. Also re-validate the session every N minutes inside long-lived loops, or close sockets when the JWT `exp` passes.
 
 ### S12. No TLS in the shipped deployment
+> **✅ Fixed (2026-11-25).** `docker-compose.prod.yml` puts Caddy in front (automatic Let's Encrypt, HSTS `max-age=31536000`), stops publishing nginx's plain-HTTP port, and passes the real client IP and `X-Forwarded-Proto` through. Guide: `docs/deploying.md`. Not done: refusing to start in production without HTTPS (the backend can't tell reliably at boot).
 `docker-compose.yml` exposes plain HTTP on `:9090`. There's no HSTS and no `wss://`. Passwords, bearer tokens, refresh tokens and the QR-login key exchange all travel in cleartext unless something else terminates TLS.
 - **Fix:** document and ship a TLS front (Caddy or Traefik with Let's Encrypt, or Cloudflare Tunnel). Add `Strict-Transport-Security`. Refuse `ENVIRONMENT=production` if `X-Forwarded-Proto` isn't https.
 
@@ -113,8 +114,8 @@ WS auth happens once at connect (`ws_auth.py`). After a session is revoked, a pa
 
 ## 🟢 Low / hygiene
 
-- **S23** No security headers or CSP on the backend itself. They only come from nginx, so a misconfigured deploy that exposes `:8000` gets none. Also disable `/docs`, `/redoc` and `/openapi.json` when `ENVIRONMENT=production`.
-- **S24** The backend container runs as **root** and keeps `build-essential` in the final image. Use a multi-stage build and a non-root `USER`. Add `read_only: true` and `cap_drop: [ALL]` in compose.
+- **S23** ✅ *Fixed:* the backend sets nosniff, `X-Frame-Options`, `Referrer-Policy`, a `default-src 'none'; sandbox` CSP, CORP and `no-store` on `/auth/*` itself; `/docs`, `/redoc`, `/openapi.json` are off in production. *Was:* No security headers or CSP on the backend itself. They only come from nginx, so a misconfigured deploy that exposes `:8000` gets none. Also disable `/docs`, `/redoc` and `/openapi.json` when `ENVIRONMENT=production`.
+- **S24** ✅ *Fixed:* multi-stage image, runs as uid 1000, no compiler; compose adds `read_only`, tmpfs `/tmp`, `cap_drop: [ALL]`, `no-new-privileges`. *Was:* The backend container runs as **root** and keeps `build-essential` in the final image. Use a multi-stage build and a non-root `USER`. Add `read_only: true` and `cap_drop: [ALL]` in compose.
 - **S25** `/ws` location in nginx lacks `X-Forwarded-For`/`X-Real-IP` and `proxy_read_timeout` (the 60 s default drops idle sockets). There's no WS message size or rate limit, and each typing event does a DB lookup (`ws.py:105`), which is cheap to amplify.
 - **S26** Invite `uses += 1` isn't atomic, so concurrent joins exceed `max_uses`. Use `UPDATE … SET uses = uses + 1 WHERE uses < max_uses RETURNING`.
 - **S27** No rate limit on `/auth/refresh`, `/decorations/redeem` (code brute force), `/users/{id}/note`, or `PATCH /me`. Notes have no length cap.

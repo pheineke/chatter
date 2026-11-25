@@ -19,6 +19,7 @@ from app.dependencies import CurrentUser, DB
 from app import ws_enforcement
 from app.rate_limiter import rate_limit_auth, rate_limit_auth_login
 from app.schemas.user import UserCreate, UserRead, Token
+from models.invite import ServerInvite
 from models.refresh_token import RefreshToken
 from models.user import User
 
@@ -52,10 +53,43 @@ async def _issue_token_pair(user_id, db, *, user_agent: str | None = None) -> To
     return Token(access_token=access, refresh_token=raw_rt)
 
 
+async def _check_registration_allowed(invite_code: str | None, db) -> None:
+    """Enforce REGISTRATION_MODE. The invite is only checked here, not used
+    up: the new user joins through /invites/{code} afterwards like anyone."""
+    mode = settings.registration_mode
+    if mode == "open":
+        return
+    if mode == "closed":
+        raise HTTPException(status_code=403, detail="Registration is closed")
+    # invite: let the very first account through so an empty instance can be set up
+    if (await db.execute(select(func.count()).select_from(User))).scalar_one() == 0:
+        return
+    if not invite_code:
+        raise HTTPException(status_code=403, detail="An invite is required to register")
+    invite = await db.get(ServerInvite, invite_code)
+    if (
+        invite is None
+        or (invite.expires_at is not None and _aware(invite.expires_at) < datetime.now(timezone.utc))
+        or (invite.max_uses and invite.uses >= invite.max_uses)
+    ):
+        raise HTTPException(status_code=403, detail="This invite is invalid or has expired")
+
+
+class AuthConfig(BaseModel):
+    registration_mode: str
+
+
+@router.get("/config", response_model=AuthConfig)
+async def auth_config():
+    """Public: lets the sign-up page show an invite field or a "closed" notice."""
+    return AuthConfig(registration_mode=settings.registration_mode)
+
+
 # ── Auth endpoints ─────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(request: Request, body: UserCreate, db: DB, _rl: None = Depends(rate_limit_auth)):
+    await _check_registration_allowed(body.invite_code, db)
     result = await db.execute(
         select(User).where(func.lower(User.username) == body.username.lower())
     )
