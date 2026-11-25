@@ -524,3 +524,62 @@ def test_private_channel_activity_not_announced_to_non_viewers(ws_app):
                 break
         else:
             pytest.fail("no channel.message received")
+
+
+# ---------------------------------------------------------------------------
+# S25: client frame size / rate limits (app/ws_limits.py)
+# ---------------------------------------------------------------------------
+
+def test_frame_limiter_refills(monkeypatch):
+    from app import ws_limits
+
+    now = [100.0]
+    monkeypatch.setattr(ws_limits.time, "monotonic", lambda: now[0])
+    lim = ws_limits.FrameLimiter(rate=2, burst=3)
+    assert [lim.allow() for _ in range(4)] == [True, True, True, False]
+    now[0] += 0.5  # +1 token
+    assert [lim.allow(), lim.allow()] == [True, False]
+
+    t = ws_limits.Throttle(2.0)
+    assert [t.ready(), t.ready()] == [True, False]
+    now[0] += 2.0
+    assert t.ready()
+
+
+@pytest.mark.timeout(20)
+def test_ws_flood_is_closed_with_policy_violation(ws_app):
+    token = _get_token(ws_app, "s25_flood")
+    with ws_app.websocket_connect("/ws/me") as ws:
+        assert _ws_authenticate(ws, token)["type"] == "auth.ok"
+        for _ in range(100):
+            ws.send_json({"type": "ping"})
+        _expect_close(ws, 1008, max_frames=200)
+
+
+@pytest.mark.timeout(20)
+def test_ws_oversized_frame_is_closed(ws_app):
+    owner, member, member_id, server_id, channel_id = _server_with_member(ws_app, "s25big")
+    with ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws:
+        assert _ws_authenticate(ws, member)["type"] == "auth.ok"
+        ws.send_text('{"type": "typing", "pad": "' + "x" * 70_000 + '"}')
+        _expect_close(ws, 1009)
+
+
+@pytest.mark.timeout(20)
+def test_ws_typing_is_throttled(ws_app):
+    owner, member, member_id, server_id, channel_id = _server_with_member(ws_app, "s25type")
+    with ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws_owner, \
+         ws_app.websocket_connect(f"/ws/channels/{channel_id}") as ws_member:
+        assert _ws_authenticate(ws_owner, owner)["type"] == "auth.ok"
+        assert _ws_authenticate(ws_member, member)["type"] == "auth.ok"
+        for _ in range(5):
+            ws_member.send_json({"type": "typing"})
+        r = ws_app.post(f"/channels/{channel_id}/messages", json={"content": "marker"}, headers=_h(owner))
+        assert r.status_code == 201, r.text
+        seen = []
+        while True:
+            msg = ws_owner.receive_json()
+            seen.append(msg["type"])
+            if msg["type"] == "message.created":
+                break
+        assert seen.count("typing.start") == 1, seen

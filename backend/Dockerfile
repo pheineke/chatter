@@ -40,4 +40,4 @@ USER app
 # nginx container). Trusting any sender ("*") is only safe because the
 # backend port is not published; see docker-compose.yml. Override with
 # FORWARDED_ALLOW_IPS=<nginx ip/cidr> if you expose it.
-CMD sh -c "alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-*}\""
+CMD sh -c "alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-*}\""

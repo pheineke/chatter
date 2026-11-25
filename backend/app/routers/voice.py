@@ -42,6 +42,7 @@ from app.authz import get_channel_permissions, require_channel_perms, visible_ch
 from app.dependencies import CurrentUser
 from app.schemas.voice import VoiceParticipantRead
 from app.voice_manager import voice_manager
+from app.ws_limits import admit_frame, voice_socket_limiter
 from app.ws_auth import accept_and_authenticate
 from app.ws_manager import manager as ws_manager
 from models.channel import ChannelPerm, Channel, ChannelType
@@ -220,9 +221,12 @@ async def voice_ws(
             },
         )
 
+    limiter = voice_socket_limiter()
     try:
         while True:
             raw = await ws.receive_text()
+            if not await admit_frame(ws, raw, limiter):
+                break
             try:
                 msg: dict[str, Any] = json.loads(raw)
             except json.JSONDecodeError:

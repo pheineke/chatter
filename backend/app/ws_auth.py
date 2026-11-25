@@ -128,6 +128,10 @@ async def accept_and_authenticate(ws: WebSocket) -> uuid.UUID | None:
         # Client disconnected before sending anything — nothing to close.
         return None
 
+    if len(raw) > 16 * 1024:  # a token is a few hundred bytes
+        await ws.close(code=1009, reason="Auth message too big")
+        return None
+
     try:
         msg = json.loads(raw)
     except json.JSONDecodeError:

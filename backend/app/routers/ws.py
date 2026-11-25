@@ -32,6 +32,7 @@ from app.authz import get_channel_permissions
 from app.database import AsyncSessionLocal
 from app.presence import broadcast_presence
 from app.ws_auth import accept_and_authenticate
+from app.ws_limits import Throttle, admit_frame, event_socket_limiter
 from app.ws_manager import manager
 from models.channel import Channel, ChannelPerm
 from models.server import ServerMember
@@ -72,6 +73,8 @@ async def channel_ws(
             await ws.close(code=4004, reason="Channel not found")
             return
         perms = await get_channel_permissions(channel, user_id, db)
+        user = await db.get(User, user_id)
+        username = user.username if user else str(user_id)  # once, not per typing frame
     if not perms & ChannelPerm.VIEW_CHANNEL:
         reason = "Not a participant of this DM" if channel.server_id is None else "Missing access to this channel"
         await ws.close(code=4003, reason=reason)
@@ -79,6 +82,8 @@ async def channel_ws(
 
     room = manager.channel_room(channel_id)
     await manager.connect(room, ws)
+    limiter = event_socket_limiter()
+    typing = Throttle(2.0)  # the client sends one every 8 s while typing
     try:
         # Handle client messages (typing events, pings)
         while True:
@@ -86,13 +91,12 @@ async def channel_ws(
                 text = await ws.receive_text()
             except Exception:
                 break
+            if not await admit_frame(ws, text, limiter):
+                break
             try:
                 data = json.loads(text)
-                if isinstance(data, dict) and data.get("type") == "typing":
+                if isinstance(data, dict) and data.get("type") == "typing" and typing.ready():
                     # Fan out typing indicator to all OTHER members of the channel room
-                    async with AsyncSessionLocal() as db:
-                        user = await db.get(User, user_id)
-                        username = user.username if user else str(user_id)
                     await manager.broadcast_channel_except(
                         channel_id,
                         ws,
@@ -149,9 +153,12 @@ async def server_ws(
 
     room = manager.server_room(server_id)
     await manager.connect(room, ws)
+    limiter = event_socket_limiter()
     try:
         while True:
-            await ws.receive_text()
+            text = await ws.receive_text()
+            if not await admit_frame(ws, text, limiter):
+                break
     except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
@@ -210,12 +217,15 @@ async def personal_ws(
             await broadcast_presence(user_id, broadcast_status, db)
     # db connection returned to pool here ^
 
+    limiter = event_socket_limiter()
     try:
         while True:
             try:
                 text = await asyncio.wait_for(ws.receive_text(), timeout=_HEARTBEAT_TIMEOUT)
             except asyncio.TimeoutError:
                 # Client stopped sending pings — treat as disconnect
+                break
+            if not await admit_frame(ws, text, limiter):
                 break
             try:
                 data = json.loads(text)
@@ -282,11 +292,14 @@ async def bot_gateway_ws(
     for room in rooms:
         await manager.connect(room, ws)
 
+    limiter = event_socket_limiter()
     try:
         while True:
             try:
                 text = await asyncio.wait_for(ws.receive_text(), timeout=_HEARTBEAT_TIMEOUT)
             except asyncio.TimeoutError:
+                break
+            if not await admit_frame(ws, text, limiter):
                 break
             try:
                 data = json.loads(text)
