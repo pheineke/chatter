@@ -1,3 +1,5 @@
+import re
+import unicodedata
 import uuid
 from datetime import datetime
 
@@ -15,6 +17,11 @@ class UserBase(BaseModel):
     status: UserStatus = UserStatus.offline
 
 
+# Matches the @mention syntax (\w), restricted to ASCII so names can't be
+# spoofed with homoglyphs or invisible characters.
+USERNAME_RE = re.compile(r'[A-Za-z0-9_]{2,32}')
+
+
 class UserCreate(BaseModel):
     username: str
     password: str
@@ -22,11 +29,16 @@ class UserCreate(BaseModel):
     @field_validator('username')
     @classmethod
     def sanitize_username(cls, v: str) -> str:
-        cleaned = (strip_html(v) or '').strip()
+        # NFKC folds look-alike forms (full-width letters etc.) before the
+        # charset check; uniqueness is case-insensitive (see auth.register and
+        # the lower(username) unique index), so "Alice" and "alice" can't coexist.
+        cleaned = unicodedata.normalize('NFKC', strip_html(v) or '').strip()
         if not cleaned:
             raise ValueError('Username cannot be empty')
-        if len(cleaned) > 50:
-            raise ValueError('Username cannot exceed 50 characters')
+        if not USERNAME_RE.fullmatch(cleaned):
+            raise ValueError(
+                'Username must be 2–32 characters: letters, numbers and underscores only'
+            )
         return cleaned
 
     @field_validator('password')

@@ -83,6 +83,11 @@ class Settings(BaseSettings):
             problems.append("DECORATION_ADMIN_IDS is '*' (any user can act as admin)")
         if "postgres:postgres@" in self.database_url:
             problems.append("DATABASE_URL still uses the default postgres:postgres credentials")
+        if self.access_token_expire_minutes > 60:
+            problems.append(
+                f"ACCESS_TOKEN_EXPIRE_MINUTES is {self.access_token_expire_minutes} "
+                "(max 60; refresh tokens keep sessions alive)"
+            )
 
         if problems:
             raise RuntimeError(

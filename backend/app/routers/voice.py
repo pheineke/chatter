@@ -38,7 +38,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.authz import get_channel_permissions
+from app.authz import get_channel_permissions, require_channel_perms, visible_channel_ids
+from app.dependencies import CurrentUser
 from app.schemas.voice import VoiceParticipantRead
 from app.voice_manager import voice_manager
 from app.ws_auth import accept_and_authenticate
@@ -87,8 +88,20 @@ async def _broadcast_state_change(
     response_model=List[VoiceParticipantRead],
     summary="Current voice channel participants",
 )
-async def list_voice_members(channel_id: uuid.UUID):
-    """Return the live participant list for a voice channel (reads from memory)."""
+async def list_voice_members(
+    channel_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the live participant list for a voice channel (reads from memory).
+
+    Caller must be able to view the channel — otherwise anyone could see who
+    is in voice in any server.
+    """
+    channel = await db.get(Channel, channel_id)
+    if channel is None:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    await require_channel_perms(channel, current_user.id, db)
     return voice_manager.get_participants(channel_id)
 
 
@@ -99,10 +112,19 @@ async def list_voice_members(channel_id: uuid.UUID):
 )
 async def get_server_voice_presence(
     server_id: uuid.UUID,
+    current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
     """Return a mapping of channel_id → [participants] for every voice channel
-    in the server that has at least one active participant."""
+    in the server that has at least one active participant and that the
+    caller can view."""
+    member = await db.execute(
+        select(ServerMember.user_id).where(
+            ServerMember.server_id == server_id, ServerMember.user_id == current_user.id
+        )
+    )
+    if member.scalar_one_or_none() is None:
+        raise HTTPException(status_code=403, detail="Not a member of this server")
     result = await db.execute(
         select(Channel).where(
             Channel.server_id == server_id,
@@ -110,10 +132,13 @@ async def get_server_voice_presence(
         )
     )
     voice_channels = result.scalars().all()
+    visible = await visible_channel_ids(
+        server_id, [ch.id for ch in voice_channels], current_user.id, db
+    )
     return {
         str(ch.id): voice_manager.get_participants(ch.id)
         for ch in voice_channels
-        if voice_manager.get_participants(ch.id)
+        if ch.id in visible and voice_manager.get_participants(ch.id)
     }
 
 

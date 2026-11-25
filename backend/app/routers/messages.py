@@ -10,7 +10,7 @@ from typing import List
 import aiofiles
 import filetype
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import delete, exists, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
@@ -148,7 +148,7 @@ async def _parse_and_save_mentions(
         user_result = await db.execute(
             select(User)
             .join(ServerMember, ServerMember.user_id == User.id)
-            .where(ServerMember.server_id == server_id, User.username == name)
+            .where(ServerMember.server_id == server_id, func.lower(User.username) == name.lower())
         )
         user = user_result.scalar_one_or_none()
         if user:
@@ -349,6 +349,19 @@ async def send_message(
     if channel.server_id and body.content:
         await _apply_word_filters(body.content, channel.server_id, current_user.id, db)
 
+    # A reply must point at a live message in this same channel. Otherwise the
+    # reply preview would leak content from channels/DMs the sender can't read.
+    if body.reply_to_id is not None:
+        target = await db.execute(
+            select(Message.id).where(
+                Message.id == body.reply_to_id,
+                Message.channel_id == channel_id,
+                Message.is_deleted.is_(False),
+            )
+        )
+        if target.scalar_one_or_none() is None:
+            raise HTTPException(status_code=400, detail="Can only reply to a message in this channel")
+
     msg = Message(
         channel_id=channel_id,
         author_id=current_user.id,
@@ -425,7 +438,12 @@ async def send_message(
 
 @router.patch("/messages/{message_id}", response_model=MessageRead)
 async def edit_message(
-    channel_id: uuid.UUID, message_id: uuid.UUID, body: MessageUpdate, current_user: CurrentUser, db: DB
+    channel_id: uuid.UUID,
+    message_id: uuid.UUID,
+    body: MessageUpdate,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_messages),
 ):
     msg = await _get_message_or_404(message_id, db)
     if msg.channel_id != channel_id:
@@ -434,6 +452,10 @@ async def edit_message(
         raise HTTPException(status_code=403, detail="Cannot edit another user's message")
     channel = await _get_channel_or_404(channel_id, db)
     await _require_channel_access(channel, current_user.id, db, ChannelPerm.SEND_MESSAGES)
+    # Same content rules as sending — otherwise "post clean, edit to banned"
+    # bypasses the filter.
+    if channel.server_id and body.content:
+        await _apply_word_filters(body.content, channel.server_id, current_user.id, db)
     msg.content = body.content
     msg.is_edited = True
     msg.edited_at = datetime.now(timezone.utc)

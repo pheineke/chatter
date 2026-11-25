@@ -263,9 +263,21 @@ def test_rest_voice_members_empty(voice_app):
     """GET members on a channel with no active connections returns empty list."""
     token = _token(voice_app, "vmembers_user")
     _, channel_id = _setup_voice_channel(voice_app, token)
-    r = voice_app.get(f"/channels/{channel_id}/voice/members")
+    r = voice_app.get(f"/channels/{channel_id}/voice/members", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     assert r.json() == []
+
+
+def test_rest_voice_members_requires_auth_and_membership(voice_app):
+    """S13: who is in voice must not be visible to outsiders."""
+    token = _token(voice_app, "vmembers_owner")
+    outsider = _token(voice_app, "vmembers_outsider")
+    server_id, channel_id = _setup_voice_channel(voice_app, token)
+    assert voice_app.get(f"/channels/{channel_id}/voice/members").status_code == 401
+    assert voice_app.get(f"/servers/{server_id}/voice-presence").status_code == 401
+    out = {"Authorization": f"Bearer {outsider}"}
+    assert voice_app.get(f"/channels/{channel_id}/voice/members", headers=out).status_code == 403
+    assert voice_app.get(f"/servers/{server_id}/voice-presence", headers=out).status_code == 403
 
 
 # --- WebSocket auth ----------------------------------------------------------
@@ -336,7 +348,10 @@ def test_voice_ws_user_appears_in_rest_members(voice_app):
             ws.receive_json()  # consume voice.members
             # Signal main thread
             results.append(
-                voice_app.get(f"/channels/{channel_id}/voice/members").json()
+                voice_app.get(
+                    f"/channels/{channel_id}/voice/members",
+                    headers={"Authorization": f"Bearer {token}"},
+                ).json()
             )
             # Let main thread finish assertion then exit
             ws.close()

@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Enum, Text, DateTime, Uuid, Boolean
+from sqlalchemy import String, Enum, Text, DateTime, Uuid, Boolean, Index, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -67,3 +67,7 @@ class User(Base):
         "FriendRequest", back_populates="recipient", foreign_keys="FriendRequest.recipient_id"
     )
     muted_channels: Mapped[list["MutedChannel"]] = relationship("MutedChannel", back_populates="user")
+
+
+# Usernames are unique case-insensitively ("Alice" vs "alice").
+Index("uq_users_username_lower", func.lower(User.username), unique=True)

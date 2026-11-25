@@ -49,11 +49,13 @@ _Method: manual code read of the auth, authorization, upload, WebSocket, link-pr
 ## 🟠 High
 
 ### S5. Rate limiting keys on the nginx container IP, not the client
+> **✅ Fixed (2026-11-25).** uvicorn runs with `--proxy-headers`; nginx *overwrites* `X-Forwarded-For` with `$remote_addr` (so clients can't spoof it) on `/api` and `/ws`; `/ws` also got 1 h read/send timeouts. Hard per-username lockout is still there; back-off/CAPTCHA remains a TODO.
 `rate_limiter.py` (`rate_limit_auth`, `rate_limit_auth_login`) uses `request.client.host`. In docker-compose, uvicorn runs without `--proxy-headers --forwarded-allow-ips`, so every request appears to come from the nginx container.
 - **Impact:** (a) the 30/min auth bucket is **global**, so one script locks *everyone* out of login and registration; (b) the per-username login limit becomes global, so anyone can lock a specific user out by sending 6 bad passwords a minute.
 - **Fix:** run `uvicorn ... --proxy-headers --forwarded-allow-ips=<nginx network/IP>` and keep `X-Forwarded-For` set in nginx (it already is for `/api`, but **not** for `/ws`). For lockout, prefer exponential back-off plus CAPTCHA over a hard per-username block.
 
 ### S6. `backend/.env.example` ships `ACCESS_TOKEN_EXPIRE_MINUTES=10080` (7 days)
+> **✅ Fixed (2026-11-25).** Example is 15; `ENVIRONMENT=production` refuses values above 60.
 The code defaults to 15 minutes and is designed around short-lived access tokens. Anyone who copies the example gets **week-long bearer tokens**. Revocation still works over REST (session check), but long-lived WS sessions and any leaked token stay useful for a long time.
 - **Fix:** set it to `15` in the example, and make the production guard reject values above about 60.
 
@@ -67,6 +69,7 @@ The code defaults to 15 minutes and is designed around short-lived access tokens
 - **Fix:** stream with a hard cap (read in chunks, abort above the limit), set nginx `client_max_body_size` to the real limit, rate-limit uploads, cap attachments per message (e.g. 10), and track a per-user storage quota.
 
 ### S9. Edit path skips the checks the send path does
+> **✅ Fixed (2026-11-25).** Edits now need channel access + SEND_MESSAGES, run word filters and the message rate limit.
 `messages.py:433` `edit_message`:
 - **No word filter.** Post a clean message, then edit it to the banned text, and the filter is bypassed.
 - **No channel-access re-check.** Kicked or banned users can still edit their old messages.
@@ -74,6 +77,7 @@ The code defaults to 15 minutes and is designed around short-lived access tokens
 - **Fix:** run the same pipeline as send: access, permissions (S3), filters, rate limit.
 
 ### S10. Reply preview leaks messages from other channels and DMs
+> **✅ Fixed (2026-11-25).** `reply_to_id` must be a live message in the same channel.
 `messages.py:363` stores `reply_to_id` without checking that the target message is in the **same channel**. `MessageRead.reply_to` returns the target's `content` and author. If you know a message UUID (from a shared screenshot, a URL, a former membership, or a WS log), you can read it from any channel, including DMs.
 - **Fix:** reject a `reply_to_id` whose `channel_id` doesn't match, or null the preview when the viewer can't access it.
 
@@ -91,8 +95,8 @@ WS auth happens once at connect (`ws_auth.py`). After a session is revoked, a pa
 
 | # | Finding | Where | Fix |
 |---|---|---|---|
-| S13 | **Unauthenticated voice presence**: `GET /channels/{id}/voice/members` and `GET /servers/{id}/voice-presence` have no auth and are proxied publicly, so anyone can see who is in voice in any server. | `voice.py:89`, `:99` | Add `CurrentUser` + `_require_member`. |
-| S14 | **Case-sensitive username uniqueness**: register checks `username ==`, but `/users/search` uses `lower() ==` with `scalar_one_or_none()`. `Alice` and `alice` can both register, which enables impersonation and makes search **500** (`MultipleResultsFound`). No charset rules, so homoglyphs and zero-width characters are allowed. | `auth.py:58`, `users.py:178` | Unique index on `lower(username)`, NFKC-normalise, restrict to `[A-Za-z0-9_.-]{2,32}`, separate `display_name`. |
+| S13 ✅ | **(Fixed: auth + membership + View Channel.)** **Unauthenticated voice presence**: `GET /channels/{id}/voice/members` and `GET /servers/{id}/voice-presence` have no auth and are proxied publicly, so anyone can see who is in voice in any server. | `voice.py:89`, `:99` | Add `CurrentUser` + `_require_member`. |
+| S14 ✅ | **(Fixed: `[A-Za-z0-9_]{2,32}` after NFKC, unique on `lower(username)`, case-insensitive login/mentions; separate `display_name` still TODO.)** **Case-sensitive username uniqueness**: register checks `username ==`, but `/users/search` uses `lower() ==` with `scalar_one_or_none()`. `Alice` and `alice` can both register, which enables impersonation and makes search **500** (`MultipleResultsFound`). No charset rules, so homoglyphs and zero-width characters are allowed. | `auth.py:58`, `users.py:178` | Unique index on `lower(username)`, NFKC-normalise, restrict to `[A-Za-z0-9_.-]{2,32}`, separate `display_name`. |
 | S15 | **Tokens in `localStorage`**: any XSS = full account takeover, including the refresh token and (via IndexedDB) E2EE keys. | `client.ts`, `useWebSocket.ts` | Move the refresh token to an `HttpOnly; Secure; SameSite=Strict` cookie scoped to `/api/auth/refresh` and keep the access token in memory only. |
 | S16 | **Third-party images leak user IPs**: markdown allows `<img src=any>`, link embeds load `og:image` directly, and CSP `img-src https:` permits any host. Posting an image link logs the IP of everyone who views the channel. | `utils/markdown.ts:92`, nginx CSP | Proxy and cache remote images through the backend (with S1's protections), or click-to-load. Then narrow `img-src`. |
 | S17 | **`banner` is a free-form string** put into `style={{backgroundImage: url(/api/static/${banner})}}`. A value with `)` can inject extra CSS `url()`s (tracking) or path-traverse (`../`). `theme_colors` and `theme_preset` are also unbounded strings. | `users.py` `update_me`, `ProfileCard.tsx:135` | Never accept `banner` via PATCH (only via upload). Validate `theme_colors` as JSON of `#hex` with a size cap. |

@@ -3,6 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icon'
 
+// Mirrors backend app/schemas/user.py USERNAME_RE.
+const USERNAME_RE = /^[A-Za-z0-9_]{2,32}$/
+const USERNAME_HINT = '2–32 characters: letters, numbers and underscores.'
+
 export default function RegisterPage() {
   const { register, login } = useAuth()
   const navigate = useNavigate()
@@ -18,6 +22,10 @@ export default function RegisterPage() {
       setError('Passwords do not match')
       return
     }
+    if (!USERNAME_RE.test(username.trim())) {
+      setError(USERNAME_HINT)
+      return
+    }
     setError('')
     setLoading(true)
     try {
@@ -25,7 +33,13 @@ export default function RegisterPage() {
       await login(username, password)
       navigate('/channels/@me', { replace: true })
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? 'Registration failed')
+      // 422s carry a list of {msg} objects; rendering that directly would crash React.
+      const detail = err.response?.data?.detail
+      setError(
+        Array.isArray(detail)
+          ? detail.map((d: { msg?: string }) => (d.msg ?? '').replace(/^Value error, /, '')).join(' ')
+          : typeof detail === 'string' ? detail : 'Registration failed',
+      )
     } finally {
       setLoading(false)
     }
@@ -56,9 +70,13 @@ export default function RegisterPage() {
               autoFocus
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              maxLength={32}
+              autoComplete="username"
+              aria-describedby="username-hint"
               className="w-full rounded-full bg-sp-input px-4 py-2 text-sp-text placeholder-sp-muted focus:outline-none focus:ring-2 focus:ring-sp-mention/30 border border-sp-divider/60"
               placeholder="Choose a username"
             />
+            <p id="username-hint" className="mt-1 px-2 text-xs text-sp-muted">{USERNAME_HINT}</p>
           </div>
           <div>
             <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sp-muted">

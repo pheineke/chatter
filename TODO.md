@@ -12,7 +12,8 @@ Legend: 🔴 do first · 🟠 high value · 🟡 worthwhile · 🟢 polish · (S
 - [x] 🔴 S2: fix `/interactions` impersonation (ownership + channel access)
 - [x] 🔴 S3: actually enforce channel permission bits (`VIEW_CHANNEL`, `SEND_MESSAGES`, …) Done, including an implicit `@everyone` role (`Role.is_default`) and a "Private channel" toggle in channel settings.
 - [x] 🔴 S4: remove/gate `POST /servers/{id}/join`
-- [ ] 🟠 S5–S12: proxy IPs for rate limiting, token TTL, refresh race, upload caps, edit path, reply leak, WS revocation, TLS
+- [x] S5, S6, S9, S10, S13, S14: proxy IPs for rate limiting, token TTL, edit path, reply leak, voice presence, usernames
+- [ ] 🟠 S7, S8, S11, S12: refresh race, upload caps, WS revocation, TLS
 
 ---
 

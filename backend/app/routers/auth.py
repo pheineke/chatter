@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.auth import (
     create_access_token,
@@ -55,7 +55,9 @@ async def _issue_token_pair(user_id, db, *, user_agent: str | None = None) -> To
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(request: Request, body: UserCreate, db: DB, _rl: None = Depends(rate_limit_auth)):
-    result = await db.execute(select(User).where(User.username == body.username))
+    result = await db.execute(
+        select(User).where(func.lower(User.username) == body.username.lower())
+    )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already taken")
 
@@ -74,7 +76,9 @@ async def login(
     _rl: None = Depends(rate_limit_auth),
 ):
     await rate_limit_auth_login(request, form.username)
-    result = await db.execute(select(User).where(User.username == form.username))
+    result = await db.execute(
+        select(User).where(func.lower(User.username) == form.username.strip().lower())
+    )
     user = result.scalar_one_or_none()
     if not user or not verify_password(form.password, user.password_hash):
         raise HTTPException(

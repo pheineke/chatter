@@ -32,6 +32,9 @@ services:
       # silently mean "everybody is". With `-`, only a genuinely absent
       # variable falls back to the permissive dev default.
       - DECORATION_ADMIN_IDS=${DECORATION_ADMIN_IDS-*}
+    # Deliberately no `ports:` here. The backend trusts X-Forwarded-For from
+    # any sender (see backend/Dockerfile), which is only safe while nginx is
+    # the sole way in.
     depends_on:
       - db
 
