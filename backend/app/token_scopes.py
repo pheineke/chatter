@@ -46,6 +46,12 @@ _SEND_ROUTES = {
 }
 
 
+# Writes that only read: signing image links for the proxy.
+_READ_POSTS = {
+    ("POST", "/meta/image-urls"),
+}
+
+
 def required_scope(method: str, route_path: str) -> Scope | None:
     """The scope a token needs for *method* on *route_path* (the route
     template, e.g. ``/servers/{server_id}``), or None if tokens may not use
@@ -53,7 +59,7 @@ def required_scope(method: str, route_path: str) -> Scope | None:
     method = method.upper()
     if route_path.startswith(_BLOCKED_PREFIXES) or (method, route_path) in _BLOCKED_EXACT:
         return None
-    if method in ("GET", "HEAD", "OPTIONS"):
+    if method in ("GET", "HEAD", "OPTIONS") or (method, route_path) in _READ_POSTS:
         return "read"
     if (method, route_path) in _SEND_ROUTES:
         return "send"

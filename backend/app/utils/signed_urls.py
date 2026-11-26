@@ -47,3 +47,38 @@ def verify_static_signature(path: str, exp: str | None, sig: str | None, *, now:
     if exp_i < (time.time() if now is None else now):
         return False
     return hmac.compare_digest(sig, _sig(path, exp_i))
+
+
+# ── Remote image proxy (security_pass S16) ────────────────────────────────────
+#
+# Remote images (link-preview thumbnails, image links in messages) are loaded
+# through GET /meta/image so viewers' browsers never contact the remote host.
+# The proxy only fetches URLs the API signed for a logged-in user, so it
+# can't be used as an open proxy by anyone who finds the endpoint.
+
+IMAGE_PROXY_TTL = 24 * 3600
+
+
+def _proxy_key() -> bytes:
+    return hmac.new(settings.secret_key.encode(), b"image-proxy-signing", hashlib.sha256).digest()
+
+
+def _proxy_sig(url: str, exp: int) -> str:
+    return hmac.new(_proxy_key(), f"{url}\n{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def signed_image_proxy_url(url: str, *, now: float | None = None) -> str:
+    """Path (relative to the API root) that serves *url* through the proxy.
+    Bucketed by day like attachment URLs, so it stays cacheable."""
+    now = time.time() if now is None else now
+    exp = int(-(-(now + IMAGE_PROXY_TTL) // _BUCKET) * _BUCKET)
+    return f"/meta/image?url={quote(url, safe='')}&exp={exp}&sig={_proxy_sig(url, exp)}"
+
+
+def verify_image_proxy_signature(url: str, exp: str | None, sig: str | None, *, now: float | None = None) -> bool:
+    if not exp or not sig or not exp.isdigit():
+        return False
+    exp_i = int(exp)
+    if exp_i < (time.time() if now is None else now):
+        return False
+    return hmac.compare_digest(sig, _proxy_sig(url, exp_i))

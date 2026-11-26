@@ -186,6 +186,28 @@ async def rate_limit_qr_status(request: Request) -> None:
     )
 
 
+async def rate_limit_image_proxy(request: Request) -> None:
+    """Proxied remote images (S16), per IP. A channel full of image links
+    loads many at once, so this is generous: 300 per minute."""
+    ip = request.client.host if request.client else "unknown"
+    await _enforce_limit(
+        key=f"image_proxy:{ip}",
+        limit=300,
+        window_seconds=60,
+        detail="Too many image requests. Retry in {retry_after}s.",
+    )
+
+
+async def rate_limit_image_url_signing(current_user: CurrentUser) -> None:
+    """Signing image links for the proxy (S16): 120 calls per minute."""
+    await _enforce_limit(
+        key=f"image_sign:{current_user.id}",
+        limit=120,
+        window_seconds=60,
+        detail="Too many requests. Retry in {retry_after}s.",
+    )
+
+
 async def rate_limit_api_token(token_id) -> None:
     """Every request made with a personal API token (S19): 120 per minute."""
     await _enforce_limit(

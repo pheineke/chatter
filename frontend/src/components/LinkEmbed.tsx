@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import client from '../api/client'
 import { Icon } from './Icon'
 import { addDismissed } from '../utils/embeds'
+import { apiProxyPath } from '../api/imageProxy'
+import { useProxiedImage } from '../hooks/useProxiedImage'
 
 // ─── API type ─────────────────────────────────────────────────────────────────
 
@@ -50,13 +52,18 @@ function ImageEmbed({
 }) {
   const [lightbox, setLightbox] = useState(false)
   const [errored, setErrored] = useState(false)
+  // Loaded through our proxy, never straight from the remote host (S16).
+  const src = useProxiedImage(url)
 
-  if (errored) return null
+  if (errored || src === null) return null
+  if (src === undefined) {
+    return <div className="mt-1.5 w-[200px] h-[120px] rounded bg-sp-sidebar animate-pulse" />
+  }
 
   return (
     <div className="relative group/embed mt-1.5 inline-block">
       <img
-        src={url}
+        src={src}
         alt="Inline preview"
         className="max-w-[400px] max-h-[300px] rounded object-cover cursor-zoom-in hover:brightness-90 transition block"
         onError={() => setErrored(true)}
@@ -69,7 +76,7 @@ function ImageEmbed({
       >
         <Icon name="x" size={12} />
       </button>
-      {lightbox && <Lightbox src={url} onClose={() => setLightbox(false)} />}
+      {lightbox && <Lightbox src={src} onClose={() => setLightbox(false)} />}
     </div>
   )
 }
@@ -103,6 +110,7 @@ function OGCard({
   // If error or no useful data, render nothing
   if (isError || !data || (!data.title && !data.description)) return null
 
+  const image = apiProxyPath(data.image)
   const hostname = (() => {
     try { return new URL(url).hostname } catch { return url }
   })()
@@ -130,9 +138,9 @@ function OGCard({
           <p className="text-[11px] text-sp-muted">{hostname}</p>
         )}
 
-        {data.image && (
+        {image && (
           <img
-            src={data.image}
+            src={image}
             alt=""
             className="mt-2 w-full max-h-[200px] rounded object-cover"
             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}

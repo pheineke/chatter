@@ -10,6 +10,9 @@
  *   > blockquote
  *   - / * / 1. lists
  *   [text](url) and bare https:// URLs  →  external links
+ *   ![alt](url)  →  a link, not an <img>: loading it would send every viewer's
+ *                   IP to that host (security_pass S16). Image links get a
+ *                   proxied preview from LinkEmbed instead.
  *   @mention  →  highlighted span
  *   ||spoiler||  →  hidden until clicked
  *
@@ -26,6 +29,14 @@ const renderer = {
   link({ href, text }: { href?: string | null; title?: string | null; text: string }): string {
     const safe = (href ?? '#').replace(/"/g, '%22').replace(/</g, '%3C')
     return `<a href="${safe}" target="_blank" rel="noopener noreferrer" class="md-link">${text}</a>`
+  },
+
+  // Images become plain links (see the header comment).
+  image({ href, text }: { href?: string | null; title?: string | null; text: string }): string {
+    const safe = (href ?? '#').replace(/"/g, '%22').replace(/</g, '%3C')
+    const label = (text || href || 'image')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    return `<a href="${safe}" target="_blank" rel="noopener noreferrer" class="md-link">${label}</a>`
   },
 
   // Discord doesn't render markdown headings — treat them as bold paragraphs.
@@ -98,11 +109,11 @@ const ALLOWED_TAGS = [
   'blockquote',
   'ul', 'ol', 'li',
   'a',
-  'img',
   'span',
 ]
 
-const ALLOWED_ATTR = ['href', 'target', 'rel', 'class', 'data-spoiler', 'src', 'alt', 'title']
+// No <img>/src: nothing in rendered markdown may load a remote resource.
+const ALLOWED_ATTR = ['href', 'target', 'rel', 'class', 'data-spoiler', 'title']
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
