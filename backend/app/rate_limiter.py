@@ -164,6 +164,16 @@ async def _enforce_limit(key: str, limit: int, window_seconds: float, detail: st
         )
 
 
+async def rate_limit_api_token(token_id) -> None:
+    """Every request made with a personal API token (S19): 120 per minute."""
+    await _enforce_limit(
+        key=f"api_token:{token_id}",
+        limit=120,
+        window_seconds=60,
+        detail="API token rate limit exceeded. Retry in {retry_after}s.",
+    )
+
+
 async def rate_limit_messages(current_user: CurrentUser) -> None:
     await _enforce_limit(
         key=f"messages:{current_user.id}",

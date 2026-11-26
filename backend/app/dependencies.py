@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import decode_access_token, hash_api_token
 from app.database import get_db
+from app.token_scopes import parse_scopes, required_scope
 from models.api_token import ApiToken
 from models.refresh_token import RefreshToken
 from models.user import User
@@ -43,6 +44,27 @@ async def get_current_user(
         api_token = result.scalar_one_or_none()
         if api_token is None:
             raise credentials_exception
+        if api_token.is_expired():
+            raise credentials_exception
+
+        # Scope check (S19): the route template decides what the call needs.
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", None) or request.url.path
+        needed = required_scope(request.method, route_path)
+        if needed is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API tokens cannot be used for this endpoint.",
+            )
+        if needed not in parse_scopes(api_token.scopes):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"This API token lacks the '{needed}' scope.",
+            )
+
+        # Per-token request budget, on top of the per-user limits.
+        from app.rate_limiter import rate_limit_api_token  # avoid import cycle
+        await rate_limit_api_token(api_token.id)
 
         # Update last_used_at (best-effort; don't block the request if it fails)
         try:

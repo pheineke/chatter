@@ -8,17 +8,18 @@ DELETE /me/tokens/{token_id} – revoke a token
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import ws_enforcement
 from app.auth import generate_api_token
 from app.dependencies import CurrentUser, DB
+from app.token_scopes import ALL_SCOPES, Scope, parse_scopes
 from models.api_token import ApiToken
 
 router = APIRouter(prefix="/me/tokens", tags=["api-tokens"])
@@ -36,8 +37,17 @@ class TokenRead(BaseModel):
     token_prefix: str
     created_at: datetime
     last_used_at: datetime | None
+    expires_at: datetime | None
+    scopes: list[str]
 
     model_config = {"from_attributes": True}
+
+    @field_validator("scopes", mode="before")
+    @classmethod
+    def _split_scopes(cls, v):
+        if isinstance(v, str):
+            return [s for s in ALL_SCOPES if s in parse_scopes(v)]
+        return v
 
 
 class TokenCreatedResponse(TokenRead):
@@ -46,7 +56,19 @@ class TokenCreatedResponse(TokenRead):
 
 
 class CreateTokenBody(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=100)
+    # Least privilege by default: a new token can only read.
+    scopes: list[Scope] = Field(default_factory=lambda: ["read"], min_length=1)
+    # None = never expires. Otherwise 1 day to 1 year.
+    expires_in_days: int | None = Field(default=90, ge=1, le=365)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name must not be blank.")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -72,11 +94,13 @@ async def create_token(
     current_user: CurrentUser,
     db: DB,
 ) -> dict:
-    # Enforce per-user cap
+    # Enforce per-user cap (expired tokens don't count)
+    now = datetime.now(timezone.utc)
     count_result = await db.execute(
         select(ApiToken).where(
             ApiToken.user_id == current_user.id,
             ApiToken.revoked.is_(False),
+            (ApiToken.expires_at.is_(None)) | (ApiToken.expires_at > now),
         )
     )
     active = list(count_result.scalars().all())
@@ -90,9 +114,11 @@ async def create_token(
 
     api_token = ApiToken(
         user_id=current_user.id,
-        name=body.name.strip(),
+        name=body.name,
         token_hash=token_hash,
         token_prefix=prefix,
+        scopes=",".join(s for s in ALL_SCOPES if s in body.scopes),
+        expires_at=now + timedelta(days=body.expires_in_days) if body.expires_in_days else None,
     )
     db.add(api_token)
     await db.commit()
@@ -104,6 +130,8 @@ async def create_token(
         "token_prefix": api_token.token_prefix,
         "created_at": api_token.created_at,
         "last_used_at": api_token.last_used_at,
+        "expires_at": api_token.expires_at,
+        "scopes": api_token.scopes,
         "token": raw,
     }
 

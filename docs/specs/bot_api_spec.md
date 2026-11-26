@@ -22,6 +22,8 @@ Authentication uses a `Authorization: Bot <token>` header. Tokens act on behalf 
 | `created_at` | timestamptz | |
 | `last_used_at` | timestamptz | nullable, updated on each authenticated request |
 | `revoked` | boolean | default false |
+| `scopes` | varchar(64) | comma-separated subset of `read,send,manage` |
+| `expires_at` | timestamptz | nullable = never expires |
 
 ### 2.2 Token format
 
@@ -37,9 +39,22 @@ aB3kRt9x.Zq8mNpL2wXvYsUjKdHeGbFcTaIoMrEnWqBlCzAxDyPuV
 
 ### 2.3 Limits
 
-- Max **5 active tokens** per user.
-- Tokens never expire (user must revoke manually).
+- Max **5 active tokens** per user (expired ones don't count).
+- Expiry is chosen at creation: `expires_in_days` 1–365 (default 90), or `null` for never.
 - Raw token shown **once** at creation — not stored server-side.
+- 120 requests per minute per token, on top of the per-user limits.
+
+### 2.4 Scopes
+
+Chosen at creation (`scopes`, default `["read"]`). See `backend/app/token_scopes.py`.
+
+| Scope | Allows |
+|---|---|
+| `read` | `GET` on any route the user can use, and connecting to the WebSocket gateways |
+| `send` | posting, editing and deleting messages, attachments and reactions; marking DMs read; `/interactions`; registering slash commands |
+| `manage` | every other write (servers, channels, roles, members, invites, friends, blocks, notes, profile) |
+
+A missing scope is a `403`. Some routes are **never** available to a token, whatever its scopes, so a leaked token can't escalate into a full login or swap E2EE keys: `/auth/*` (sessions, refresh, QR approve), `/me/tokens*`, `POST /users/me/change-password`, `/me/e2ee-public-key`, `/mls/*`, `/decorations/*`. Tokens created before scopes existed have all three and no expiry.
 
 ---
 
@@ -55,9 +70,10 @@ Authorization: Bot aB3kRt9x.Zq8mNpL2wXvYsUjKdHeGbFcTaIoMrEnWqBlCzAxDyPuV
 
 1. Parse `Authorization` header — if starts with `Bot `, extract token.
 2. Compute SHA-256 of token.
-3. Look up `api_token` where `token_hash = hash AND revoked = false`.
-4. Fetch associated `user` — this is the "acting user" for this request.
-5. Update `last_used_at` asynchronously.
+3. Look up `api_token` where `token_hash = hash AND revoked = false`, and reject it if `expires_at` has passed.
+4. Check the route against the token's scopes (2.4).
+5. Fetch associated `user` — this is the "acting user" for this request.
+6. Update `last_used_at` asynchronously.
 6. Inject user into request dependencies (same `get_current_user` path as session auth).
 
 ### 3.3 Scope

@@ -42,6 +42,7 @@ from fastapi import WebSocket
 from sqlalchemy import select
 
 from app.auth import decode_access_token, hash_api_token
+from app.token_scopes import parse_scopes
 from app.database import AsyncSessionLocal
 from models.api_token import ApiToken
 from models.refresh_token import RefreshToken
@@ -104,7 +105,11 @@ async def _resolve_token(token: str) -> WSIdentity | None:
                 )
             )
             api_token = result.scalar_one_or_none()
-        if api_token is not None:
+        if (
+            api_token is not None
+            and "read" in parse_scopes(api_token.scopes)
+            and not api_token.is_expired()
+        ):
             return WSIdentity(user_id=api_token.user_id, api_token_id=api_token.id)
 
     return None

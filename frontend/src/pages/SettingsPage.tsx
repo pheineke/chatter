@@ -11,7 +11,7 @@ import { useSoundManager } from '../hooks/useSoundManager'
 import { useBlocks } from '../hooks/useBlocks'
 import { useDesktopNotificationsContext } from '../contexts/DesktopNotificationsContext'
 import { getSessions, revokeSession, revokeAllOtherSessions, type Session } from '../api/sessions'
-import { getTokens, createToken, revokeToken, type ApiToken, type ApiTokenCreated } from '../api/tokens'
+import { getTokens, createToken, revokeToken, type ApiToken, type ApiTokenCreated, type TokenScope } from '../api/tokens'
 import { AVATAR_FRAMES } from '../utils/avatarFrames'
 import { getMyDecorations, redeemDecorationCode } from '../api/decorations'
 import { useE2EE } from '../contexts/E2EEContext'
@@ -1360,10 +1360,26 @@ function EditableField({ label, value, placeholder, readOnly, multiline, isEditi
 
 const MAX_TOKENS = 5
 
+const TOKEN_SCOPES: { id: TokenScope; label: string; hint: string }[] = [
+  { id: 'read', label: 'Read', hint: 'Read messages, servers and profiles; connect to the gateway' },
+  { id: 'send', label: 'Send', hint: 'Send, edit and delete messages and reactions' },
+  { id: 'manage', label: 'Manage', hint: 'Everything else: servers, channels, roles, members, friends, profile' },
+]
+
+const TOKEN_EXPIRY: { days: number | null; label: string }[] = [
+  { days: 7, label: '7 days' },
+  { days: 30, label: '30 days' },
+  { days: 90, label: '90 days' },
+  { days: 365, label: '1 year' },
+  { days: null, label: 'Never' },
+]
+
 function TokensTab() {
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newScopes, setNewScopes] = useState<TokenScope[]>(['read'])
+  const [newExpiry, setNewExpiry] = useState<number | null>(90)
   const [revealed, setRevealed] = useState<ApiTokenCreated | null>(null)
   const [copied, setCopied] = useState(false)
   const [revokeId, setRevokeId] = useState<string | null>(null)
@@ -1374,11 +1390,13 @@ function TokensTab() {
   })
 
   const createMut = useMutation({
-    mutationFn: (name: string) => createToken(name),
+    mutationFn: (name: string) => createToken(name, newScopes, newExpiry),
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['api-tokens'] })
       setShowCreate(false)
       setNewName('')
+      setNewScopes(['read'])
+      setNewExpiry(90)
       setRevealed(created)
     },
   })
@@ -1404,7 +1422,16 @@ function TokensTab() {
     return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
-  const activeCount = tokens.length
+  function toggleScope(id: TokenScope) {
+    setNewScopes((cur) => (cur.includes(id) ? cur.filter((s) => s !== id) : [...cur, id]))
+  }
+
+  function isExpired(t: ApiToken) {
+    return t.expires_at !== null && new Date(t.expires_at).getTime() <= Date.now()
+  }
+
+  const canCreate = newName.trim() !== '' && newScopes.length > 0 && !createMut.isPending
+  const activeCount = tokens.filter((t) => !isExpired(t)).length
   const atCap = activeCount >= MAX_TOKENS
 
   return (
@@ -1412,8 +1439,9 @@ function TokensTab() {
       <div>
         <h2 className="text-xl font-semibold text-sp-text mb-1">API Tokens</h2>
         <p className="text-sm text-sp-muted">
-          Personal API tokens let scripts and bots act on your behalf.
-          Tokens are shown only once at creation.
+          Personal API tokens let scripts and bots act on your behalf, limited to the
+          scopes you pick. They can never change your password, manage sessions or
+          tokens, or touch your encryption keys. Tokens are shown only once at creation.
         </p>
       </div>
 
@@ -1431,6 +1459,13 @@ function TokensTab() {
               <div className="text-xs text-sp-muted font-mono">
                 {t.token_prefix}{'·'.repeat(8)}
                 <span className="ml-3 font-sans">Last used: {fmtDate(t.last_used_at)}</span>
+              </div>
+              <div className="text-xs text-sp-muted">
+                {t.scopes.join(', ')}
+                {' · '}
+                {isExpired(t)
+                  ? <span className="text-red-400">Expired {fmtDate(t.expires_at)}</span>
+                  : t.expires_at ? `Expires ${fmtDate(t.expires_at)}` : 'Never expires'}
               </div>
             </div>
             {revokeId === t.id ? (
@@ -1462,7 +1497,7 @@ function TokensTab() {
 
       {/* Create button */}
       <button
-        onClick={() => { setShowCreate(true); setNewName('') }}
+        onClick={() => { setShowCreate(true); setNewName(''); setNewScopes(['read']); setNewExpiry(90) }}
         disabled={atCap}
         className="md:px-4 md:py-2 px-5 py-3 rounded-m3-sm bg-sp-mention hover:bg-sp-mention/85 disabled:opacity-50 disabled:cursor-not-allowed text-white md:text-sm text-[15px] font-medium transition-colors"
         title={atCap ? `Maximum of ${MAX_TOKENS} active tokens` : undefined}
@@ -1481,17 +1516,50 @@ function TokensTab() {
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && newName.trim()) createMut.mutate(newName.trim()) }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && canCreate) createMut.mutate(newName.trim()) }}
+                maxLength={100}
                 placeholder="e.g. My bot"
                 className="w-full px-3 py-2 rounded-m3-sm bg-sp-input border border-sp-divider/50 text-sp-text placeholder:text-sp-muted text-sm focus:outline-none focus:ring-2 focus:ring-sp-mention/60"
               />
+            </div>
+            <fieldset>
+              <legend className="block text-xs font-semibold text-sp-muted uppercase mb-1">Scopes</legend>
+              <div className="space-y-1.5">
+                {TOKEN_SCOPES.map((sc) => (
+                  <label key={sc.id} className="flex items-start gap-2 text-sm text-sp-text cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 accent-sp-mention"
+                      checked={newScopes.includes(sc.id)}
+                      onChange={() => toggleScope(sc.id)}
+                    />
+                    <span>
+                      {sc.label}
+                      <span className="block text-xs text-sp-muted">{sc.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div>
+              <label htmlFor="token-expiry" className="block text-xs font-semibold text-sp-muted uppercase mb-1">Expires</label>
+              <select
+                id="token-expiry"
+                className="input w-full"
+                value={newExpiry === null ? 'never' : String(newExpiry)}
+                onChange={(e) => setNewExpiry(e.target.value === 'never' ? null : Number(e.target.value))}
+              >
+                {TOKEN_EXPIRY.map((o) => (
+                  <option key={o.label} value={o.days === null ? 'never' : String(o.days)}>{o.label}</option>
+                ))}
+              </select>
             </div>
             {createMut.isError && <p className="text-red-400 text-sm">{(createMut.error as Error)?.message ?? 'Failed to create token.'}</p>}
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded text-sp-muted hover:text-sp-text text-sm">Cancel</button>
               <button
-                onClick={() => { if (newName.trim()) createMut.mutate(newName.trim()) }}
-                disabled={!newName.trim() || createMut.isPending}
+                onClick={() => { if (canCreate) createMut.mutate(newName.trim()) }}
+                disabled={!canCreate}
                 className="px-4 py-2 rounded-m3-sm bg-sp-mention hover:bg-sp-mention/85 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium"
               >
                 {createMut.isPending ? 'Creating…' : 'Create'}
