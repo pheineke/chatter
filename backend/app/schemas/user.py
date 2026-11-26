@@ -1,3 +1,4 @@
+import json
 import re
 import unicodedata
 import uuid
@@ -67,19 +68,55 @@ class UserCreate(BaseModel):
         return check_new_password(v)
 
 
+# theme_colors is a JSON object like {"accent": "#a78bfa", ...}; the
+# frontend writes each value into a <style> tag, so only plain hex colours
+# under short lowercase keys are accepted (security_pass S17).
+THEME_COLORS_MAX_CHARS = 1024
+_THEME_KEY_RE = re.compile(r'[a-z][a-zA-Z]{0,23}')
+_HEX_COLOR_RE = re.compile(r'#[0-9a-fA-F]{6}')
+_PRESET_RE = re.compile(r'[a-z0-9_-]{1,50}')
+
+
 class UserUpdate(BaseModel):
     description: str | None = None
     pronouns: str | None = None
     custom_status: str | None = None
     status: UserStatus | None = None
-    banner: str | None = None
+    # No `banner` here: it is only ever set by POST /users/me/banner, which
+    # stores a server-generated path. A free-form value ended up inside a
+    # CSS url() on every profile view (S17).
     dm_permission: DMPermission | None = None
     allow_server_fonts: bool | None = None
     hide_status: bool | None = None
-    avatar_decoration: str | None = None
+    avatar_decoration: str | None = Field(default=None, max_length=50)
     theme_preset: str | None = None
     theme_colors: str | None = None
     backup_downloaded: bool | None = None
+
+    @field_validator('theme_preset')
+    @classmethod
+    def validate_theme_preset(cls, v: str | None) -> str | None:
+        if v is not None and not _PRESET_RE.fullmatch(v):
+            raise ValueError('Unknown theme preset')
+        return v
+
+    @field_validator('theme_colors')
+    @classmethod
+    def validate_theme_colors(cls, v: str | None) -> str | None:
+        if v is None or v == 'null':  # "null" clears the overrides
+            return v
+        if len(v) > THEME_COLORS_MAX_CHARS:
+            raise ValueError('Theme colours are too long')
+        try:
+            colors = json.loads(v)
+        except ValueError:
+            raise ValueError('Theme colours must be JSON') from None
+        if not isinstance(colors, dict) or len(colors) > 20:
+            raise ValueError('Theme colours must be an object of at most 20 colours')
+        for key, value in colors.items():
+            if not _THEME_KEY_RE.fullmatch(key) or not isinstance(value, str) or not _HEX_COLOR_RE.fullmatch(value):
+                raise ValueError('Theme colours must map names to #rrggbb values')
+        return v
 
     @field_validator('description', 'pronouns', 'custom_status', mode='before')
     @classmethod

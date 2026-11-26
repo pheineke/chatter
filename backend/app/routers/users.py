@@ -91,8 +91,6 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
         current_user.pronouns = body.pronouns
     if 'custom_status' in body.model_fields_set:
         current_user.custom_status = body.custom_status
-    if body.banner is not None:
-        current_user.banner = body.banner
     if body.dm_permission is not None:
         current_user.dm_permission = body.dm_permission
     if body.allow_server_fonts is not None:
@@ -115,7 +113,7 @@ async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, respons
     if body.theme_preset is not None:
         current_user.theme_preset = body.theme_preset
     if body.theme_colors is not None:
-        # If null string was passed from front-end it still matches but as a string "null" maybe we should check
+        # Validated in UserUpdate; the string "null" clears the overrides.
         current_user.theme_colors = body.theme_colors if body.theme_colors != "null" else None
     if body.backup_downloaded is not None:
         current_user.backup_downloaded = body.backup_downloaded

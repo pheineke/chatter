@@ -20,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext'
 import type { Member, Role } from '../api/types'
 import type { ServerInvite } from '../api/invites'
 import { SettingsLayout, type SettingsTab } from '../components/SettingsLayout'
+import { staticCssUrl } from '../utils/staticUrl'
 
 // ─── Nav sidebar ─────────────────────────────────────────────────────────────
 
@@ -231,7 +232,7 @@ function OverviewTab({ serverId, server, onSaved }: { serverId: string; server: 
           className="h-28 relative bg-cover bg-center group cursor-pointer"
           style={{
             backgroundColor: server.banner ? undefined : '#3F51B5',
-            backgroundImage: server.banner ? `url(/api/static/${server.banner})` : undefined,
+            backgroundImage: staticCssUrl(server.banner),
           }}
           onClick={() => bannerRef.current?.click()}
         >

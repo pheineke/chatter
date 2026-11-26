@@ -7,6 +7,7 @@ import { getNote, setNote } from '../api/users'
 import { useAuth } from '../contexts/AuthContext'
 import { useE2EE } from '../contexts/E2EEContext'
 import type { User } from '../api/types'
+import { staticCssUrl } from '../utils/staticUrl'
 
 const NOTE_E2EE_PREFIX = 'chatter-note-e2ee-v1:'
 
@@ -126,7 +127,7 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
           className="md:h-24 h-28 relative shrink-0"
           style={{
             backgroundColor: user.banner ? undefined : '#3F51B5',
-            backgroundImage: user.banner ? `url(/api/static/${user.banner})` : undefined,
+            backgroundImage: staticCssUrl(user.banner),
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}

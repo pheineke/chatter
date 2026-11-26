@@ -19,6 +19,7 @@ import { QRScanner } from '../components/QRScanner'
 import { clearDMCache } from '../db/dmCache'
 import { SettingsLayout, type SettingsGroup } from '../components/SettingsLayout'
 import { getMediaDevices } from '../utils/media'
+import { staticCssUrl } from '../utils/staticUrl'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'tokens' | 'notifications'
 
@@ -179,7 +180,7 @@ function AccountTab() {
           className="h-24 rounded-t-lg relative bg-cover bg-center group cursor-pointer"
           style={{
             backgroundColor: user?.banner ? undefined : '#3F51B5',
-            backgroundImage: user?.banner ? `url(/api/static/${user.banner})` : undefined,
+            backgroundImage: staticCssUrl(user?.banner),
           }}
           onClick={() => bannerInput.current?.click()}
         >

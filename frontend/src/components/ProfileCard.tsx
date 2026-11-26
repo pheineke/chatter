@@ -14,6 +14,7 @@ import { useBlocks } from '../hooks/useBlocks'
 import { Linkified } from '../utils/linkify'
 import { ProfileFullModal } from './ProfileFullModal'
 import { Portal } from './Portal'
+import { staticCssUrl } from '../utils/staticUrl'
 
 function UserTag({ userId }: { userId: string }) {
   const [copied, setCopied] = useState(false)
@@ -132,7 +133,7 @@ export function ProfileCard({ userId, onClose, position }: Props) {
        {/* Banner */}
         <div 
           className="h-28 bg-sp-mention relative rounded-t-m3-lg"
-         style={{ backgroundColor: user?.banner ? undefined : '#3F51B5', backgroundImage: user?.banner ? `url(/api/static/${user.banner})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}
+         style={{ backgroundColor: user?.banner ? undefined : '#3F51B5', backgroundImage: staticCssUrl(user?.banner), backgroundSize: 'cover', backgroundPosition: 'center' }}
        >
          {/* More options button */}
          <div className="absolute top-2 right-2" ref={menuRef}>
