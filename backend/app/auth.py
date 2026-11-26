@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
 
 from app.config import settings
 
@@ -28,11 +28,14 @@ def create_access_token(user_id: uuid.UUID, session_id: uuid.UUID | None = None)
 
 def decode_access_token(token: str) -> dict | None:
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        if "sub" not in payload:
-            return None
+        payload = jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.algorithm],
+            options={"require": ["exp", "sub"]},
+        )
         return payload
-    except (JWTError, ValueError):
+    except (jwt.PyJWTError, ValueError):
         return None
 
 

@@ -121,6 +121,7 @@ WS auth happens once at connect (`ws_auth.py`). After a session is revoked, a pa
 - **S27** No rate limit on `/auth/refresh`, `/decorations/redeem` (code brute force), `/users/{id}/note`, or `PATCH /me`. Notes have no length cap.
 - **S28** Admins can demote, kick or ban other admins and edit the Admin role itself. There's no role hierarchy, so one compromised admin account can take over the whole server except the owner. Add position-based hierarchy.
 - **S29** No dependency scanning in CI. Add `pip-audit`, `npm audit --omit=dev`, and Dependabot or Renovate. `python-jose` is barely maintained, so consider moving to `PyJWT` or `joserfc`.
+  > **✅ Fixed (2026-11-26).** CI `audit` job: `pip-audit --strict` on the backend pins, `npm audit --omit=dev --audit-level=high` on the frontend. `.github/dependabot.yml` covers pip, npm, both Dockerfiles and Actions. The first scan found 42 advisories in Pillow 12.3 (bumped to 13.0) and high/moderate ones in axios, form-data, dompurify, follow-redirects and @remix-run/router (fixed via lockfile updates). Moved from python-jose to PyJWT. Tokens now must carry `exp`, and `ALGORITHM` only accepts HS256/384/512. Still open: a moderate react-router advisory that needs the v7 major (see TODO).
 
 ---
 

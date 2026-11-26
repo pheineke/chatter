@@ -78,3 +78,25 @@ jobs:
       - run: npm test
       # `build` runs `tsc` first, so this also type-checks.
       - run: npm run build
+
+  # Known-vulnerability scan of the pinned dependencies (security_pass S29).
+  # Fails the build on any advisory for a backend package, and on high or
+  # critical advisories for frontend runtime packages (dev tooling such as
+  # vite/vitest never ships in the built bundle, so it is not gated here).
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pip-audit
+      - name: pip-audit (backend)
+        run: pip-audit --requirement backend/requirements.txt --strict
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: npm audit (frontend runtime deps)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high

@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from httpx import AsyncClient
-from jose import jwt
+import jwt
 
 from app.auth import (
     hash_password,
@@ -82,7 +82,7 @@ class TestJWT:
     def test_wrong_secret_rejected(self):
         uid = uuid.uuid4()
         payload = {"sub": str(uid), "exp": datetime.now(timezone.utc) + timedelta(minutes=15)}
-        bad_token = jwt.encode(payload, "wrong-secret", algorithm=settings.algorithm)
+        bad_token = jwt.encode(payload, "wrong-secret-of-a-respectable-length-32+", algorithm=settings.algorithm)
         assert decode_access_token(bad_token) is None
 
     def test_expired_token_rejected(self):
@@ -159,7 +159,7 @@ async def test_garbage_bearer_returns_401(client: AsyncClient):
 async def test_jwt_from_wrong_secret_returns_401(client: AsyncClient):
     uid = uuid.uuid4()
     payload = {"sub": str(uid), "exp": datetime.now(timezone.utc) + timedelta(minutes=15)}
-    bad_token = jwt.encode(payload, "attacker-secret", algorithm="HS256")
+    bad_token = jwt.encode(payload, "attacker-secret-of-a-respectable-length-32+", algorithm="HS256")
     r = await client.get("/users/me", headers={"Authorization": f"Bearer {bad_token}"})
     assert r.status_code == 401
 
@@ -170,6 +170,29 @@ async def test_expired_jwt_returns_401(client: AsyncClient):
     expired = jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
     r = await client.get("/users/me", headers={"Authorization": f"Bearer {expired}"})
     assert r.status_code == 401
+
+
+def test_unsigned_alg_none_token_is_rejected():
+    """A token with alg "none" carries no signature and must never decode."""
+    payload = {"sub": str(uuid.uuid4()), "exp": datetime.now(timezone.utc) + timedelta(minutes=5)}
+    unsigned = jwt.encode(payload, None, algorithm="none")
+    assert decode_access_token(unsigned) is None
+
+
+def test_token_without_expiry_is_rejected():
+    """Tokens must carry exp; one minted without it would never expire."""
+    forever = jwt.encode({"sub": str(uuid.uuid4())}, settings.secret_key, algorithm=settings.algorithm)
+    assert decode_access_token(forever) is None
+
+
+def test_non_hmac_algorithm_setting_is_refused():
+    from pydantic import ValidationError
+
+    from app.config import Settings
+
+    for alg in ("none", "RS256"):
+        with pytest.raises(ValidationError):
+            Settings(algorithm=alg)
 
 
 async def test_bot_token_header_with_invalid_token_returns_401(client: AsyncClient):

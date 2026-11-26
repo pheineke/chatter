@@ -22,7 +22,9 @@ class Settings(BaseSettings):
 
     # JWT
     secret_key: str = "change-me-in-production"
-    algorithm: str = "HS256"
+    # HMAC only: the key is a shared secret, so an asymmetric or "none"
+    # algorithm here would be a misconfiguration (security_pass S29).
+    algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
     # Access tokens are short-lived; rotating refresh tokens extend sessions securely
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7

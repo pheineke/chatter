@@ -24,6 +24,8 @@ import shutil  # noqa: E402
 import tempfile  # noqa: E402
 _TEST_STATIC = tempfile.mkdtemp(prefix="chatter-test-static-")
 os.environ["STATIC_DIR"] = _TEST_STATIC
+# A full-length key, so PyJWT doesn't warn about short HMAC keys on every token.
+os.environ.setdefault("SECRET_KEY", "test-secret-key-that-is-at-least-32-bytes-long")
 atexit.register(shutil.rmtree, _TEST_STATIC, ignore_errors=True)
 
 from app.database import get_db

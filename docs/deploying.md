@@ -92,5 +92,6 @@ docker compose up -d --build              # migrations run on backend start
 ## Not covered yet
 
 See `docs/security_pass.md` for open items. The ones that matter most for a
-public instance: there is no role hierarchy among admins (S28), no
-dependency scanning (S29), and the remaining low-severity items.
+public instance: there is no role hierarchy among admins (S28), and the
+remaining low-severity items. CI scans dependencies on every push (S29), so
+enable Dependabot security updates in the GitHub repository settings too.

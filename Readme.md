@@ -17,7 +17,7 @@ A Discord-inspired real-time chat platform with a **FastAPI** backend and a **Re
 | [PostgreSQL](https://www.postgresql.org/) | Relational database |
 | [SQLAlchemy (async)](https://docs.sqlalchemy.org/) | ORM and query layer |
 | [Alembic](https://alembic.sqlalchemy.org/) | Database migrations |
-| [python-jose](https://github.com/mpdavis/python-jose) | JWT authentication |
+| [PyJWT](https://github.com/jpadilla/pyjwt) | JWT authentication |
 | [passlib / bcrypt](https://passlib.readthedocs.io/) | Password hashing |
 | [python-multipart](https://github.com/andrew-d/python-multipart) | File upload handling |
 
