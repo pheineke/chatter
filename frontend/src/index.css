@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Inter is bundled (@fontsource/inter, imported in main.tsx) rather than
+   loaded from Google Fonts: the CSP's style-src 'self' blocked that request,
+   and self-hosting means no third-party request on every page load. */
 
 @tailwind base;
 @tailwind components;

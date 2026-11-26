@@ -217,7 +217,7 @@ export function MessagePane({ voiceSession, onJoinVoice, onLeaveVoice, onOpenNav
         </div>
         {/* Join Voice content */}
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-sp-muted">
-          <div className="text-5xl">🔊</div>
+          <Icon name="volume-up" size={48} />
           <h2 className="text-xl font-bold text-sp-text">{channel.title}</h2>
           <p className="text-sm">Voice Channel</p>
           <button
