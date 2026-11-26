@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { forceLogout, refreshAccessToken } from '../api/refresh'
+import { getAccessToken } from '../api/tokenStore'
 
 const WS_BASE = import.meta.env.VITE_WS_URL ?? ''  // empty = use vite proxy
 
@@ -47,8 +48,17 @@ export function useWebSocket(path: string, { onMessage, onOpen, onRejected, enab
   const connect = useCallback((gen: number) => {
     if (generation.current !== gen) return   // a newer generation took over
     if (!enabled) return
-    const token = localStorage.getItem('token')
-    if (!token) return
+    const token = getAccessToken()
+    if (!token) {
+      // Memory-only token (S15): after a reload, get one before connecting.
+      refreshAccessToken(null).then((result) => {
+        if (generation.current !== gen) return
+        if (result.ok) connect(gen)
+        else if (result.reason === 'invalid') forceLogout()
+        else setTimeout(() => connect(gen), reconnectDelay.current)
+      })
+      return
+    }
 
     const url = `${WS_BASE}${path}`
     const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -93,7 +103,7 @@ export function useWebSocket(path: string, { onMessage, onOpen, onRejected, enab
 
       if (event.code === 4001) {
         // Token rejected — try to refresh before reconnecting
-        refreshAccessToken().then((result) => {
+        refreshAccessToken(token).then((result) => {
           if (generation.current !== gen) return
           if (!result.ok && result.reason === 'invalid') {
             forceLogout()

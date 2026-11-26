@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import delete, func, select, update
@@ -29,6 +29,53 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+# Browser clients send this on login/refresh to get the refresh token as an
+# HttpOnly cookie instead of in the JSON body (security_pass S15). A refresh
+# that *used* the cookie always answers in cookie mode, so script running in
+# the page can't trade the cookie for a readable token.
+COOKIE_MODE_HEADER = "X-Refresh-Cookie"
+
+
+def _cookie_secure(request: Request) -> bool:
+    if settings.refresh_cookie_secure is not None:
+        return settings.refresh_cookie_secure
+    return request.url.scheme == "https"
+
+
+def _set_refresh_cookie(response: Response, request: Request, raw: str) -> None:
+    response.set_cookie(
+        settings.refresh_cookie_name,
+        raw,
+        max_age=settings.refresh_token_expire_days * 86400,
+        path=settings.refresh_cookie_path,
+        httponly=True,
+        secure=_cookie_secure(request),
+        samesite="strict",
+    )
+
+
+def _clear_refresh_cookie(response: Response, request: Request) -> None:
+    response.delete_cookie(
+        settings.refresh_cookie_name,
+        path=settings.refresh_cookie_path,
+        httponly=True,
+        secure=_cookie_secure(request),
+        samesite="strict",
+    )
+
+
+def _wants_cookie(request: Request) -> bool:
+    return request.headers.get(COOKIE_MODE_HEADER) == "1"
+
+
+def _deliver(token: Token, request: Request, response: Response, *, cookie: bool) -> Token:
+    """Return *token* as-is, or move its refresh token into the cookie."""
+    if not cookie:
+        return token
+    _set_refresh_cookie(response, request, token.refresh_token)
+    return Token(access_token=token.access_token, refresh_token=None)
+
 
 def _ua(request: Request) -> str | None:
     ua = request.headers.get("User-Agent", "")
@@ -116,6 +163,7 @@ async def register(request: Request, body: UserCreate, db: DB, _rl: None = Depen
 @router.post("/login", response_model=Token)
 async def login(
     request: Request,
+    response: Response,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: DB,
     _rl: None = Depends(rate_limit_auth),
@@ -134,16 +182,31 @@ async def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return await _issue_token_pair(user.id, db, user_agent=_ua(request))
+    pair = await _issue_token_pair(user.id, db, user_agent=_ua(request))
+    return _deliver(pair, request, response, cookie=_wants_cookie(request))
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    # Optional for browsers, which send the cookie instead.
+    refresh_token: str | None = None
+
+
+def _presented_refresh_token(request: Request, body: RefreshRequest | None) -> tuple[str | None, bool]:
+    """(token, came_from_cookie). A token in the body wins: that is how a
+    device adopts a token it was handed (QR login, pre-cookie storage)."""
+    if body is not None and body.refresh_token:
+        return body.refresh_token, False
+    cookie = request.cookies.get(settings.refresh_cookie_name)
+    return (cookie, True) if cookie else (None, False)
 
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
-    request: Request, body: RefreshRequest, db: DB, _rl: None = Depends(rate_limit_refresh)
+    request: Request,
+    response: Response,
+    db: DB,
+    body: Annotated[RefreshRequest | None, Body()] = None,
+    _rl: None = Depends(rate_limit_refresh),
 ):
     """Exchange a valid refresh token for a new access + refresh token pair.
 
@@ -156,7 +219,11 @@ async def refresh_token(
     window (tabs racing, lost response) and for tokens revoked by logout or
     session revocation, the request is just rejected.
     """
-    rt_hash = hash_refresh_token(body.refresh_token)
+    raw, from_cookie = _presented_refresh_token(request, body)
+    cookie_mode = from_cookie or _wants_cookie(request)
+    if raw is None:
+        raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
+    rt_hash = hash_refresh_token(raw)
     result = await db.execute(
         select(RefreshToken).where(RefreshToken.token_hash == rt_hash).with_for_update()
     )
@@ -186,7 +253,8 @@ async def refresh_token(
         # A concurrent request rotated it between our read and our update.
         raise HTTPException(status_code=401, detail="Invalid or revoked refresh token")
 
-    return await _issue_token_pair(token_row.user_id, db, user_agent=_ua(request))
+    pair = await _issue_token_pair(token_row.user_id, db, user_agent=_ua(request))
+    return _deliver(pair, request, response, cookie=cookie_mode)
 
 
 def _aware(dt: datetime) -> datetime:
@@ -207,9 +275,18 @@ async def _handle_reuse(token_row: RefreshToken, now: datetime, db) -> None:
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(body: RefreshRequest, db: DB):
-    """Revoke the supplied refresh token, ending the session."""
-    rt_hash = hash_refresh_token(body.refresh_token)
+async def logout(
+    request: Request,
+    response: Response,
+    db: DB,
+    body: Annotated[RefreshRequest | None, Body()] = None,
+):
+    """Revoke the supplied (or cookie) refresh token, ending the session."""
+    _clear_refresh_cookie(response, request)
+    raw, _ = _presented_refresh_token(request, body)
+    if raw is None:
+        return
+    rt_hash = hash_refresh_token(raw)
     result = await db.execute(
         select(RefreshToken).where(RefreshToken.token_hash == rt_hash)
     )
@@ -279,22 +356,31 @@ async def revoke_session(session_id: str, current_user: CurrentUser, db: DB):
 
 
 class RevokeOthersRequest(BaseModel):
-    current_refresh_token: str
+    current_refresh_token: str | None = None
 
 
 @router.delete("/sessions", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_all_other_sessions(
-    body: RevokeOthersRequest,
+    request: Request,
     current_user: CurrentUser,
     db: DB,
+    body: Annotated[RevokeOthersRequest | None, Body()] = None,
 ):
-    """Revoke all sessions for the current user except the one provided."""
-    keep_hash = hash_refresh_token(body.current_refresh_token)
-    # Find the row to keep
-    result = await db.execute(
-        select(RefreshToken).where(RefreshToken.token_hash == keep_hash)
-    )
-    keep_row = result.scalar_one_or_none()
+    """Revoke all sessions for the current user except the current one: the
+    one named by ``current_refresh_token`` if given, otherwise the session
+    the access token belongs to (browsers no longer hold the refresh token)."""
+    keep_row = None
+    if body is not None and body.current_refresh_token:
+        keep_hash = hash_refresh_token(body.current_refresh_token)
+        result = await db.execute(
+            select(RefreshToken).where(RefreshToken.token_hash == keep_hash)
+        )
+        keep_row = result.scalar_one_or_none()
+    elif getattr(request.state, "session_id", None):
+        result = await db.execute(
+            select(RefreshToken).where(RefreshToken.id == uuid.UUID(request.state.session_id))
+        )
+        keep_row = result.scalar_one_or_none()
 
     keep_id = None
     if keep_row is None or keep_row.user_id != current_user.id:

@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import type { User } from '../api/types'
 import { getMe, login as apiLogin, register as apiRegister, logout as apiLogout } from '../api/users'
+import { adoptRefreshToken, endSession, shareAccessToken } from '../api/refresh'
+import { clearLegacyTokens, hasSession, markSession, setAccessToken } from '../api/tokenStore'
 
 import { applyColorOverrides, loadColorOverrides } from '../utils/colorOverrides'
 
@@ -8,7 +10,8 @@ export interface AuthContextValue {
   user: User | null
   loading: boolean
   login: (username: string, password: string) => Promise<void>
-  /** Authenticate using a pre-issued token pair (e.g. from QR login). */
+  /** Authenticate using a pre-issued token pair (e.g. from QR login). The
+   * refresh token is exchanged for this browser's cookie session. */
   loginWithTokens: (accessToken: string, refreshToken: string) => Promise<void>
   register: (username: string, password: string, inviteCode?: string) => Promise<void>
   logout: () => void
@@ -47,18 +50,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) { setLoading(false); return }
+    // The access token is memory-only and the refresh token an HttpOnly
+    // cookie (S15); the API client gets a token on the first request.
+    if (!hasSession()) { setLoading(false); return }
 
-    // Restore from cache immediately so the UI is never stuck
+    // Restore from cache immediately so the UI is never stuck, and validate
+    // in the background. Without a cached profile, wait for /users/me:
+    // showing "logged out" first would send RequireAuth to /login.
     const cached = localStorage.getItem('cachedUser')
+    let restored = false
     if (cached) {
-      try { setUser(JSON.parse(cached)) } catch { /* ignore */ }
+      try { setUser(JSON.parse(cached)); restored = true } catch { /* ignore */ }
     }
-    setLoading(false)
-
-    // Validate in background — update or clear user silently
-    refreshUser()
+    if (restored) {
+      setLoading(false)
+      void refreshUser()
+    } else {
+      void refreshUser().finally(() => setLoading(false))
+    }
   }, [])
 
   useEffect(() => {
@@ -82,14 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     const data = await apiLogin(username, password)
-    localStorage.setItem('token', data.access_token)
-    localStorage.setItem('refreshToken', data.refresh_token)
+    clearLegacyTokens()
+    markSession(true)
+    setAccessToken(data.access_token)
+    shareAccessToken(data.access_token)
     await refreshUser()
   }
 
-  const loginWithTokens = async (accessToken: string, refreshToken: string) => {
-    localStorage.setItem('token', accessToken)
-    localStorage.setItem('refreshToken', refreshToken)
+  const loginWithTokens = async (_accessToken: string, refreshToken: string) => {
+    const result = await adoptRefreshToken(refreshToken)
+    if (!result.ok) throw new Error('Could not start the session.')
     await refreshUser()
   }
 
@@ -98,12 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    const refreshToken = localStorage.getItem('refreshToken')
-    if (refreshToken) {
-      void apiLogout(refreshToken)
-    }
-    localStorage.removeItem('token')
-    localStorage.removeItem('refreshToken')
+    void apiLogout() // sends the cookie; the server revokes and clears it
+    endSession()
     localStorage.removeItem('cachedUser')
     setUser(null)
   }

@@ -68,22 +68,22 @@ describe('login', () => {
     expect(mockPost).toHaveBeenCalledWith(
       '/auth/login',
       expect.any(URLSearchParams),
-      expect.objectContaining({ headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }),
+      expect.objectContaining({ headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Refresh-Cookie': '1' } }),
     )
     expect(result).toEqual(tokens)
   })
 })
 
 describe('logout', () => {
-  it('POSTs to /auth/logout with refresh token', async () => {
+  it('POSTs to /auth/logout without a token: the cookie carries it', async () => {
     mockPost.mockResolvedValue({})
-    await logout('my-refresh-token')
-    expect(mockPost).toHaveBeenCalledWith('/auth/logout', { refresh_token: 'my-refresh-token' })
+    await logout()
+    expect(mockPost).toHaveBeenCalledWith('/auth/logout')
   })
 
   it('does not throw if the request fails', async () => {
     mockPost.mockRejectedValue(new Error('network error'))
-    await expect(logout('ref')).resolves.toBeUndefined()
+    await expect(logout()).resolves.toBeUndefined()
   })
 })
 

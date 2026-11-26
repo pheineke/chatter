@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     # without wiping the user's other sessions (two tabs refreshing at once,
     # a response lost in transit). Later replays are treated as theft.
     refresh_reuse_grace_seconds: int = 30
+    # Browsers keep the refresh token in an HttpOnly cookie, so injected
+    # script can't read it (security_pass S15). Its Path is the browser-side
+    # path of the auth routes: behind the bundled nginx they live under /api.
+    refresh_cookie_name: str = "chatter_rt"
+    refresh_cookie_path: str = "/api/auth"
+    # None = Secure when the request arrived over HTTPS (X-Forwarded-Proto is
+    # trusted via uvicorn --proxy-headers). Browsers drop Secure cookies on
+    # plain-HTTP LAN addresses, so don't force it on there.
+    refresh_cookie_secure: bool | None = None
 
     # Comma-separated list of user IDs that can generate decoration codes.
     # Default "*" allows any authenticated user (dev mode).

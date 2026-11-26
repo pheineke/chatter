@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from './AuthContext'
+import { getAccessToken, setAccessToken } from '../api/tokenStore'
 
 // Mock all api/users functions used by AuthContext
 vi.mock('../api/users', () => ({
@@ -46,9 +47,10 @@ function renderConsumer() {
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+  setAccessToken(null)
   // Default: no token stored, so loading resolves quickly without network call
   mockGetMe.mockResolvedValue(fakeUser)
-  mockLogin.mockResolvedValue({ access_token: 'acc', refresh_token: 'ref' })
+  mockLogin.mockResolvedValue({ access_token: 'acc', refresh_token: null })
   mockLogout.mockResolvedValue(undefined)
   mockRegister.mockResolvedValue(fakeUser)
 })
@@ -60,8 +62,8 @@ describe('AuthProvider — initial state', () => {
     expect(screen.queryByTestId('username')).toBeNull()
   })
 
-  it('calls getMe and sets user when token is present', async () => {
-    localStorage.setItem('token', 'existing-token')
+  it('calls getMe and sets user when a session exists', async () => {
+    localStorage.setItem('hasSession', '1')
     renderConsumer()
     await waitFor(() => expect(screen.queryByTestId('loading')).toBeNull())
     expect(await screen.findByTestId('username')).toHaveTextContent('alice')
@@ -70,7 +72,7 @@ describe('AuthProvider — initial state', () => {
 })
 
 describe('login()', () => {
-  it('stores tokens in localStorage and sets user', async () => {
+  it('keeps the access token in memory only and sets user', async () => {
     const user = userEvent.setup()
     renderConsumer()
     await waitFor(() => expect(screen.queryByTestId('loading')).toBeNull())
@@ -78,18 +80,20 @@ describe('login()', () => {
     await user.click(screen.getByText('login'))
     await waitFor(() => expect(screen.getByTestId('username')).toHaveTextContent('alice'))
 
-    expect(localStorage.getItem('token')).toBe('acc')
-    expect(localStorage.getItem('refreshToken')).toBe('ref')
+    expect(getAccessToken()).toBe('acc')
+    expect(localStorage.getItem('token')).toBeNull()
+    expect(localStorage.getItem('refreshToken')).toBeNull()
+    expect(localStorage.getItem('hasSession')).toBe('1')
     expect(mockLogin).toHaveBeenCalledWith('alice', 'pw')
     expect(mockGetMe).toHaveBeenCalled()
   })
 })
 
 describe('logout()', () => {
-  it('clears tokens and nulls user', async () => {
+  it('ends the session and nulls user', async () => {
     // Set up logged in state first
-    localStorage.setItem('token', 'acc')
-    localStorage.setItem('refreshToken', 'ref')
+    localStorage.setItem('hasSession', '1')
+    setAccessToken('acc')
     renderConsumer()
     await waitFor(() => expect(screen.queryByTestId('loading')).toBeNull())
     expect(screen.getByTestId('username')).toHaveTextContent('alice')
@@ -98,15 +102,15 @@ describe('logout()', () => {
     await user.click(screen.getByText('logout'))
 
     await waitFor(() => expect(screen.queryByTestId('username')).toBeNull())
-    expect(localStorage.getItem('token')).toBeNull()
-    expect(localStorage.getItem('refreshToken')).toBeNull()
-    expect(mockLogout).toHaveBeenCalledWith('ref')
+    expect(getAccessToken()).toBeNull()
+    expect(localStorage.getItem('hasSession')).toBeNull()
+    expect(mockLogout).toHaveBeenCalledWith()
   })
 })
 
 describe('updateUser()', () => {
   it('patches user state without a network call', async () => {
-    localStorage.setItem('token', 'acc')
+    localStorage.setItem('hasSession', '1')
     renderConsumer()
     await waitFor(() => expect(screen.getByTestId('username')).toHaveTextContent('alice'))
 
@@ -127,5 +131,18 @@ describe('register()', () => {
 
     await user.click(screen.getByText('register'))
     expect(mockRegister).toHaveBeenCalledWith('alice', 'pw', undefined)
+  })
+})
+
+describe('AuthProvider — session without a cached profile', () => {
+  it('stays loading until /users/me answers instead of showing logged out', async () => {
+    localStorage.setItem('hasSession', '1')
+    let resolveMe!: (u: typeof fakeUser) => void
+    mockGetMe.mockReturnValue(new Promise((r) => { resolveMe = r }))
+    renderConsumer()
+    expect(screen.getByTestId('loading')).toBeInTheDocument()
+    await act(async () => { resolveMe(fakeUser) })
+    await waitFor(() => expect(screen.queryByTestId('loading')).toBeNull())
+    expect(screen.getByTestId('username')).toHaveTextContent('alice')
   })
 })

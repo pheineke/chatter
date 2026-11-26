@@ -41,8 +41,11 @@ Linux capabilities.
 Skip the overlay's `caddy` service: point your proxy at the frontend
 container, set `ENVIRONMENT=production`, and mount `deploy/nginx-real-ip.conf`
 (adjust the `set_real_ip_from` ranges to your proxy's address). Make sure your
-proxy *replaces* `X-Forwarded-For` rather than appending to it, and adds
-`Strict-Transport-Security`.
+proxy *replaces* `X-Forwarded-For` rather than appending to it, adds
+`Strict-Transport-Security`, and sends `X-Forwarded-Proto: https`: the
+backend marks the login cookie `Secure` based on it (or set
+`REFRESH_COOKIE_SECURE=true`). If the API is reachable at a path other than
+`/api`, set `REFRESH_COOKIE_PATH` to that path plus `/auth`.
 
 ### Behind a Cloudflare Tunnel instead of Caddy
 

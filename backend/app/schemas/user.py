@@ -178,7 +178,8 @@ class UserRead(UserPublicRead):
 
 class Token(BaseModel):
     access_token: str
-    refresh_token: str
+    # None when the refresh token was set as an HttpOnly cookie instead.
+    refresh_token: str | None = None
     token_type: str = "bearer"
 
 

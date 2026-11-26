@@ -18,10 +18,7 @@ export async function revokeSession(sessionId: string): Promise<void> {
   await client.delete(`/auth/sessions/${sessionId}`)
 }
 
+/** The server keeps the session this request's access token belongs to. */
 export async function revokeAllOtherSessions(): Promise<void> {
-  const currentRefreshToken = localStorage.getItem('refreshToken')
-  if (!currentRefreshToken) return
-  await client.delete('/auth/sessions', {
-    data: { current_refresh_token: currentRefreshToken },
-  })
+  await client.delete('/auth/sessions')
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useWebSocket } from './useWebSocket'
+import { setAccessToken } from '../api/tokenStore'
 
 /** Minimal stand-in for the browser WebSocket: records instances so tests can drive them. */
 class FakeWS {
@@ -23,12 +24,13 @@ describe('useWebSocket close handling', () => {
     FakeWS.instances = []
     vi.useFakeTimers()
     vi.stubGlobal('WebSocket', FakeWS)
-    localStorage.setItem('token', 'tok')
+    setAccessToken('tok')
   })
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
     localStorage.clear()
+    setAccessToken(null)
   })
 
   function connectAndAuth() {
