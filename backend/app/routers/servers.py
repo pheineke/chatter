@@ -5,7 +5,7 @@ from collections import defaultdict
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.rate_limiter import rate_limit_uploads
@@ -76,9 +76,78 @@ async def _require_admin(server: Server, user_id: uuid.UUID, db) -> None:
         select(UserRole)
         .join(Role)
         .where(Role.server_id == server.id, Role.is_admin == True, UserRole.user_id == user_id)
+        .limit(1)  # holding several admin roles is fine
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=403, detail="Admin permission required")
+
+
+# ---- Role hierarchy (security_pass S28) --------------------------------------
+#
+# A member's rank is the highest position among their roles (higher = more
+# senior; -1 with no roles). The owner outranks everyone. A non-owner admin
+# may only act on members ranked strictly below them, and only on roles
+# positioned strictly below their own top role. Admins of equal rank can
+# therefore not kick, ban, rename or demote each other, or edit the role that
+# makes them admin. @everyone counts as the lowest role.
+
+OWNER_RANK = float("inf")
+NO_ROLE_RANK = -1
+
+
+async def _member_rank(server: Server, user_id: uuid.UUID, db) -> float:
+    if user_id == server.owner_id:
+        return OWNER_RANK
+    is_member = await db.execute(
+        select(ServerMember.user_id).where(
+            ServerMember.server_id == server.id, ServerMember.user_id == user_id
+        )
+    )
+    if is_member.scalar_one_or_none() is None:
+        return NO_ROLE_RANK
+    top = await db.execute(
+        select(func.max(Role.position))
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(
+            Role.server_id == server.id,
+            UserRole.user_id == user_id,
+            Role.is_default.is_(False),
+        )
+    )
+    value = top.scalar_one_or_none()
+    return NO_ROLE_RANK if value is None else value
+
+
+async def _require_outranks_member(
+    server: Server, actor_id: uuid.UUID, target_id: uuid.UUID, db
+) -> None:
+    """403 unless *actor_id* ranks strictly above *target_id* (owner always does)."""
+    if actor_id == server.owner_id:
+        return
+    if target_id == server.owner_id or (
+        await _member_rank(server, actor_id, db) <= await _member_rank(server, target_id, db)
+    ):
+        raise HTTPException(
+            status_code=403, detail="You can only manage members whose highest role is below yours"
+        )
+
+
+async def _require_outranks_position(
+    server: Server, actor_id: uuid.UUID, position: int, db
+) -> None:
+    """403 unless *actor_id*'s top role sits strictly above *position*."""
+    if actor_id == server.owner_id:
+        return
+    if await _member_rank(server, actor_id, db) <= position:
+        raise HTTPException(
+            status_code=403, detail="You can only manage roles below your highest role"
+        )
+
+
+async def _require_outranks_role(server: Server, actor_id: uuid.UUID, role: Role, db) -> None:
+    if role.is_default:
+        return
+    await _require_outranks_position(server, actor_id, role.position, db)
 
 
 # ---- Servers ----------------------------------------------------------------
@@ -93,7 +162,9 @@ async def create_server(body: ServerCreate, current_user: CurrentUser, db: DB):
     db.add(ServerMember(server_id=server.id, user_id=current_user.id))
     # Create default Admin role, plus the implicit @everyone role whose channel
     # overwrites apply to every member (used to make channels private).
-    db.add(Role(server_id=server.id, name="Admin", is_admin=True, position=0))
+    # The Admin role sits above roles created at the default position 0, so
+    # its holders can manage those, but not each other (S28).
+    db.add(Role(server_id=server.id, name="Admin", is_admin=True, position=1))
     db.add(Role(server_id=server.id, name=EVERYONE_ROLE_NAME, is_default=True, position=0))
 
     await db.commit()
@@ -356,6 +427,8 @@ async def remove_member(
         await _require_admin(server, current_user.id, db)
     if user_id == server.owner_id:
         raise HTTPException(status_code=400, detail="Owner cannot be removed from their server")
+    if current_user.id != user_id:
+        await _require_outranks_member(server, current_user.id, user_id, db)
     result = await db.execute(
         select(ServerMember).where(
             ServerMember.server_id == server_id, ServerMember.user_id == user_id
@@ -395,6 +468,7 @@ async def update_member_nick(
     if current_user.id != user_id:
         server = await _get_server_or_404(server_id, db)
         await _require_admin(server, current_user.id, db)
+        await _require_outranks_member(server, current_user.id, user_id, db)
     result = await db.execute(
         select(ServerMember)
         .options(selectinload(ServerMember.user))
@@ -471,6 +545,7 @@ async def list_roles(server_id: uuid.UUID, current_user: CurrentUser, db: DB):
 async def create_role(server_id: uuid.UUID, body: RoleCreate, current_user: CurrentUser, db: DB):
     server = await _get_server_or_404(server_id, db)
     await _require_admin(server, current_user.id, db)
+    await _require_outranks_position(server, current_user.id, body.position, db)
     role = Role(
         server_id=server_id,
         name=body.name,
@@ -509,6 +584,9 @@ async def update_role(
     role = result.scalar_one_or_none()
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
+    await _require_outranks_role(server, current_user.id, role, db)
+    if body.position is not None and not role.is_default:
+        await _require_outranks_position(server, current_user.id, body.position, db)
     if role.is_default:
         changed = body.model_dump(exclude_unset=True)
         if (
@@ -566,6 +644,7 @@ async def delete_role(
         raise HTTPException(status_code=404, detail="Role not found")
     if role.is_default:
         raise HTTPException(status_code=400, detail="The @everyone role can't be deleted")
+    await _require_outranks_role(server, current_user.id, role, db)
     
     await create_audit_log(
         session=db,
@@ -598,6 +677,9 @@ async def assign_role(
         raise HTTPException(status_code=404, detail="Role not found")
     if role.is_default:
         raise HTTPException(status_code=400, detail="Every member already has the @everyone role")
+    await _require_outranks_role(server, current_user.id, role, db)
+    if user_id != current_user.id:
+        await _require_outranks_member(server, current_user.id, user_id, db)
     existing = await db.execute(
         select(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
     )
@@ -636,6 +718,10 @@ async def remove_role(
     )
     user_role = result.scalar_one_or_none()
     if user_role:
+        role = await db.get(Role, role_id)
+        await _require_outranks_role(server, current_user.id, role, db)
+        if user_id != current_user.id:
+            await _require_outranks_member(server, current_user.id, user_id, db)
         await db.delete(user_role)
         await create_audit_log(
             session=db,
@@ -708,6 +794,7 @@ async def ban_member(server_id: uuid.UUID, user_id: uuid.UUID, current_user: Cur
     await _require_admin(server, current_user.id, db)
     if user_id == server.owner_id:
         raise HTTPException(status_code=400, detail="Cannot ban the server owner")
+    await _require_outranks_member(server, current_user.id, user_id, db)
     # Record ban
     existing = await db.execute(
         select(ServerBan).where(ServerBan.server_id == server_id, ServerBan.user_id == user_id)

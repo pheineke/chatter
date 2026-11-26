@@ -115,6 +115,7 @@ Each open channel, server and `/ws/me` opens its own socket and runs its own aut
 - [x] "Private channel" toggle in channel settings (denies `VIEW_CHANNEL` for `@everyone`, shows who can still see it).
 - [x] When a channel becomes hidden for someone who has it open, they're navigated away (channel list refetch) and their channel/voice socket is closed.
 - [ ] Close sockets when their JWT expires (today only on revoke), and when a server is deleted.
+- [ ] Role order UI: drag to reorder roles in server settings (sends `position`). The backend enforces the hierarchy (S28), but today only the API can build an admin ladder. Also grey out roles and members the viewer can't manage, instead of letting them hit a 403.
 
 ### 3.3 Accessibility 🟡
 Only **14** `aria-label`s across the app, and **19** clickable `<div>`/`<span>` elements.
