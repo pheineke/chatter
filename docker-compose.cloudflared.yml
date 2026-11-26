@@ -10,5 +10,6 @@ services:
     # other devices; it is HTTPS, which voice needs anyway.
     ports: !override
       - "127.0.0.1:${HTTP_PORT:-9090}:80"
+      - "[::1]:${HTTP_PORT:-9090}:80"  # "localhost" may resolve to IPv6 first
     volumes:
       - ./deploy/nginx-cloudflared.conf:/etc/nginx/conf.d/00-real-ip.conf:ro
