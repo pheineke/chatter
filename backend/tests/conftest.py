@@ -5,6 +5,7 @@ Each test function gets its own in-memory SQLite database so tests are fully
 isolated.  The `client` fixture exposes an httpx.AsyncClient wired to the
 FastAPI app with the real database dependency replaced by the per-test session.
 """
+import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -42,6 +43,17 @@ from models.base import Base
 # you'd get "no such table: users", run a single file another way and it
 # passed.
 import main  # noqa: E402,F401  (imported for its import side effects)
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Rate-limit windows are process-global; start every test with none, so
+    a test's own requests decide whether it hits a limit."""
+    from app import rate_limiter
+
+    rate_limiter._windows.clear()
+    rate_limiter._slowmode_last.clear()
+    yield
+
 
 # ---------------------------------------------------------------------------
 # Database fixture

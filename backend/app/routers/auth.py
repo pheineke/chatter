@@ -17,7 +17,7 @@ from app.auth import (
 from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app import ws_enforcement
-from app.rate_limiter import rate_limit_auth, rate_limit_auth_login
+from app.rate_limiter import rate_limit_auth, rate_limit_auth_login, rate_limit_refresh
 from app.schemas.user import UserCreate, UserRead, Token
 from models.invite import ServerInvite
 from models.refresh_token import RefreshToken
@@ -129,7 +129,9 @@ class RefreshRequest(BaseModel):
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(request: Request, body: RefreshRequest, db: DB):
+async def refresh_token(
+    request: Request, body: RefreshRequest, db: DB, _rl: None = Depends(rate_limit_refresh)
+):
     """Exchange a valid refresh token for a new access + refresh token pair.
 
     Rotation: each refresh token works once. Rotation is a single conditional

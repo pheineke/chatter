@@ -288,6 +288,54 @@ async def rate_limit_banner_change(current_user: CurrentUser) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# security_pass S27
+# ---------------------------------------------------------------------------
+
+async def rate_limit_refresh(request: Request) -> None:
+    """/auth/refresh: 60 per minute per IP. Each tab refreshes about once per
+    access-token lifetime, so this only bites on scripted hammering."""
+    ip = request.client.host if request.client else "unknown"
+    await _enforce_limit(
+        key=f"auth-refresh:{ip}",
+        limit=60,
+        window_seconds=60.0,
+        detail="Too many requests. Please try again later.",
+    )
+
+
+async def rate_limit_decoration_redeem(current_user: CurrentUser) -> None:
+    """Decoration-code redemption: 10 attempts per 10 minutes per user, so
+    codes can't be guessed by brute force."""
+    await _enforce_limit(
+        key=f"deco-redeem:{current_user.id}",
+        limit=10,
+        window_seconds=600.0,
+        detail="Too many attempts. Please wait {retry_after} seconds.",
+    )
+
+
+async def rate_limit_note_update(current_user: CurrentUser) -> None:
+    """Private notes autosave while typing: 60 writes per minute per user."""
+    await _enforce_limit(
+        key=f"note:{current_user.id}",
+        limit=60,
+        window_seconds=60.0,
+        detail="You're saving notes too quickly. Please slow down!",
+    )
+
+
+async def rate_limit_me_update(current_user: CurrentUser) -> None:
+    """Any PATCH /users/me (status, theme, settings...): 60 per minute per
+    user. Status changes fan out to every friend, so they aren't free."""
+    await _enforce_limit(
+        key=f"me-update:{current_user.id}",
+        limit=60,
+        window_seconds=60.0,
+        detail="You're updating your settings too quickly. Please slow down!",
+    )
+
+
 async def rate_limit_decoration_generate(current_user: CurrentUser) -> None:
     """Decoration-code generation batches: max 2 per 10 minutes per admin."""
     await _enforce_limit(

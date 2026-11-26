@@ -3,13 +3,13 @@
 import secrets
 import uuid
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import select, update
 
 from app.config import settings
 from app.dependencies import CurrentUser, DB
-from app.rate_limiter import rate_limit_decoration_generate
+from app.rate_limiter import rate_limit_decoration_generate, rate_limit_decoration_redeem
 from models.decoration_code import DecorationCode
 
 router = APIRouter(prefix="/decorations", tags=["decorations"])
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/decorations", tags=["decorations"])
 # ── Schemas ──────────────────────────────────────────────────────────────────
 
 class RedeemBody(BaseModel):
-    code: str
+    code: str = Field(max_length=64)
 
 
 class GenerateBody(BaseModel):
@@ -49,7 +49,12 @@ async def my_decorations(current_user: CurrentUser, db: DB):
 
 
 @router.post("/redeem", response_model=FrameEntry)
-async def redeem_code(body: RedeemBody, current_user: CurrentUser, db: DB):
+async def redeem_code(
+    body: RedeemBody,
+    current_user: CurrentUser,
+    db: DB,
+    _rl: None = Depends(rate_limit_decoration_redeem),
+):
     """Redeem a decoration code to unlock a frame."""
     code_str = body.code.strip().upper()
     if not code_str:
@@ -80,10 +85,19 @@ async def redeem_code(body: RedeemBody, current_user: CurrentUser, db: DB):
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="You already own this decoration")
 
-    deco.redeemed_by = current_user.id
-    db.add(deco)
+    # Claim the code only if nobody else got there first: two concurrent
+    # redeems of one code would otherwise both succeed.
+    frame_id = deco.frame_id
+    claimed = await db.execute(
+        update(DecorationCode)
+        .where(DecorationCode.id == deco.id, DecorationCode.redeemed_by.is_(None))
+        .values(redeemed_by=current_user.id)
+    )
+    if claimed.rowcount != 1:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="This code has already been used")
     await db.commit()
-    return FrameEntry(frame_id=deco.frame_id)
+    return FrameEntry(frame_id=frame_id)
 
 
 @router.post("/generate", response_model=list[GeneratedCode])

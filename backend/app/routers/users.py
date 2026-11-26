@@ -3,7 +3,7 @@ import uuid
 
 import aiofiles
 from fastapi import APIRouter, HTTPException, Response, UploadFile, File, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 
 from app.auth import hash_password, verify_password
@@ -11,7 +11,13 @@ from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.presence import broadcast_presence
 from app.schemas.user import UserRead, UserUpdate, UserPublicRead
-from app.rate_limiter import rate_limit_profile_update, rate_limit_avatar_change, rate_limit_banner_change
+from app.rate_limiter import (
+    rate_limit_avatar_change,
+    rate_limit_banner_change,
+    rate_limit_me_update,
+    rate_limit_note_update,
+    rate_limit_profile_update,
+)
 from app.utils.file_validation import verify_image_magic_with_dims, AVATAR_MAX, BANNER_MAX
 from app.ws_manager import manager
 from models.friend import FriendRequest, FriendRequestStatus
@@ -65,6 +71,7 @@ async def get_me(current_user: CurrentUser):
 
 @router.patch("/me", response_model=UserRead)
 async def update_me(body: UserUpdate, current_user: CurrentUser, db: DB, response: Response):
+    await rate_limit_me_update(current_user)
     # Rate-limit profile text changes (not pure status toggles)
     if body.description is not None or body.pronouns is not None:
         await rate_limit_profile_update(current_user)
@@ -198,8 +205,18 @@ async def get_user(user_id: uuid.UUID, db: DB, current_user: CurrentUser):
     return _mask_user_read(user, current_user.id)
 
 
+# Plain notes are capped at 256 characters in the UI; end-to-end encrypted
+# notes are stored as "<prefix><nonce>:<base64 ciphertext>", which for 256
+# characters of 4-byte UTF-8 stays well under this cap.
+NOTE_MAX_LENGTH = 2048
+
+
 class NoteBody(BaseModel):
     content: str = ""
+
+
+class NoteUpdate(BaseModel):
+    content: str = Field(default="", max_length=NOTE_MAX_LENGTH)
 
 
 class ChangePasswordBody(BaseModel):
@@ -232,7 +249,8 @@ async def get_note(user_id: uuid.UUID, current_user: CurrentUser, db: DB):
 
 
 @router.put("/{user_id}/note", response_model=NoteBody)
-async def set_note(user_id: uuid.UUID, body: NoteBody, current_user: CurrentUser, db: DB):
+async def set_note(user_id: uuid.UUID, body: NoteUpdate, current_user: CurrentUser, db: DB):
+    await rate_limit_note_update(current_user)
     result = await db.execute(
         select(UserNote).where(
             UserNote.owner_id == current_user.id,

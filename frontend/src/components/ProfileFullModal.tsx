@@ -188,6 +188,7 @@ export function ProfileFullModal({ user, onClose, focusNote }: Props) {
                   rows={3}
                   value={noteText}
                   onChange={handleNoteChange}
+                  maxLength={256}
                   placeholder="Click to add a note"
                 />
               </div>
