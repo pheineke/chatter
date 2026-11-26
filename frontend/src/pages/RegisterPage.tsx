@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icon'
 import { getRegistrationMode, type RegistrationMode } from '../api/users'

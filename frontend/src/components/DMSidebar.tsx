@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useMatch } from 'react-router-dom'
+import { useNavigate, useMatch } from 'react-router'
 import { useState, useEffect } from 'react'
 import type { MouseEvent } from 'react'
 import { getConversations, markDMRead } from '../api/dms'

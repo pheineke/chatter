@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import { getInvite, joinViaInvite } from '../api/invites'
 import type { ServerInvite } from '../api/invites'
 import { useAuth } from '../contexts/AuthContext'

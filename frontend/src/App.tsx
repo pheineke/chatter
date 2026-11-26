@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router'
 import { AuthProvider } from './contexts/AuthContext'
 import { UnreadChannelsProvider } from './contexts/UnreadChannelsContext'
 import { DesktopNotificationsProvider } from './contexts/DesktopNotificationsContext'

@@ -7,7 +7,7 @@ import { ProfileCard } from './ProfileCard'
 import { ContextMenu } from './ContextMenu'
 import { Icon } from './Icon'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/AuthContext'
 import type { Member, Role, Server } from '../api/types'
 

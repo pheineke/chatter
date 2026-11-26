@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMatch } from 'react-router-dom'
+import { useMatch } from 'react-router'
 import { useWebSocket } from './useWebSocket'
 import { useAuth } from '../contexts/AuthContext'
 import { useUnreadChannels } from '../contexts/UnreadChannelsContext'

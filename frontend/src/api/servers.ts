@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router'
 import client from './client'
 import type { Server, Member, Role, AuditLogEntry, CustomEmoji } from './types'
 

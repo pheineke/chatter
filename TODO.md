@@ -54,7 +54,7 @@ Routers mix HTTP, authorization, DB queries and WS fan-out. For example, `messag
 - [ ] **Lint debt**: `ruff check .` reports ~225 findings (import order, PEP 604 hints, 52 F821 from SQLAlchemy string forward refs → add `TYPE_CHECKING` imports). CI blocks only on E9/F63/F7 until this is cleaned up, then make full `ruff check` blocking again.
 - [ ] Old migration `f7a8b9c0d1e2` can't be downgraded on Postgres (writes integers into boolean columns). Fix or document migrations as forward-only, then squash (see 1.4).
 - [x] Add `pip-audit` / `npm audit` (S29). Still to do: `ruff format --check`.
-- [ ] Upgrade react-router-dom 6 → 7. It clears a moderate advisory (open redirect via backslash in `<Link>`/`useNavigate`). Exposure is low: our navigate targets come from in-app state, not the URL.
+- [x] Upgrade react-router-dom 6 → react-router 7.18 (v8 needs React 19). It clears a moderate advisory (open redirect via backslash in `<Link>`/`useNavigate`). Exposure is low: our navigate targets come from in-app state, not the URL.
 - [ ] Postgres runs are ~4× slower (tables created/dropped per test); switch to one schema per session + per-test transaction rollback if CI time becomes a problem.
 
 ### 1.6 Small backend cleanups 🟢

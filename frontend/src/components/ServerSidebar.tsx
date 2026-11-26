@@ -1,6 +1,6 @@
 import { PortalModal } from './PortalModal'
 import { markDMRead, getConversations } from '../api/dms'
-import { useNavigate, useParams, useLocation, useMatch } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, useMatch } from 'react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { getMyServers, createServer, leaveServer } from '../api/servers'

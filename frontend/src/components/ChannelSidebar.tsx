@@ -1,4 +1,4 @@
-import { useNavigate, useParams, useMatch } from 'react-router-dom'
+import { useNavigate, useParams, useMatch } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { getChannels, getCategories, createChannel, updateChannel, deleteChannel, getServerVoicePresence, reorderChannels, reorderCategories, createCategory, updateCategory, deleteCategory } from '../api/channels'

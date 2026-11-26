@@ -11,7 +11,7 @@
 import { type ReactElement } from 'react'
 import { render, type RenderOptions } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { UnreadChannelsProvider } from '../contexts/UnreadChannelsContext'
 import { MLSContext, type MLSContextValue } from '../contexts/MLSContext'
 import { AuthContext, type AuthContextValue } from '../contexts/AuthContext'

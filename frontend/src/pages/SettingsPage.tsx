@@ -1,4 +1,4 @@
-﻿import { useLocation, useNavigate } from 'react-router-dom'
+﻿import { useLocation, useNavigate } from 'react-router'
 import { useRef, useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icon'

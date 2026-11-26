@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { useVoiceCall } from '../contexts/VoiceCallContext'
 import { Icon } from './Icon'
 import { getMediaDevices } from '../utils/media'
