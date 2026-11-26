@@ -150,8 +150,9 @@ Only **14** `aria-label`s across the app, and **19** clickable `<div>`/`<span>` 
 - [x] Non-root, multi-stage backend image (S24); compose adds `read_only`, `cap_drop: [ALL]`, `no-new-privileges`.
 - [ ] Add a `healthcheck:` for each service and `depends_on: condition: service_healthy` for the DB.
 - [ ] Frontend: an unprivileged nginx image (`nginxinc/nginx-unprivileged`) and `cap_drop` there too.
-- [ ] The Caddy → nginx → backend chain was validated piece by piece (configs, the hardened backend container), not yet as a running stack with a real certificate. Do one trial deploy.
-- [x] Backups: `scripts/backup.sh` (pg_dump + static/, 14-day rotation), restore documented in `docs/deploying.md`. Test a restore once.
+- [x] Full-stack trial (2026-11-26, isolated `chattertrial` project): nginx → backend in production + invite mode, 20/20 smoke checks (headers, hidden docs, invites, refresh, WebSocket incl. frame cap, signed attachments) and the hardened container (uid 1000, read-only, no caps). Found and fixed `microphone=()` in nginx's Permissions-Policy, which blocked voice chat.
+- [ ] Still untested as a running stack: the Caddy overlay with a real certificate (needs a domain and ports 80/443).
+- [x] Backups: `scripts/backup.sh` (pg_dump + static/, 14-day rotation), restore documented in `docs/deploying.md`. Restore tested 2026-11-26: wiped DB volume and uploads, followed the documented steps; accounts, roles, messages and attachments came back.
 - [ ] TURN server (coturn) for voice behind NAT and for IP privacy.
 - [ ] Basic observability: access logs without tokens, error tracking (self-hosted GlitchTip/Sentry), disk-usage alert (uploads on a Pi SD card).
 - [x] Registration switch: `REGISTRATION_MODE=open|invite|closed`.
