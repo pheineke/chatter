@@ -4,6 +4,7 @@ import { useNavigate, useParams, useLocation, useMatch } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { getMyServers, createServer, leaveServer } from '../api/servers'
+import { getChannels } from '../api/channels'
 import { joinViaInvite } from '../api/invites'
 import { Icon } from './Icon'
 import { ContextMenu } from './ContextMenu'
@@ -273,12 +274,17 @@ export function ServerSidebar({ unreadDMsCount = 0, activeServerId, onCloseNav }
   }
 
   const createMut = useMutation({
-    mutationFn: () => createServer(name),
-    onSuccess: (s) => {
+    mutationFn: async () => {
+      const server = await createServer(name)
+      // New servers come with #general; open it instead of an empty view.
+      const channels = await getChannels(server.id).catch(() => [])
+      return { server, firstText: channels.find((c) => c.type === 'text') }
+    },
+    onSuccess: ({ server, firstText }) => {
       qc.invalidateQueries({ queryKey: ['servers'] })
       setShowCreate(false)
       setName('')
-      navigate(`/channels/${s.id}`)
+      navigate(firstText ? `/channels/${server.id}/${firstText.id}` : `/channels/${server.id}`)
     },
   })
 

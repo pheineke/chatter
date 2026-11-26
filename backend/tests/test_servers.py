@@ -21,6 +21,21 @@ async def test_create_server(client: AsyncClient, alice_headers):
     assert "id" in data
 
 
+async def test_new_server_starts_with_a_text_and_a_voice_channel(client: AsyncClient, alice_headers):
+    sid = (await create_server(client, alice_headers))["id"]
+    cats = (await client.get(f"/servers/{sid}/categories", headers=alice_headers)).json()
+    chans = (await client.get(f"/servers/{sid}/channels", headers=alice_headers)).json()
+
+    cat_by_id = {c["id"]: c["title"] for c in cats}
+    got = sorted((c["type"], c["title"], cat_by_id.get(c["category_id"])) for c in chans)
+    assert got == [("text", "general", "Text Channels"), ("voice", "General", "Voice Channels")]
+
+    # The default text channel is immediately usable.
+    text_id = next(c["id"] for c in chans if c["type"] == "text")
+    r = await client.post(f"/channels/{text_id}/messages", json={"content": "first!"}, headers=alice_headers)
+    assert r.status_code == 201, r.text
+
+
 async def test_list_servers_shows_only_joined(client: AsyncClient, alice_headers, bob_headers):
     await create_server(client, alice_headers, "Alice's Server")
     await create_server(client, bob_headers, "Bob's Server")

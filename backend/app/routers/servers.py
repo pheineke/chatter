@@ -32,6 +32,7 @@ from app import ws_enforcement
 from app.ws_manager import manager
 from app.services.audit_log_service import create_audit_log
 from models.audit_log import AuditLogAction
+from models.channel import Category, Channel, ChannelType
 from models.server import EVERYONE_ROLE_NAME, Server, ServerMember, Role, UserRole
 from models.custom_emoji import CustomEmoji
 from models.user import User, UserStatus
@@ -166,6 +167,19 @@ async def create_server(body: ServerCreate, current_user: CurrentUser, db: DB):
     # its holders can manage those, but not each other (S28).
     db.add(Role(server_id=server.id, name="Admin", is_admin=True, position=1))
     db.add(Role(server_id=server.id, name=EVERYONE_ROLE_NAME, is_default=True, position=0))
+
+    # Start with somewhere to talk: one text and one voice channel, each in
+    # its own category, like a fresh Discord server.
+    text_cat = Category(server_id=server.id, title="Text Channels", position=0)
+    voice_cat = Category(server_id=server.id, title="Voice Channels", position=1)
+    db.add_all([text_cat, voice_cat])
+    await db.flush()
+    db.add_all([
+        Channel(server_id=server.id, category_id=text_cat.id, title="general",
+                type=ChannelType.text, position=0),
+        Channel(server_id=server.id, category_id=voice_cat.id, title="General",
+                type=ChannelType.voice, position=0),
+    ])
 
     await db.commit()
     await db.refresh(server)
