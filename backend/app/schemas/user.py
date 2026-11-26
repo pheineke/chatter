@@ -22,6 +22,24 @@ class UserBase(BaseModel):
 USERNAME_RE = re.compile(r'[A-Za-z0-9_]{2,32}')
 
 
+# bcrypt only looks at the first 72 bytes and bcrypt>=5 raises on longer
+# input (security_pass S21), so that is the hard ceiling. 72 bytes is still
+# 72 ASCII characters, or 18-36 for non-Latin scripts and emoji.
+PASSWORD_MIN_CHARS = 8
+PASSWORD_MAX_BYTES = 72
+
+
+def check_new_password(v: str) -> str:
+    if len(v) < PASSWORD_MIN_CHARS:
+        raise ValueError(f'Password must be at least {PASSWORD_MIN_CHARS} characters')
+    if len(v.encode('utf-8')) > PASSWORD_MAX_BYTES:
+        raise ValueError(
+            f'Password is too long (max {PASSWORD_MAX_BYTES} bytes; '
+            'that is 72 plain letters, fewer with accents or emoji)'
+        )
+    return v
+
+
 class UserCreate(BaseModel):
     username: str
     password: str
@@ -46,9 +64,7 @@ class UserCreate(BaseModel):
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters')
-        return v
+        return check_new_password(v)
 
 
 class UserUpdate(BaseModel):

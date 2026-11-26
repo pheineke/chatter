@@ -325,6 +325,17 @@ async def rate_limit_note_update(current_user: CurrentUser) -> None:
     )
 
 
+async def rate_limit_password_change(current_user: CurrentUser) -> None:
+    """change-password checks the current password: 5 tries per 10 minutes,
+    so a stolen access token can't be used to brute-force it."""
+    await _enforce_limit(
+        key=f"password-change:{current_user.id}",
+        limit=5,
+        window_seconds=600.0,
+        detail="Too many attempts. Please wait {retry_after} seconds.",
+    )
+
+
 async def rate_limit_me_update(current_user: CurrentUser) -> None:
     """Any PATCH /users/me (status, theme, settings...): 60 per minute per
     user. Status changes fan out to every friend, so they aren't free."""

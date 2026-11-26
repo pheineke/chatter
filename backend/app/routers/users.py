@@ -2,20 +2,22 @@ import os
 import uuid
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, Response, UploadFile, File, status
-from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile, File, status
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import delete, func, or_, select
 
 from app.auth import hash_password, verify_password
 from app.config import settings
 from app.dependencies import CurrentUser, DB
 from app.presence import broadcast_presence
-from app.schemas.user import UserRead, UserUpdate, UserPublicRead
+from app import ws_enforcement
+from app.schemas.user import UserRead, UserUpdate, UserPublicRead, check_new_password
 from app.rate_limiter import (
     rate_limit_avatar_change,
     rate_limit_banner_change,
     rate_limit_me_update,
     rate_limit_note_update,
+    rate_limit_password_change,
     rate_limit_profile_update,
 )
 from app.utils.file_validation import verify_image_magic_with_dims, AVATAR_MAX, BANNER_MAX
@@ -24,6 +26,7 @@ from models.friend import FriendRequest, FriendRequestStatus
 from models.server import ServerMember
 from models.user import User, UserStatus
 from models.note import UserNote
+from models.refresh_token import RefreshToken
 from models.decoration_code import DecorationCode
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -220,20 +223,35 @@ class NoteUpdate(BaseModel):
 
 
 class ChangePasswordBody(BaseModel):
-    current_password: str
+    current_password: str = Field(max_length=1024)
     new_password: str
+
+    @field_validator('new_password')
+    @classmethod
+    def _check_new(cls, v: str) -> str:
+        return check_new_password(v)
 
 
 @router.post("/me/change-password", status_code=status.HTTP_204_NO_CONTENT)
-async def change_password(body: ChangePasswordBody, current_user: CurrentUser, db: DB):
-    """Change the authenticated user's password."""
+async def change_password(
+    request: Request, body: ChangePasswordBody, current_user: CurrentUser, db: DB
+):
+    """Change the authenticated user's password and sign out every other
+    session: whoever knew the old password may still hold one (S21)."""
+    await rate_limit_password_change(current_user)
     if not verify_password(body.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
-    if len(body.new_password) < 8:
-        raise HTTPException(status_code=422, detail="New password must be at least 8 characters")
     current_user.password_hash = hash_password(body.new_password)
     db.add(current_user)
+
+    sid = getattr(request.state, "session_id", None)
+    keep = uuid.UUID(sid) if sid else None
+    others = delete(RefreshToken).where(RefreshToken.user_id == current_user.id)
+    if keep is not None:
+        others = others.where(RefreshToken.id != keep)
+    await db.execute(others)
     await db.commit()
+    await ws_enforcement.close_user_sessions(current_user.id, keep_session=keep)
 
 
 @router.get("/{user_id}/note", response_model=NoteBody)

@@ -293,6 +293,8 @@ function ChangePasswordSection() {
     setPwSuccess(false)
     if (!pwCurrent) { setPwError('Please enter your current password'); return }
     if (pwNew.length < 8) { setPwError('New password must be at least 8 characters'); return }
+    // bcrypt's limit (security_pass S21); multi-byte characters count more than once.
+    if (new TextEncoder().encode(pwNew).length > 72) { setPwError('New password is too long (max 72 bytes)'); return }
     if (pwNew !== pwConfirm) { setPwError('New passwords do not match'); return }
     setPwLoading(true)
     try {
@@ -302,7 +304,11 @@ function ChangePasswordSection() {
       setTimeout(() => setPwSuccess(false), 4000)
     } catch (err: any) {
       const detail = err?.response?.data?.detail
-      setPwError(typeof detail === 'string' ? detail : 'Failed to update password')
+      setPwError(
+        typeof detail === 'string' ? detail
+          : Array.isArray(detail) ? detail.map((d: { msg?: string }) => (d.msg ?? '').replace(/^Value error, /, '')).join(' ')
+          : 'Failed to update password',
+      )
     } finally {
       setPwLoading(false)
     }
@@ -326,7 +332,7 @@ function ChangePasswordSection() {
           onKeyDown={e => { if (e.key === 'Enter') handleChangePassword() }}
         />
         {pwError && <p className="text-red-400 text-sm">{pwError}</p>}
-        {pwSuccess && <p className="text-green-400 text-sm">Password updated successfully!</p>}
+        {pwSuccess && <p className="text-green-400 text-sm">Password updated. Your other devices have been signed out.</p>}
         <div className="flex justify-end pt-1">
           <button onClick={handleChangePassword} disabled={pwLoading} className="btn md:py-1.5 py-2">
             {pwLoading ? 'Saving…' : 'Update Password'}

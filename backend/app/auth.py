@@ -14,7 +14,15 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
+    """False for a wrong password, and also for input bcrypt can't take (over
+    72 bytes, S21) or a malformed stored hash, instead of raising a 500."""
+    secret = plain.encode()
+    if len(secret) > 72:
+        return False
+    try:
+        return bcrypt.checkpw(secret, hashed.encode())
+    except ValueError:
+        return False
 
 
 def create_access_token(user_id: uuid.UUID, session_id: uuid.UUID | None = None) -> str:
