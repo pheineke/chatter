@@ -28,6 +28,7 @@ import { loadKeyPair } from '../db/keyStore'
 import { createQRChallenge, pollQRStatus, approveQRSession } from '../api/e2ee'
 import { useAuth } from '../contexts/AuthContext'
 import { Icon } from '../components/Icon'
+import { QRApprovalPrompt } from '../components/QRApprovalPrompt'
 
 const isMobile = typeof window !== 'undefined' && 'maxTouchPoints' in navigator && navigator.maxTouchPoints > 0
 
@@ -56,6 +57,8 @@ function DesktopQRHost({ loginWithTokens }: { loginWithTokens: (at: string, rt: 
   const [errorMsg, setErrorMsg] = useState('')
 
   const ephemeralPairRef = useRef<CryptoKeyPair | null>(null)
+  // Never part of the QR: only this device can collect the tokens.
+  const pollSecretRef = useRef<string | null>(null)
 
   const startSession = useCallback(async () => {
     setPhase('initialising')
@@ -65,6 +68,7 @@ function DesktopQRHost({ loginWithTokens }: { loginWithTokens: (at: string, rt: 
       ephemeralPairRef.current = pair
       const pubB64 = await exportPublicKey(pair.publicKey)
       const session = await createQRChallenge(pubB64)
+      pollSecretRef.current = session.poll_secret
       setSessionId(session.session_id)
       setQrPayload(
         JSON.stringify({
@@ -89,7 +93,8 @@ function DesktopQRHost({ loginWithTokens }: { loginWithTokens: (at: string, rt: 
     let cancelled = false
     const poll = async () => {
       try {
-        const resp = await pollQRStatus(sessionId)
+        if (!pollSecretRef.current) return
+        const resp = await pollQRStatus(sessionId, pollSecretRef.current)
         if (cancelled) return
         if (resp.status === 'scanned') {
           setPhase('scanned')
@@ -395,25 +400,11 @@ function MobileQRScanner({ loginWithTokens }: { loginWithTokens: (at: string, rt
         )}
 
         {phase === 'confirming' && scannedPayload && (
-          <div className="space-y-5 text-center max-w-sm">
-            <div className="flex items-center justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sp-mention/20">
-                <Icon name="monitor" size={32} className="text-sp-mention" />
-              </div>
-            </div>
-            <div>
-              <p className="font-semibold text-sp-text text-lg">New device wants to log in</p>
-              <p className="mt-1 text-sm text-sp-muted">This will transfer your E2EE key to the new device. Only approve if you initiated this login.</p>
-            </div>
-            <div className="flex gap-3 justify-center">
-              <button onClick={() => { setPhase('scanning'); setScannedPayload(null); location.reload() }} className="rounded px-4 py-2 text-sm text-sp-muted hover:bg-sp-input transition">
-                Cancel
-              </button>
-              <button onClick={handleApprove} className="rounded bg-sp-mention px-6 py-2 text-sm font-semibold text-white hover:bg-sp-mention/85 transition">
-                Approve
-              </button>
-            </div>
-          </div>
+          <QRApprovalPrompt
+            sessionId={scannedPayload.session_id}
+            onApprove={handleApprove}
+            onCancel={() => { setPhase('scanning'); setScannedPayload(null); location.reload() }}
+          />
         )}
 
         {phase === 'approving' && (

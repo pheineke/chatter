@@ -9,17 +9,21 @@ E2EE key management:
   GET  /users/{user_id}/e2ee-public-key → fetch any user's public key (for encrypting)
   PUT  /me/e2ee-public-key              → upload / rotate own key pair's public half
 """
+import hashlib
+import hmac
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.auth import create_access_token, generate_refresh_token
 from app.dependencies import CurrentUser, DB
+from app.rate_limiter import rate_limit_qr_challenge, rate_limit_qr_status
 from models.e2ee import QRSession, QRSessionStatus, UserE2EEKey
 from models.refresh_token import RefreshToken
 from app.config import settings
@@ -35,13 +39,26 @@ _QR_TTL_SECONDS = 120
 class QRChallengeRequest(BaseModel):
     """Sent by the new device when it first creates a QR session."""
     # ECDH P-256 ephemeral public key of the new device, base64-encoded SPKI
-    device_ephemeral_pk: str
+    device_ephemeral_pk: str = Field(min_length=1, max_length=512)
 
 
 class QRChallengeResponse(BaseModel):
     session_id: uuid.UUID
     # Echo the PK back so the new device can embed it in the QR payload
     device_ephemeral_pk: str
+    expires_at: datetime
+    # Keep this on the new device; never put it in the QR code. Send it as
+    # the X-QR-Poll-Secret header when polling /status.
+    poll_secret: str
+
+
+class QRSessionInfo(BaseModel):
+    """Shown on the approving device before it approves."""
+    session_id: uuid.UUID
+    requester_ip: str | None
+    requester_user_agent: str | None
+    same_network: bool
+    created_at: datetime
     expires_at: datetime
 
 
@@ -106,18 +123,61 @@ def _get_ua(request: Request) -> str | None:
 
 
 # ─── QR Session endpoints ──────────────────────────────────────────────────────
+#
+# Hardening (security_pass S18):
+# * The new device gets a poll secret that is not in the QR code; collecting
+#   the tokens needs it, so a photo of the QR is not enough.
+# * Tokens and the wrapped E2EE key are handed out once, by an atomic claim,
+#   and wiped from the row in the same UPDATE.
+# * Rows are purged a few minutes after they expire.
+# * The approver sees where the request came from (browser, IP, same network
+#   or not) before approving, to make QRLjacking — an attacker showing the
+#   victim *their* QR — visible.
+
+# Keep expired rows this long so a device that was approved right at the end
+# of the TTL can still collect its tokens.
+_QR_PURGE_GRACE = timedelta(minutes=5)
+POLL_SECRET_HEADER = "X-QR-Poll-Secret"
+
+
+def _hash_poll_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+def _client_ip(request: Request) -> str | None:
+    return request.client.host[:64] if request.client else None
+
+
+def _aware(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+async def _purge_old_qr_sessions(db) -> None:
+    cutoff = datetime.now(timezone.utc) - _QR_PURGE_GRACE
+    await db.execute(delete(QRSession).where(QRSession.expires_at < cutoff))
+
 
 @router.post("/auth/qr/challenge", response_model=QRChallengeResponse, status_code=201)
-async def qr_challenge(body: QRChallengeRequest, db: DB):
+async def qr_challenge(
+    request: Request,
+    body: QRChallengeRequest,
+    db: DB,
+    _rl: None = Depends(rate_limit_qr_challenge),
+):
     """Create a new QR login session.
 
     Called by the *new* (untrusted) device.  No authentication required —
     the session is not associated with any user until a trusted device approves it.
     """
+    await _purge_old_qr_sessions(db)
+    poll_secret = secrets.token_urlsafe(32)
     expires = datetime.now(timezone.utc) + timedelta(seconds=_QR_TTL_SECONDS)
     session = QRSession(
         device_ephemeral_pk=body.device_ephemeral_pk,
         expires_at=expires,
+        poll_secret_hash=_hash_poll_secret(poll_secret),
+        requester_ip=_client_ip(request),
+        requester_user_agent=_get_ua(request),
     )
     db.add(session)
     await db.commit()
@@ -126,33 +186,42 @@ async def qr_challenge(body: QRChallengeRequest, db: DB):
         session_id=session.id,
         device_ephemeral_pk=session.device_ephemeral_pk,
         expires_at=session.expires_at,
+        poll_secret=poll_secret,
     )
 
 
 @router.get("/auth/qr/{session_id}/status", response_model=QRStatusResponse)
-async def qr_status(session_id: uuid.UUID, db: DB):
+async def qr_status(
+    session_id: uuid.UUID,
+    db: DB,
+    poll_secret: Annotated[str | None, Header(alias=POLL_SECRET_HEADER)] = None,
+    _rl: None = Depends(rate_limit_qr_status),
+):
     """Poll the status of a QR session.
 
-    Called by the *new* device every ~2 s.  Sensitive token fields are only
-    returned once the session is 'approved'; the session is then moved to
-    'used' so the tokens cannot be fetched a second time.
+    Called by the *new* device every ~2 s with the poll secret it got from
+    /challenge. Once approved, the tokens and wrapped key are returned exactly
+    once and erased from the database in the same statement.
     """
     result = await db.execute(select(QRSession).where(QRSession.id == session_id))
     session = result.scalar_one_or_none()
-    if session is None:
+    # Unknown session and wrong secret look the same.
+    if (
+        session is None
+        or not poll_secret
+        or not session.poll_secret_hash
+        or not hmac.compare_digest(session.poll_secret_hash, _hash_poll_secret(poll_secret))
+    ):
         raise HTTPException(status_code=404, detail="QR session not found")
 
-    # Mark expired sessions
     now = datetime.now(timezone.utc)
-    exp = session.expires_at
-    if exp.tzinfo is None:
-        exp = exp.replace(tzinfo=timezone.utc)
-    if exp < now and session.status == QRSessionStatus.pending:
+    if _aware(session.expires_at) < now and session.status in (
+        QRSessionStatus.pending, QRSessionStatus.scanned
+    ):
         session.status = QRSessionStatus.expired
         await db.commit()
 
     if session.status == QRSessionStatus.approved:
-        # Return tokens exactly once, then mark as used
         resp = QRStatusResponse(
             session_id=session.id,
             status=QRSessionStatus.approved,
@@ -162,11 +231,56 @@ async def qr_status(session_id: uuid.UUID, db: DB):
             encryption_nonce=session.encryption_nonce,
             approver_e2ee_public_key=session.approver_e2ee_public_key,
         )
-        session.status = QRSessionStatus.used
+        # Claim and wipe in one conditional UPDATE: a second, concurrent poll
+        # matches zero rows and gets no tokens.
+        claimed = await db.execute(
+            update(QRSession)
+            .where(QRSession.id == session.id, QRSession.status == QRSessionStatus.approved)
+            .values(
+                status=QRSessionStatus.used,
+                access_token=None,
+                refresh_token=None,
+                encrypted_private_key=None,
+                encryption_nonce=None,
+            )
+            .execution_options(synchronize_session=False)
+        )
         await db.commit()
-        return resp
+        if claimed.rowcount == 1:
+            return resp
+        return QRStatusResponse(session_id=session.id, status=QRSessionStatus.used)
 
     return QRStatusResponse(session_id=session.id, status=session.status)
+
+
+@router.get("/auth/qr/{session_id}", response_model=QRSessionInfo)
+async def qr_session_info(
+    request: Request,
+    session_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+):
+    """What the approving device shows before the user taps Approve: which
+    browser and IP asked for the login, and whether it is on the approver's
+    own network. Marks a pending session as scanned."""
+    result = await db.execute(select(QRSession).where(QRSession.id == session_id))
+    session = result.scalar_one_or_none()
+    if session is None or _aware(session.expires_at) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=404, detail="QR session not found or expired")
+    if session.status not in (QRSessionStatus.pending, QRSessionStatus.scanned):
+        raise HTTPException(status_code=409, detail=f"QR session is already '{session.status}'")
+    if session.status == QRSessionStatus.pending:
+        session.status = QRSessionStatus.scanned
+        await db.commit()
+    approver_ip = _client_ip(request)
+    return QRSessionInfo(
+        session_id=session.id,
+        requester_ip=session.requester_ip,
+        requester_user_agent=session.requester_user_agent,
+        same_network=bool(session.requester_ip) and session.requester_ip == approver_ip,
+        created_at=session.created_at,
+        expires_at=session.expires_at,
+    )
 
 
 @router.post("/auth/qr/{session_id}/approve", status_code=200, response_model=QRStatusResponse)
@@ -191,29 +305,40 @@ async def qr_approve(
     if session is None:
         raise HTTPException(status_code=404, detail="QR session not found")
 
-    now = datetime.now(timezone.utc)
-    exp = session.expires_at
-    if exp.tzinfo is None:
-        exp = exp.replace(tzinfo=timezone.utc)
-
-    if session.status != QRSessionStatus.pending:
+    if session.status not in (QRSessionStatus.pending, QRSessionStatus.scanned):
         raise HTTPException(status_code=409, detail=f"QR session is already '{session.status}'")
-    if exp < now:
+    if _aware(session.expires_at) < datetime.now(timezone.utc):
         session.status = QRSessionStatus.expired
         await db.commit()
         raise HTTPException(status_code=410, detail="QR session has expired")
 
-    # Mint a fresh token pair for the new device session
-    access, raw_rt = await _issue_token_pair_for_user(current_user.id, db, ua=_get_ua(request))
+    # The new session is labelled with the *new* device's browser, not the
+    # approver's.
+    access, raw_rt = await _issue_token_pair_for_user(
+        current_user.id, db, ua=session.requester_user_agent
+    )
 
-    session.status = QRSessionStatus.approved
-    session.approver_user_id = current_user.id
-    session.encrypted_private_key = body.encrypted_private_key
-    session.encryption_nonce = body.encryption_nonce
-    session.approver_e2ee_public_key = body.approver_e2ee_public_key
-    session.access_token = access
-    session.refresh_token = raw_rt
-
+    # Only one approval wins, even if two trusted devices race.
+    claimed = await db.execute(
+        update(QRSession)
+        .where(
+            QRSession.id == session.id,
+            QRSession.status.in_([QRSessionStatus.pending, QRSessionStatus.scanned]),
+        )
+        .values(
+            status=QRSessionStatus.approved,
+            approver_user_id=current_user.id,
+            encrypted_private_key=body.encrypted_private_key,
+            encryption_nonce=body.encryption_nonce,
+            approver_e2ee_public_key=body.approver_e2ee_public_key,
+            access_token=access,
+            refresh_token=raw_rt,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if claimed.rowcount != 1:
+        await db.rollback()  # also drops the refresh token minted above
+        raise HTTPException(status_code=409, detail="QR session was already approved")
     await db.commit()
 
     return QRStatusResponse(session_id=session.id, status=QRSessionStatus.approved)

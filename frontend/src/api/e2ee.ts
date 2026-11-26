@@ -8,6 +8,19 @@ export interface QRChallengeResponse {
   session_id: string
   device_ephemeral_pk: string
   expires_at: string
+  /** Stays on the new device (never in the QR); required to poll /status. */
+  poll_secret: string
+}
+
+/** Shown on the approving device before it approves (anti-QRLjacking). */
+export interface QRSessionInfo {
+  session_id: string
+  requester_ip: string | null
+  requester_user_agent: string | null
+  /** The request came from the same public IP as the approving device. */
+  same_network: boolean
+  created_at: string
+  expires_at: string
 }
 
 export interface QRStatusResponse {
@@ -47,8 +60,19 @@ export async function createQRChallenge(deviceEphemeralPk: string): Promise<QRCh
  * Poll the status of a QR session.
  * Called by the NEW device every ~2 s until status is "approved" or "expired".
  */
-export async function pollQRStatus(sessionId: string): Promise<QRStatusResponse> {
-  const { data } = await apiClient.get(`/auth/qr/${sessionId}/status`)
+export async function pollQRStatus(sessionId: string, pollSecret: string): Promise<QRStatusResponse> {
+  const { data } = await apiClient.get(`/auth/qr/${sessionId}/status`, {
+    headers: { 'X-QR-Poll-Secret': pollSecret },
+  })
+  return data
+}
+
+/**
+ * Where a QR login request came from. Called by the trusted device after
+ * scanning, before the user approves; also tells the new device "scanned".
+ */
+export async function getQRSessionInfo(sessionId: string): Promise<QRSessionInfo> {
+  const { data } = await apiClient.get(`/auth/qr/${sessionId}`)
   return data
 }
 

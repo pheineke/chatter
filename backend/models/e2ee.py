@@ -62,6 +62,15 @@ class QRSession(Base):
     access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # SHA-256 of a secret only the new device knows (it is not in the QR
+    # code). Polling for the tokens requires it, so someone who merely sees
+    # or photographs the QR can't collect the session (security_pass S18).
+    poll_secret_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Where the challenge came from, shown to the approver so they can tell
+    # whether the login really is the device in front of them (QRLjacking).
+    requester_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    requester_user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

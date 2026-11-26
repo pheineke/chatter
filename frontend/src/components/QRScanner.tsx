@@ -9,6 +9,7 @@ import { loadKeyPair } from '../db/keyStore'
 import { approveQRSession } from '../api/e2ee'
 import { useAuth } from '../contexts/AuthContext'
 import { Icon } from './Icon'
+import { QRApprovalPrompt } from './QRApprovalPrompt'
 
 type ScanPhase = 'scanning' | 'confirming' | 'approving' | 'done' | 'error' | 'no-camera' | 'no-key'
 
@@ -176,32 +177,12 @@ export function QRScanner({ onClose }: Props) {
         )}
 
         {phase === 'confirming' && scannedPayload && (
-          <div className="flex flex-col items-center gap-6 px-6 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sp-mention/20">
-              <Icon name="monitor" size={32} className="text-sp-mention" />
-            </div>
-            <div>
-              <p className="font-semibold text-white text-lg">New device wants to log in</p>
-              <p className="mt-2 text-sm text-white/60 max-w-xs">
-                This will transfer your E2EE key to the new device.
-                Only approve if you initiated this login.
-              </p>
-            </div>
-            <div className="flex gap-4">
-              <button
-                onClick={() => { setPhase('scanning'); setScannedPayload(null) }}
-                className="px-6 py-2 rounded text-sm text-white/70 border border-white/20 hover:bg-white/10 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleApprove}
-                className="px-6 py-2 rounded bg-sp-mention text-sm font-semibold text-white hover:bg-sp-mention/85 transition"
-              >
-                Approve
-              </button>
-            </div>
-          </div>
+          <QRApprovalPrompt
+            sessionId={scannedPayload.session_id}
+            onApprove={handleApprove}
+            onCancel={onClose}
+            onDark
+          />
         )}
 
         {phase === 'approving' && (

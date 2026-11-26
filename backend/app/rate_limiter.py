@@ -164,6 +164,28 @@ async def _enforce_limit(key: str, limit: int, window_seconds: float, detail: st
         )
 
 
+async def rate_limit_qr_challenge(request: Request) -> None:
+    """Unauthenticated QR login challenges (S18): 10 per 10 minutes per IP."""
+    ip = request.client.host if request.client else "unknown"
+    await _enforce_limit(
+        key=f"qr_challenge:{ip}",
+        limit=10,
+        window_seconds=600,
+        detail="Too many QR login attempts. Retry in {retry_after}s.",
+    )
+
+
+async def rate_limit_qr_status(request: Request) -> None:
+    """QR status polls (every 2 s from the new device): 90 per minute per IP."""
+    ip = request.client.host if request.client else "unknown"
+    await _enforce_limit(
+        key=f"qr_status:{ip}",
+        limit=90,
+        window_seconds=60,
+        detail="Polling too fast. Retry in {retry_after}s.",
+    )
+
+
 async def rate_limit_api_token(token_id) -> None:
     """Every request made with a personal API token (S19): 120 per minute."""
     await _enforce_limit(
