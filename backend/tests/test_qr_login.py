@@ -121,3 +121,16 @@ async def test_challenges_are_rate_limited(client):
         await challenge(client)
     r = await client.post("/auth/qr/challenge", json={"device_ephemeral_pk": "ZXBo"})
     assert r.status_code == 429
+
+
+def test_same_network_compares_ipv6_by_prefix():
+    from app.routers.e2ee import _same_network
+
+    assert _same_network("203.0.113.7", "203.0.113.7")
+    assert not _same_network("203.0.113.7", "203.0.113.8")
+    # two devices in one home: same /64, different interface IDs
+    assert _same_network("2001:db8:1:2::a", "2001:db8:1:2:ffff::b")
+    assert not _same_network("2001:db8:1:2::a", "2001:db8:1:3::a")
+    assert not _same_network("203.0.113.7", "2001:db8::1")
+    assert not _same_network(None, "203.0.113.7")
+    assert not _same_network("garbage", "garbage")

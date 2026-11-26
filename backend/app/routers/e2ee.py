@@ -11,6 +11,7 @@ E2EE key management:
 """
 import hashlib
 import hmac
+import ipaddress
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -148,6 +149,23 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host[:64] if request.client else None
 
 
+def _same_network(a: str | None, b: str | None) -> bool:
+    """Same IPv4 address, or same IPv6 /64. Devices on one home network
+    share the public IPv4 (NAT) but each gets its own IPv6 address inside
+    the network's /64, so exact matching would flag every IPv6 user."""
+    if not a or not b:
+        return False
+    try:
+        ia, ib = ipaddress.ip_address(a), ipaddress.ip_address(b)
+    except ValueError:
+        return False
+    if ia.version != ib.version:
+        return False
+    if ia.version == 6:
+        return ipaddress.ip_network(f"{ia}/64", strict=False) == ipaddress.ip_network(f"{ib}/64", strict=False)
+    return ia == ib
+
+
 def _aware(dt: datetime) -> datetime:
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
@@ -277,7 +295,7 @@ async def qr_session_info(
         session_id=session.id,
         requester_ip=session.requester_ip,
         requester_user_agent=session.requester_user_agent,
-        same_network=bool(session.requester_ip) and session.requester_ip == approver_ip,
+        same_network=_same_network(session.requester_ip, approver_ip),
         created_at=session.created_at,
         expires_at=session.expires_at,
     )
