@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 
 from app.auth import (
+    DUMMY_PASSWORD_HASH,
     create_access_token,
     generate_refresh_token,
     hash_password,
@@ -96,9 +98,17 @@ async def register(request: Request, body: UserCreate, db: DB, _rl: None = Depen
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already taken")
 
+    # Saying a name is taken can't be avoided (usernames are public through
+    # mentions and member lists anyway); the per-IP limit above bounds how
+    # fast anyone can probe.
     user = User(username=body.username, password_hash=hash_password(body.password))
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Lost a race with a concurrent registration of the same name.
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Username already taken")
     await db.refresh(user)
     return user
 
@@ -115,7 +125,10 @@ async def login(
         select(User).where(func.lower(User.username) == form.username.strip().lower())
     )
     user = result.scalar_one_or_none()
-    if not user or not verify_password(form.password, user.password_hash):
+    # Always one bcrypt check, so response time doesn't reveal whether the
+    # username exists (S20).
+    password_ok = verify_password(form.password, user.password_hash if user else DUMMY_PASSWORD_HASH)
+    if user is None or not password_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

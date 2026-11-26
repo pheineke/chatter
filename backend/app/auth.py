@@ -13,6 +13,12 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
+# A real bcrypt hash of a random secret, made once at import. Login checks
+# the submitted password against it when the username doesn't exist, so
+# both cases cost one bcrypt round and take the same time (S20).
+DUMMY_PASSWORD_HASH = bcrypt.hashpw(secrets.token_bytes(16).hex().encode(), bcrypt.gensalt()).decode()
+
+
 def verify_password(plain: str, hashed: str) -> bool:
     """False for a wrong password, and also for input bcrypt can't take (over
     72 bytes, S21) or a malformed stored hash, instead of raising a 500."""
