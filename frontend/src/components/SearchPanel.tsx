@@ -101,7 +101,7 @@ export function SearchPanel({ channelId, onJump, onClose, query }: Props) {
               {/* Avatar */}
               {msg.author.avatar ? (
                 <img
-                  src={`/static/avatars/${msg.author.avatar}`}
+                  src={`/api/static/${msg.author.avatar}`}
                   alt={msg.author.username}
                   className="md:w-5 md:h-5 w-7 h-7 rounded-full object-cover shrink-0"
                 />

@@ -54,7 +54,7 @@ export default function InvitePage() {
           <>
             <div className="w-16 h-16 rounded-full bg-sp-input mx-auto mb-4 flex items-center justify-center text-2xl font-bold overflow-hidden">
               {invite.server_image
-                ? <img src={invite.server_image} alt={invite.server_title} className="w-full h-full object-cover" />
+                ? <img src={`/api/static/${invite.server_image}`} alt={invite.server_title} className="w-full h-full object-cover" />
                 : invite.server_title.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
             </div>
             <p className="text-sp-muted text-sm mb-1">You've been invited to join</p>
