@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useVoiceCall } from '../contexts/VoiceCallContext'
 import { Icon } from './Icon'
+import { getMediaDevices } from '../utils/media'
 import type { VoiceSession } from '../pages/AppShell'
 
 interface Props {
@@ -49,8 +50,10 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
   const outputMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null).finally(() => {
-      navigator.mediaDevices.enumerateDevices().then(setDevices).catch(() => setDevices([]))
+    const media = getMediaDevices()
+    if (!media) return // insecure context: no device list to show
+    media.getUserMedia({ audio: true }).catch(() => null).finally(() => {
+      media.enumerateDevices().then(setDevices).catch(() => setDevices([]))
     })
   }, [])
 
@@ -153,6 +156,13 @@ export function VoiceChannelBar({ session, onLeave }: Props) {
           <Icon name="phone-off" size={18} />
         </button>
       </div>
+
+      {state.mediaError && (
+        <div role="status" className="flex items-start gap-1.5 md:px-2 px-3 py-1.5 bg-sp-user text-sp-idle md:text-xs text-sm leading-snug">
+          <Icon name="alert-triangle" size={14} className="mt-0.5 shrink-0" />
+          <span>{state.mediaError}</span>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="grid grid-cols-4 px-1 py-1 bg-sp-user gap-px">

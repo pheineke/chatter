@@ -18,6 +18,7 @@ import { useE2EE } from '../contexts/E2EEContext'
 import { QRScanner } from '../components/QRScanner'
 import { clearDMCache } from '../db/dmCache'
 import { SettingsLayout, type SettingsGroup } from '../components/SettingsLayout'
+import { getMediaDevices } from '../utils/media'
 
 type Tab = 'account' | 'appearance' | 'voice' | 'privacy' | 'tokens' | 'notifications'
 
@@ -824,8 +825,9 @@ function VoiceTab() {
   const { playSound } = useSoundManager()
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {}).finally(() =>
-      navigator.mediaDevices.enumerateDevices().then(d => setDevices(d))
+    const media = getMediaDevices()
+    media?.getUserMedia({ audio: true }).catch(() => {}).finally(() =>
+      media.enumerateDevices().then(d => setDevices(d)).catch(() => setDevices([]))
     )
     return () => { stopTestRef.current(); stopCameraRef.current() }
   }, [])

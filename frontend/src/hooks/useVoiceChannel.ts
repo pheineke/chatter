@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import type { VoiceParticipant } from '../api/types'
 import { useWebSocket } from './useWebSocket'
 import { useSoundManager } from './useSoundManager'
+import { getMediaDevices, INSECURE_MEDIA_MESSAGE, MIC_DENIED_MESSAGE } from '../utils/media'
 
 interface UseVoiceChannelOptions {
   channelId: string | null
@@ -14,6 +15,9 @@ export interface VoiceState {
   isDeafened: boolean
   isSharingScreen: boolean
   isSharingWebcam: boolean
+  /** Why the microphone/camera can't be used (insecure origin, permission
+   *  denied), shown in the voice bar. null when media works. */
+  mediaError: string | null
 }
 
 /**
@@ -31,6 +35,7 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     isDeafened: false,
     isSharingScreen: false,
     isSharingWebcam: false,
+    mediaError: null,
   })
 
   // Map of peerId → RTCPeerConnection
@@ -429,11 +434,16 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
   // --- Local media ----------------------------------------------------------
 
   const acquireMedia = useCallback(async () => {
+    const media = getMediaDevices()
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (!media) throw new Error('insecure context')
+      const stream = await media.getUserMedia({ audio: true })
       localStream.current = stream
+      setState(s => ({ ...s, mediaError: null }))
     } catch {
-      console.warn('Microphone access denied')
+      // Join anyway, listen-only, and say why.
+      console.warn('Microphone unavailable')
+      setState(s => ({ ...s, mediaError: media ? MIC_DENIED_MESSAGE : INSECURE_MEDIA_MESSAGE }))
     } finally {
       // Signal that the media acquisition attempt is complete (success or failure)
       // so the WebSocket connection can now be opened safely.
@@ -518,7 +528,12 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
       // audio: true makes the browser show a "Share audio" / "Share tab audio" checkbox
       // in its native picker. If the user unchecks it the stream just has no audio tracks,
       // and the track-iteration below handles that gracefully (nothing extra is sent).
-      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+      const media = getMediaDevices()
+      if (!media) {
+        setState(s => ({ ...s, mediaError: INSECURE_MEDIA_MESSAGE }))
+        return
+      }
+      screenStream = await media.getDisplayMedia({ video: true, audio: true })
     } catch {
       return  // user cancelled or permission denied
     }
@@ -559,7 +574,12 @@ export function useVoiceChannel({ channelId, userId }: UseVoiceChannelOptions) {
     }
     let camStream: MediaStream
     try {
-      camStream = await navigator.mediaDevices.getUserMedia({ video: true })
+      const media = getMediaDevices()
+      if (!media) {
+        setState(s => ({ ...s, mediaError: INSECURE_MEDIA_MESSAGE }))
+        return
+      }
+      camStream = await media.getUserMedia({ video: true })
     } catch {
       return
     }
