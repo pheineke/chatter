@@ -44,6 +44,27 @@ container, set `ENVIRONMENT=production`, and mount `deploy/nginx-real-ip.conf`
 proxy *replaces* `X-Forwarded-For` rather than appending to it, and adds
 `Strict-Transport-Security`.
 
+### Behind a Cloudflare Tunnel instead of Caddy
+
+If `cloudflared` on the host already serves your domain (ingress
+`service: http://localhost:9090`), Cloudflare terminates TLS and you don't
+need the Caddy overlay. Use the tunnel overlay instead:
+
+```sh
+# .env
+COMPOSE_FILE=docker-compose.yml:docker-compose.cloudflared.yml
+```
+
+It does two things:
+
+- nginx takes the client IP from Cloudflare's `CF-Connecting-IP` header.
+  Without it every visitor arrives from the Docker gateway, so per-IP rate
+  limits apply to everyone at once, and a few bad logins from anyone lock
+  that username for all.
+- nginx is published on `127.0.0.1` only, so nobody can reach it around
+  Cloudflare (and forge that header). Use the domain from other devices
+  too; voice and encryption need HTTPS anyway.
+
 ## 3. First account
 
 With `REGISTRATION_MODE=invite`, the first account on an empty instance can

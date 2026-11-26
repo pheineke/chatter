@@ -1,0 +1,14 @@
+# Overlay for a deployment behind a Cloudflare Tunnel (cloudflared on the
+# host, ingress service http://localhost:<HTTP_PORT>). Use it with:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.cloudflared.yml   (in .env)
+# TLS is terminated by Cloudflare, so the Caddy overlay isn't needed.
+services:
+  frontend:
+    # Reachable from this machine only (cloudflared). That is what makes
+    # trusting CF-Connecting-IP safe (deploy/nginx-cloudflared.conf), and it
+    # stops LAN clients from bypassing Cloudflare. Use the public domain from
+    # other devices; it is HTTPS, which voice needs anyway.
+    ports: !override
+      - "127.0.0.1:${HTTP_PORT:-9090}:80"
+    volumes:
+      - ./deploy/nginx-cloudflared.conf:/etc/nginx/conf.d/00-real-ip.conf:ro
