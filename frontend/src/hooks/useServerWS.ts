@@ -211,8 +211,6 @@ export function useServerWS(serverId: string | null, currentChannelId?: string) 
         case 'server.member_kicked':
         case 'server.member_banned':
         case 'server.member_updated':
-        case 'role.assigned':
-        case 'role.removed':
           qc.invalidateQueries({ queryKey: ['members', serverId] })
           if (msg.type === 'server.member_kicked' || msg.type === 'server.member_banned') {
             const { user_id } = msg.data as { user_id: string }
